@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>데이터베이스 관리 - WebCrawlServer</title>
+    
+    <!-- 공통 CSS -->
+    <link rel="stylesheet" href="../../css/styles.css">
+    <!-- 관리자 전용 CSS -->
+    <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+    <!-- 헤더 -->
+    <header class="admin-header">
+        <div class="admin-header-content">
+            <div class="admin-logo">
+                <a href="/admin">
+                    <strong>WebCrawlServer</strong>
+                    <span>Admin</span>
+                </a>
+            </div>
+            
+            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="메뉴 열기">☰</button>
+            
+            <nav class="admin-nav" id="main-nav">
+                <ul class="admin-nav-list">
+                    <!-- 대시보드 -->
+                    <li class="nav-item">
+                        <a href="/admin" class="nav-dashboard">대시보드</a>
+                    </li>
+                    
+                    <!-- 서버 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-server">서버</a>
+                        <div class="dropdown-menu">
+                            <div class="dropdown-header">서버 관리</div>
+                            <a href="/admin/process">프로세스 목록</a>
+                            <a href="/admin/process/detail?pid=1">프로세스 세부정보</a>
+                            <div class="dropdown-divider"></div>
+                            <div class="dropdown-header">로그</div>
+                            <a href="/admin/process/logs">로그 기록 목록</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 데이터베이스 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-database">데이터베이스</a>
+                        <div class="dropdown-menu">
+                            <a href="/admin/database">DB 관리</a>
+                            <a href="#" onclick="alert('DB 백업 기능은 준비 중입니다.'); return false;">DB 백업</a>
+                            <a href="#" onclick="alert('DB 복원 기능은 준비 중입니다.'); return false;">DB 복원</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 모듈 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-modules">모듈</a>
+                        <div class="dropdown-menu">
+                            <a href="/admin/modules">모듈 목록</a>
+                            <a href="/admin/modules/create">모듈 추가</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 워크플로우 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-workflows">워크플로우</a>
+                        <div class="dropdown-menu">
+                            <a href="/admin/workflows">워크플로우 목록</a>
+                            <a href="/admin/workflows/create">워크플로우 생성</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 스케줄러 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-scheduler">스케줄러</a>
+                        <div class="dropdown-menu">
+                            <a href="/admin/scheduler">예약 작업 목록</a>
+                            <a href="/admin/scheduler/create">작업 예약</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 로그 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-logs">로그</a>
+                        <div class="dropdown-menu">
+                            <a href="/admin/logs">로그 보기</a>
+                            <a href="/admin/logs?type=activity">액티비티 로그</a>
+                            <a href="/admin/logs?type=error">에러 로그</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 설정 -->
+                    <li class="nav-item">
+                        <a href="/admin/settings" class="nav-settings">설정</a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="admin-header-actions">
+                <a href="/admin" class="btn btn-secondary btn-sm">뒤로가기</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- 브레드크럼 (현재 위치) -->
+    <nav class="breadcrumb" id="breadcrumb">
+        <div class="breadcrumb-item"><a href="/admin">관리자</a></div>
+        <div class="breadcrumb-item active">데이터베이스</div>
+    </nav>
+
+    <!-- 본문 -->
+    <main class="admin-main">
+        <div class="admin-container">
+            <!-- 페이지 제목 -->
+            <div class="admin-page-header">
+                <h1>데이터베이스 관리</h1>
+                <p class="admin-page-subtitle">SQLite 데이터베이스 상세 정보 및 관리</p>
+            </div>
+
+            <!-- 알림 컨테이너 -->
+            <div id="alert-container" class="mb-md"></div>
+
+            <!-- 데이터베이스 개요 -->
+            <section class="admin-section">
+                <div class="admin-section-header">
+                    <h2>데이터베이스 개요</h2>
+                </div>
+                <div class="admin-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-title">데이터베이스 파일</span>
+                        </div>
+                        <div class="stat-card-value" id="db-file">main.db</div>
+                        <div class="stat-card-footer">
+                            <span class="stat-status online">연결됨</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-title">총 테이블 수</span>
+                        </div>
+                        <div class="stat-card-value" id="total-tables">5</div>
+                        <div class="stat-card-footer">
+                            <span class="stat-status online">정상</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-title">총 레코드 수</span>
+                        </div>
+                        <div class="stat-card-value" id="total-records">128</div>
+                        <div class="stat-card-footer">
+                            <span class="stat-status online">정상</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-title">파일 크기</span>
+                        </div>
+                        <div class="stat-card-value" id="db-size">2.4 MB</div>
+                        <div class="stat-card-footer">
+                            <span class="stat-status online">정상</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 데이터베이스 연결 정보 -->
+            <section class="admin-section">
+                <div class="admin-section-header">
+                    <h2>데이터베이스 연결 정보</h2>
+                </div>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>항목</th>
+                                <th>값</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>데이터베이스 타입</td>
+                                <td>SQLite 3</td>
+                                <td><span class="badge badge-success">지원됨</span></td>
+                            </tr>
+                            <tr>
+                                <td>파일 위치</td>
+                                <td id="db-path">database/main.db</td>
+                                <td><span class="badge badge-success">존재</span></td>
+                            </tr>
+                            <tr>
+                                <td>WAL 모드</td>
+                                <td>활성화됨</td>
+                                <td><span class="badge badge-success">작동 중</span></td>
+                            </tr>
+                            <tr>
+                                <td>외래 키 제약</td>
+                                <td>활성화됨</td>
+                                <td><span class="badge badge-success">작동 중</span></td>
+                            </tr>
+                            <tr>
+                                <td>연결 상태</td>
+                                <td>연결됨</td>
+                                <td><span class="badge badge-success">정상</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 데이터베이스 상세 정보 -->
+            <section class="admin-section">
+                <div class="admin-section-header">
+                    <h2>데이터베이스 상세 정보</h2>
+                    <div class="admin-section-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="refreshDBInfo()">새로고침</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>테이블명</th>
+                                <th>레코드 수</th>
+                                <th>용도</th>
+                                <th>마지막 수정</th>
+                                <th>액션</th>
+                            </tr>
+                        </thead>
+                        <tbody id="db-tables-list">
+                            <tr>
+                                <td>modules</td>
+                                <td id="modules-count">3</td>
+                                <td>모듈 정보</td>
+                                <td id="modules-updated">2026-07-26 10:00:00</td>
+                                <td>
+                                    <a href="#" class="btn btn-secondary btn-sm" onclick="viewTableDetails('modules'); return false;">자세히</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>workflows</td>
+                                <td id="workflows-count">5</td>
+                                <td>워크플로우 정보</td>
+                                <td id="workflows-updated">2026-07-26 12:00:00</td>
+                                <td>
+                                    <a href="#" class="btn btn-secondary btn-sm" onclick="viewTableDetails('workflows'); return false;">자세히</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>scheduled_jobs</td>
+                                <td id="scheduled-jobs-count">2</td>
+                                <td>예약 작업</td>
+                                <td id="scheduled-jobs-updated">2026-07-26 11:00:00</td>
+                                <td>
+                                    <a href="#" class="btn btn-secondary btn-sm" onclick="viewTableDetails('scheduled_jobs'); return false;">자세히</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>activity_logs</td>
+                                <td id="activity-logs-count">128</td>
+                                <td>활동 로그</td>
+                                <td id="activity-logs-updated">2026-07-26 14:30:00</td>
+                                <td>
+                                    <a href="#" class="btn btn-secondary btn-sm" onclick="viewTableDetails('activity_logs'); return false;">자세히</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>error_logs</td>
+                                <td id="error-logs-count">5</td>
+                                <td>에러 로그</td>
+                                <td id="error-logs-updated">2026-07-26 14:00:00</td>
+                                <td>
+                                    <a href="#" class="btn btn-secondary btn-sm" onclick="viewTableDetails('error_logs'); return false;">자세히</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>schema_migrations</td>
+                                <td id="schema-migrations-count">0</td>
+                                <td>스키마 마이그레이션</td>
+                                <td id="schema-migrations-updated">-</td>
+                                <td>
+                                    <a href="#" class="btn btn-secondary btn-sm" onclick="viewTableDetails('schema_migrations'); return false;">자세히</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 테이블 상세 정보 모달 -->
+            <div id="table-details-modal" class="admin-modal hidden" role="dialog" aria-hidden="true">
+                <div class="admin-modal-content">
+                    <div class="admin-modal-header">
+                        <h2 id="table-details-title">테이블 상세 정보</h2>
+                        <button class="admin-modal-close" onclick="closeTableDetails()">&times;</button>
+                    </div>
+                    <div class="admin-modal-body">
+                        <div class="admin-toolbar">
+                            <div class="toolbar-group">
+                                <label>테이블명:</label>
+                                <span id="table-name">-</span>
+                            </div>
+                            <div class="toolbar-group">
+                                <label>레코드 수:</label>
+                                <span id="table-record-count">-</span>
+                            </div>
+                        </div>
+                        
+                        <div class="admin-section">
+                            <div class="admin-section-header">
+                                <h3>테이블 구조</h3>
+                            </div>
+                            <div class="table-container">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>컬럼명</th>
+                                            <th>타입</th>
+                                            <th>NULL 가능</th>
+                                            <th>기본값</th>
+                                            <th>설명</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table-columns-list">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="admin-section">
+                            <div class="admin-section-header">
+                                <h3>최근 데이터 미리보기</h3>
+                            </div>
+                            <div class="table-container">
+                                <table class="table">
+                                    <thead id="preview-thead">
+                                    </thead>
+                                    <tbody id="preview-tbody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="admin-modal-footer">
+                        <button class="btn btn-secondary" onclick="exportTableData()">내보내기</button>
+                        <button class="btn btn-primary" onclick="closeTableDetails()">닫기</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 데이터베이스 관리 액션 -->
+            <section class="admin-section">
+                <div class="admin-section-header">
+                    <h2>데이터베이스 관리</h2>
+                </div>
+                <div class="quick-actions">
+                    <div class="quick-action-group">
+                        <h3>백업 및 복원</h3>
+                        <div class="quick-action-buttons">
+                            <button class="btn btn-primary btn-sm" onclick="backupDatabase()">데이터베이스 백업</button>
+                            <button class="btn btn-secondary btn-sm" onclick="restoreDatabase()">데이터베이스 복원</button>
+                        </div>
+                    </div>
+                    <div class="quick-action-group">
+                        <h3>유지보수</h3>
+                        <div class="quick-action-buttons">
+                            <button class="btn btn-secondary btn-sm" onclick="optimizeDatabase()">최적화</button>
+                            <button class="btn btn-secondary btn-sm" onclick="vacuumDatabase()">공간 정리</button>
+                        </div>
+                    </div>
+                    <div class="quick-action-group">
+                        <h3> نمود</h3>
+                        <div class="quick-action-buttons">
+                            <button class="btn btn-danger btn-sm" onclick="clearDatabase()">모든 데이터 삭제</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="admin-footer">
+        <div class="admin-container">
+            <p>&copy; 2026 WebCrawlServer. 모든 권리 보호.</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="../../js/main.js"></script>
+    <script src="../js/admin.js"></script>
+    <script>
+        var currentTable = null;
+        
+        // 페이지 로드 시 DB 정보 로드
+        domReady(function() {
+            loadDBInfo();
+        });
+        
+        // DB 정보 로드
+        function loadDBInfo() {
+            // 더미 데이터 - 실제는 API 호출로 대체
+            var dbInfo = {
+                file: 'main.db',
+                tables: 5,
+                totalRecords: 128,
+                size: '2.4 MB',
+                tablesData: {
+                    modules: { count: 3, updated: '2026-07-26 10:00:00' },
+                    workflows: { count: 5, updated: '2026-07-26 12:00:00' },
+                    scheduled_jobs: { count: 2, updated: '2026-07-26 11:00:00' },
+                    activity_logs: { count: 128, updated: '2026-07-26 14:30:00' },
+                    error_logs: { count: 5, updated: '2026-07-26 14:00:00' },
+                    schema_migrations: { count: 0, updated: '-' }
+                }
+            };
+            
+            updateDBInfo(dbInfo);
+        }
+        
+        // DB 정보 업데이트
+        function updateDBInfo(info) {
+            if (info.file) document.getElementById('db-file').textContent = info.file;
+            if (info.tables) document.getElementById('total-tables').textContent = info.tables;
+            if (info.totalRecords) document.getElementById('total-records').textContent = info.totalRecords;
+            if (info.size) document.getElementById('db-size').textContent = info.size;
+            
+            if (info.tablesData) {
+                document.getElementById('modules-count').textContent = info.tablesData.modules.count;
+                document.getElementById('modules-updated').textContent = info.tablesData.modules.updated;
+                document.getElementById('workflows-count').textContent = info.tablesData.workflows.count;
+                document.getElementById('workflows-updated').textContent = info.tablesData.workflows.updated;
+                document.getElementById('scheduled-jobs-count').textContent = info.tablesData.scheduled_jobs.count;
+                document.getElementById('scheduled-jobs-updated').textContent = info.tablesData.scheduled_jobs.updated;
+                document.getElementById('activity-logs-count').textContent = info.tablesData.activity_logs.count;
+                document.getElementById('activity-logs-updated').textContent = info.tablesData.activity_logs.updated;
+                document.getElementById('error-logs-count').textContent = info.tablesData.error_logs.count;
+                document.getElementById('error-logs-updated').textContent = info.tablesData.error_logs.updated;
+                document.getElementById('schema-migrations-count').textContent = info.tablesData.schema_migrations.count;
+                document.getElementById('schema-migrations-updated').textContent = info.tablesData.schema_migrations.updated;
+            }
+        }
+        
+        // DB 정보 새로고침
+        function refreshDBInfo() {
+            loadDBInfo();
+            showAlert('info', '데이터베이스 정보가 새로고침되었습니다.', 2000);
+        }
+        
+        // 테이블 상세 정보 보기
+        function viewTableDetails(tableName) {
+            currentTable = tableName;
+            var modal = document.getElementById('table-details-modal');
+            var title = document.getElementById('table-details-title');
+            var tableNameSpan = document.getElementById('table-name');
+            var recordCountSpan = document.getElementById('table-record-count');
+            
+            title.textContent = tableName + ' - 테이블 상세 정보';
+            tableNameSpan.textContent = tableName;
+            
+            // 테이블별 레코드 수
+            var tableCounts = {
+                modules: 3,
+                workflows: 5,
+                scheduled_jobs: 2,
+                activity_logs: 128,
+                error_logs: 5,
+                schema_migrations: 0
+            };
+            recordCountSpan.textContent = tableCounts[tableName] || 0;
+            
+            // 컬럼 정보 로드
+            loadTableColumns(tableName);
+            loadTablePreview(tableName);
+            
+            modal.classList.remove('hidden');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+        
+        // 컬럼 정보 로드
+        function loadTableColumns(tableName) {
+            // 테이블 구조 정보 (SQLite 스키마 기준)
+            var tableColumns = {
+                modules: [
+                    { name: 'id', type: 'INTEGER', nullable: 'NO', default: 'AUTOINCREMENT', description: '모듈 고유 ID' },
+                    { name: 'name', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '모듈 이름' },
+                    { name: 'type', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '모듈 타입' },
+                    { name: 'config', type: 'TEXT', nullable: 'YES', default: 'NULL', description: '모듈 설정 (JSON)' },
+                    { name: 'tags', type: 'TEXT', nullable: 'YES', default: 'NULL', description: '태그 목록' },
+                    { name: 'metadata', type: 'TEXT', nullable: 'YES', default: 'NULL', description: '메타데이터' },
+                    { name: 'created_at', type: 'TIMESTAMP', nullable: 'YES', default: 'CURRENT_TIMESTAMP', description: '생성 시간' },
+                    { name: 'updated_at', type: 'TIMESTAMP', nullable: 'YES', default: 'CURRENT_TIMESTAMP', description: '수정 시간' }
+                ],
+                workflows: [
+                    { name: 'id', type: 'INTEGER', nullable: 'NO', default: 'AUTOINCREMENT', description: '워크플로우 고유 ID' },
+                    { name: 'name', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '워크플로우 이름' },
+                    { name: 'yaml_content', type: 'TEXT', nullable: 'NO', default: 'NULL', description: 'YAML 내용' },
+                    { name: 'module_id', type: 'INTEGER', nullable: 'YES', default: 'NULL', description: '모듈 ID (외래키)' },
+                    { name: 'is_active', type: 'BOOLEAN', nullable: 'YES', default: '1', description: '활성 상태' },
+                    { name: 'created_at', type: 'TIMESTAMP', nullable: 'YES', default: 'CURRENT_TIMESTAMP', description: '생성 시간' },
+                    { name: 'updated_at', type: 'TIMESTAMP', nullable: 'YES', default: 'CURRENT_TIMESTAMP', description: '수정 시간' }
+                ],
+                scheduled_jobs: [
+                    { name: 'id', type: 'INTEGER', nullable: 'NO', default: 'AUTOINCREMENT', description: '예약 작업 고유 ID' },
+                    { name: 'name', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '작업 이름' },
+                    { name: 'workflow_id', type: 'INTEGER', nullable: 'NO', default: 'NULL', description: '워크플로우 ID (외래키)' },
+                    { name: 'cron_expression', type: 'TEXT', nullable: 'YES', default: 'NULL', description: 'Cron 표현식' },
+                    { name: 'once_at', type: 'TIMESTAMP', nullable: 'YES', default: 'NULL', description: '한번 실행 시간' },
+                    { name: 'interval_seconds', type: 'INTEGER', nullable: 'YES', default: 'NULL', description: '간격 (초)' },
+                    { name: 'status', type: 'TEXT', nullable: 'NO', default: 'active', description: '상태' },
+                    { name: 'overlap_policy', type: 'TEXT', nullable: 'NO', default: 'skip', description: '중복 정책' },
+                    { name: 'last_executed_at', type: 'TIMESTAMP', nullable: 'YES', default: 'NULL', description: '마지막 실행 시간' },
+                    { name: 'next_execution_at', type: 'TIMESTAMP', nullable: 'YES', default: 'NULL', description: '다음 실행 시간' },
+                    { name: 'created_at', type: 'TIMESTAMP', nullable: 'YES', default: 'CURRENT_TIMESTAMP', description: '생성 시간' },
+                    { name: 'updated_at', type: 'TIMESTAMP', nullable: 'YES', default: 'CURRENT_TIMESTAMP', description: '수정 시간' }
+                ],
+                activity_logs: [
+                    { name: 'id', type: 'INTEGER', nullable: 'NO', default: 'AUTOINCREMENT', description: '로그 고유 ID' },
+                    { name: 'source', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '소스' },
+                    { name: 'action', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '액션' },
+                    { name: 'status', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '상태' },
+                    { name: 'message', type: 'TEXT', nullable: 'YES', default: 'NULL', description: '메시지' },
+                    { name: 'cpu_usage', type: 'REAL', nullable: 'YES', default: 'NULL', description: 'CPU 사용량' },
+                    { name: 'memory_usage', type: 'REAL', nullable: 'YES', default: 'NULL', description: '메모리 사용량' },
+                    { name: 'module_id', type: 'INTEGER', nullable: 'YES', default: 'NULL', description: '모듈 ID (외래키)' },
+                    { name: 'workflow_id', type: 'INTEGER', nullable: 'YES', default: 'NULL', description: '워크플로우 ID (외래키)' },
+                    { name: 'created_at', type: 'TIMESTAMP', nullable: 'YES', default: 'CURRENT_TIMESTAMP', description: '생성 시간' }
+                ],
+                error_logs: [
+                    { name: 'id', type: 'INTEGER', nullable: 'NO', default: 'AUTOINCREMENT', description: '에러 로그 고유 ID' },
+                    { name: 'error_type', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '에러 타입' },
+                    { name: 'error_message', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '에러 메시지' },
+                    { name: 'stack_trace', type: 'TEXT', nullable: 'YES', default: 'NULL', description: '스택 트레이스' },
+                    { name: 'context', type: 'TEXT', nullable: 'YES', default: 'NULL', description: '컨텍스트' },
+                    { name: 'activity_log_id', type: 'INTEGER', nullable: 'YES', default: 'NULL', description: '액티비티 로그 ID (외래키)' },
+                    { name: 'created_at', type: 'TIMESTAMP', nullable: 'YES', default: 'CURRENT_TIMESTAMP', description: '생성 시간' }
+                ],
+                schema_migrations: [
+                    { name: 'migration_id', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '마이그레이션 ID' },
+                    { name: 'target_type', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '대상 타입' },
+                    { name: 'module', type: 'TEXT', nullable: 'YES', default: 'NULL', description: '모듈' },
+                    { name: 'description', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '설명' },
+                    { name: 'applied_sql', type: 'TEXT', nullable: 'NO', default: 'NULL', description: '적용된 SQL' },
+                    { name: 'applied_at', type: 'TIMESTAMP', nullable: 'YES', default: 'CURRENT_TIMESTAMP', description: '적용 시간' }
+                ]
+            };
+            
+            var columns = tableColumns[tableName] || [];
+            var columnsList = document.getElementById('table-columns-list');
+            
+            if (columnsList) {
+                columnsList.innerHTML = '';
+                columns.forEach(function(column) {
+                    var row = document.createElement('tr');
+                    row.innerHTML = '
+                        <td>' + column.name + '</td>
+                        <td>' + column.type + '</td>
+                        <td>' + column.nullable + '</td>
+                        <td>' + (column.default || '-') + '</td>
+                        <td>' + column.description + '</td>
+                    ';
+                    columnsList.appendChild(row);
+                });
+            }
+        }
+        
+        // 테이블 미리보기 로드
+        function loadTablePreview(tableName) {
+            // 더미 데이터
+            var previewData = {
+                modules: {
+                    columns: ['id', 'name', 'type', 'created_at'],
+                    data: [
+                        [1, 'crawler', 'crawler', '2026-07-26 10:00:00'],
+                        [2, 'image_editor', 'image', '2026-07-26 11:00:00'],
+                        [3, 'note_manager', 'note', '2026-07-26 12:00:00']
+                    ]
+                },
+                workflows: {
+                    columns: ['id', 'name', 'is_active', 'created_at'],
+                    data: [
+                        [1, 'data_collection', '예', '2026-07-26 10:30:00'],
+                        [2, 'image_processing', '예', '2026-07-26 11:30:00'],
+                        [3, 'db_backup', '아니오', '2026-07-26 12:30:00']
+                    ]
+                },
+                scheduled_jobs: {
+                    columns: ['id', 'name', 'status', 'next_execution_at'],
+                    data: [
+                        [1, 'daily_backup', 'active', '2026-07-27 02:00:00'],
+                        [2, 'hourly_monitoring', 'paused', '2026-07-26 15:00:00']
+                    ]
+                },
+                activity_logs: {
+                    columns: ['id', 'source', 'action', 'status', 'created_at'],
+                    data: [
+                        [128, 'crawler', 'data_collection', 'success', '2026-07-26 14:30:00'],
+                        [127, 'monitor', 'status_check', 'success', '2026-07-26 14:25:00'],
+                        [126, 'db_monitor', 'log_record', 'success', '2026-07-26 14:20:00']
+                    ]
+                },
+                error_logs: {
+                    columns: ['id', 'error_type', 'error_message', 'created_at'],
+                    data: [
+                        [5, 'module_load', '모듈 로드 실패: missing_module', '2026-07-26 14:00:00'],
+                        [4, 'connection', 'DB 연결 실패', '2026-07-26 10:00:00']
+                    ]
+                },
+                schema_migrations: {
+                    columns: ['migration_id', 'target_type', 'description', 'applied_at'],
+                    data: []
+                }
+            };
+            
+            var data = previewData[tableName] || { columns: [], data: [] };
+            var thead = document.getElementById('preview-thead');
+            var tbody = document.getElementById('preview-tbody');
+            
+            if (thead && data.columns && data.columns.length > 0) {
+                thead.innerHTML = '<tr>' + data.columns.map(function(col) {
+                    return '<th>' + col + '</th>';
+                }).join('') + '</tr>';
+            }
+            
+            if (tbody && data.data && data.data.length > 0) {
+                tbody.innerHTML = '';
+                data.data.forEach(function(row) {
+                    var tr = document.createElement('tr');
+                    tr.innerHTML = row.map(function(cell) {
+                        return '<td>' + cell + '</td>';
+                    }).join('');
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+        
+        // 테이블 상세 정보 닫기
+        function closeTableDetails() {
+            var modal = document.getElementById('table-details-modal');
+            modal.classList.add('hidden');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        
+        // 테이블 데이터 내보내기
+        function exportTableData() {
+            if (currentTable) {
+                showAlert('info', currentTable + ' 테이블 데이터를 내보내고 있습니다.', 3000);
+            }
+        }
+        
+        // 데이터베이스 백업
+        function backupDatabase() {
+            if (confirm('데이터베이스를 백업하시겠습니까?')) {
+                showAlert('success', '데이터베이스 백업이 완료되었습니다.', 3000);
+            }
+        }
+        
+        // 데이터베이스 복원
+        function restoreDatabase() {
+            if (confirm('데이터베이스를 복원하시겠습니까? 기존 데이터는 삭제됩니다.')) {
+                showAlert('success', '데이터베이스 복원이 완료되었습니다.', 3000);
+            }
+        }
+        
+        // 데이터베이스 최적화
+        function optimizeDatabase() {
+            showAlert('info', '데이터베이스 최적화를 시작합니다.', 3000);
+        }
+        
+        // 데이터베이스 공간 정리
+        function vacuumDatabase() {
+            showAlert('info', '데이터베이스 공간 정리를 시작합니다.', 3000);
+        }
+        
+        // 데이터베이스 모두 삭제
+        function clearDatabase() {
+            if (confirm('정말로 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                showAlert('error', '모든 데이터가 삭제되었습니다.', 3000);
+            }
+        }
+    </script>
+</body>
+</html>

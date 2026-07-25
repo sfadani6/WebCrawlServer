@@ -1,0 +1,185 @@
+{
+    // ===================================================================
+    // === 워크스페이스에 포함할 폴더 목록
+    // ===================================================================
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    // ===================================================================
+    // === 프로젝트 공통 설정 (Settings)
+    // ===================================================================
+    "settings": {
+        "sftp.configPath": ".vscode/sftp.json",
+        "window.title": "🟨 WebCrawlServer",
+
+        // ---------------------------------------------------
+        // --- 편집기 & 포맷팅 설정
+        // ---------------------------------------------------
+        "editor.tabSize": 4,
+        "editor.wordWrap": "on",
+        "editor.formatOnSave": false,
+
+        "[json]": {
+            "editor.formatOnSave": false
+        },
+        "[jsonc]": {
+            "editor.formatOnSave": false
+        },
+
+        // --- 개인 UI 취향 설정 ---
+        "workbench.colorCustomizations": {
+            "activityBar.background": "#2c3e50"
+        },
+        "terminal.integrated.cursorStyle": "line",
+        "terminal.integrated.cursorBlinking": true,
+
+        // --- SFTP 확장 프로그램 설정 ---
+        "sftp.downloadWhenOpenInRemoteExplorer": true,
+
+        // --- 포맷터 및 린터 설정 ---
+        "[javascript]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[typescript]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+
+        "eslint.validate": [
+            "javascript",
+            "javascriptreact",
+            "typescript",
+            "typescriptreact",
+            "json"
+        ],
+
+        // VSCODE 소리 볼륨 설정
+        "accessibility.signalOptions.volume": 0,
+
+        // ★ [수정됨] DB 연결 관련 설정 키 추가 (예: SQLTools 커넥션 설정인 경우)
+        "sqltools.connections": [
+            {
+                "pgOptions": {
+                    "ssl": {
+                        "rejectUnauthorized": true
+                    }
+                },
+                "ssh": "Disabled",
+                "previewLimit": 50,
+                "server": "tired-newfie-16312.jxf.gcp-us-west2.cockroachlabs.cloud",
+                "port": 26257,
+                "sshOptions": {
+                    "port": 22
+                },
+                "name": "CockroachDB",
+                "driver": "PostgreSQL",
+                "database": "defaultdb",
+                "username": "sam",
+                "password": "TwOxuhrbako0_WCzHfu6bg",
+                "ssl": {
+                    "require": true,
+                    "rejectUnauthorized": true,
+                    "ca": "E:\\up\\0-project\\0-ssh\\cockroachlabs.crt"
+                }
+            }
+        ],
+
+        "liveServer.settings.AdvanceCustomBrowserCmdLine": "C:\\APPS\\thorium_AVX2\\BIN\\thorium.exe --user-data-dir=C:\\APPS\\thorium_AVX2\\USER_DATA\\Profile 1 --allow-outdated-plugins --disable-logging --disable-breakpad --disable-encryption --disable-machine-id",
+
+        // ---------------------------------------------------
+        // --- 파일 탐색기 설정
+        // ---------------------------------------------------
+        "files.exclude": {
+            "**/.git": false,
+            "**/.DS_Store": true,
+            "apps/**/.git": false,
+            "**/.system_generated": true,
+            "node_modules": true,
+            "**/node_modules": true
+        },
+
+        // ---------------------------------------------------
+        // --- Cline 워크스페이스 전용 설정
+        // ---------------------------------------------------
+        "cline.enable": true,
+        "cline.scope": "workspace",
+        "cline.logPath": "${workspaceFolder}/.cline/logs",
+        "cline.saveConversations": true,
+        "cline.allowRead": true,
+        "cline.allowEdit": true,
+        "cline.autoApprove": false,
+        "cline.executeSafeCommands": true,
+
+        // ---------------------------------------------------
+        // --- Codex 워크스페이스 전용 설정
+        // ---------------------------------------------------
+        "codex.workspaceFolder": "${workspaceFolder}",
+        "codex.historyPath": "${workspaceFolder}/.codex",
+        "codex.enableTerminalAccess": true,
+        "codex.enableFileAccess": true,
+
+        // ---------------------------------------------------
+        // --- 터미널 및 프로필 설정
+        // ---------------------------------------------------
+        "terminal.integrated.tabs.hideCondition": "never",
+        "terminal.integrated.tabs.enabled": true,
+
+        "terminal.integrated.profiles.windows": {
+            "WSL-Rocky-9": {
+                "path": "wsl.exe",
+                "args": ["-d", "Rocky-9"],
+                "icon": "terminal-linux"
+            },
+            "PowerShell 7.5.5": {
+                "source": "PowerShell",
+                "terminal.integrated.tabs.title": "ps755",
+                "args": [
+                    "-NoExit",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "E:\\up\\0-project\\git\\xtx9999\\sfscript\\ps\\vscodepsenv.ps1"
+                ],
+                "icon": "server"
+            },
+            "default Terminal": {
+                "path": "C:\\Program Files\\PowerShell\\7.6.1\\pwsh.exe",
+                "terminal.integrated.tabs.title": "ps761",
+                "args": [
+                    "-NoExit",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    "E:\\up\\0-project\\git\\xtx9999\\sfscript\\ps\\vscodepsenv.ps1"
+                ],
+                "icon": "terminal-powershell"
+            },
+            "Git Bash": {
+                "path": "C:/APPS/Git-2/bin/bash.exe",
+                "icon": "github",
+                "cwd": "${workspaceFolder}",
+                "args": [
+                    "--rcfile",
+                    "script/vscode_gitbash_init.sh"
+                ]
+            },
+            "GCP-Server": {
+                "terminal.integrated.tabs.title": "GCP-Server",
+                "path": "ssh",
+                "args": [
+                    "-i", "E:/up/0-project/0-ssh/gcp-key",
+                    "xtx9999@8.231.208.180"
+                ],
+                "icon": "terminal-linux",
+                "cwd": "${workspaceFolder}"
+            }
+        },
+
+        "terminal.integrated.defaultProfile.windows": "default Terminal",
+        "terminal.integrated.env.windows": {
+            "CODEX_HOME": "${workspaceFolder}\\.codex"
+        },
+        "terminal.integrated.cwd": "${workspaceFolder}"
+    }
+}

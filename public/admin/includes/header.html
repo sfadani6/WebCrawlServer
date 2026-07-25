@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebCrawlServer - 관리자</title>
+    
+    <!-- 공통 CSS -->
+    <link rel="stylesheet" href="../../css/styles.css">
+    <!-- 관리자 전용 CSS -->
+    <link rel="stylesheet" href="../css/admin.css">
+    <style>
+        /* 드롭다운 메뉴 스타일 */
+        .nav-item {
+            position: relative;
+        }
+        
+        .nav-item > a {
+            display: block;
+            padding: var(--spacing-sm) var(--spacing-md);
+            color: var(--color-gray-3);
+            text-decoration: none;
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            border-radius: var(--radius-md);
+            transition: background-color var(--transition-fast), color var(--transition-fast);
+            white-space: nowrap;
+        }
+        
+        .nav-item > a:hover {
+            background-color: var(--color-dark-3);
+            color: var(--color-white);
+        }
+        
+        .nav-item > a.active {
+            background-color: var(--color-dark-4);
+            color: var(--color-white);
+        }
+        
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: var(--color-dark-2);
+            border: 1px solid var(--color-dark-3);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            min-width: 200px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all var(--transition-fast);
+        }
+        
+        .nav-item:hover .dropdown-menu,
+        .nav-item.open .dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        
+        .dropdown-menu a {
+            display: block;
+            padding: var(--spacing-sm) var(--spacing-md);
+            color: var(--color-gray-3);
+            text-decoration: none;
+            font-size: var(--font-size-sm);
+            border-radius: var(--radius-md);
+            transition: background-color var(--transition-fast), color var(--transition-fast);
+            white-space: nowrap;
+        }
+        
+        .dropdown-menu a:hover {
+            background-color: var(--color-dark-3);
+            color: var(--color-white);
+        }
+        
+        .dropdown-menu a.active {
+            background-color: var(--color-dark-4);
+            color: var(--color-white);
+        }
+        
+        .dropdown-divider {
+            height: 1px;
+            background-color: var(--color-dark-3);
+            margin: var(--spacing-xs) 0;
+        }
+        
+        .dropdown-header {
+            padding: var(--spacing-sm) var(--spacing-md);
+            color: var(--color-gray-2);
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        /* 브레드크럼 (현재 위치 표시) */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-sm) var(--spacing-lg);
+            background-color: var(--color-dark-1);
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-sm);
+            color: var(--color-gray-3);
+            overflow-x: auto;
+        }
+        
+        .breadcrumb-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+        
+        .breadcrumb-item:not(:last-child)::after {
+            content: '/';
+            color: var(--color-gray-1);
+        }
+        
+        .breadcrumb-item.active {
+            color: var(--color-white);
+            font-weight: 500;
+        }
+        
+        /* 모바일 메뉴 토글 */
+        .mobile-menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--color-light);
+            font-size: var(--font-size-xl);
+            cursor: pointer;
+            padding: var(--spacing-xs);
+        }
+        
+        @media (max-width: 992px) {
+            .mobile-menu-toggle {
+                display: block;
+            }
+            
+            .admin-nav {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background-color: var(--color-dark-1);
+                border-top: 1px solid var(--color-dark-3);
+                max-height: 0;
+                overflow: hidden;
+                transition: max-height var(--transition-normal);
+            }
+            
+            .admin-nav.open {
+                max-height: 500px;
+            }
+            
+            .admin-nav-list {
+                display: flex;
+                flex-direction: column;
+                gap: var(--spacing-xs);
+            }
+            
+            .nav-item > a {
+                padding: var(--spacing-sm) var(--spacing-md);
+            }
+            
+            .dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: visible;
+                transform: none;
+                box-shadow: none;
+                border: none;
+                display: none;
+                background-color: var(--color-dark-2);
+            }
+            
+            .nav-item:hover .dropdown-menu,
+            .nav-item.open .dropdown-menu {
+                display: block;
+                padding-left: var(--spacing-md);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 헤더 -->
+    <header class="admin-header">
+        <div class="admin-header-content">
+            <div class="admin-logo">
+                <a href="/admin">
+                    <strong>WebCrawlServer</strong>
+                    <span>Admin</span>
+                </a>
+            </div>
+            
+            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="메뉴 열기">☰</button>
+            
+            <nav class="admin-nav" id="main-nav">
+                <ul class="admin-nav-list">
+                    <!-- 대시보드 -->
+                    <li class="nav-item">
+                        <a href="/admin" class="nav-dashboard">대시보드</a>
+                    </li>
+                    
+                    <!-- 서버 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-server">서버</a>
+                        <div class="dropdown-menu">
+                            <div class="dropdown-header">서버 관리</div>
+                            <a href="/admin/process">프로세스 목록</a>
+                            <a href="/admin/process/detail?pid=1">프로세스 세부정보</a>
+                            <div class="dropdown-divider"></div>
+                            <div class="dropdown-header">로그</div>
+                            <a href="/admin/process/logs">로그 기록 목록</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 데이터베이스 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-database">데이터베이스</a>
+                        <div class="dropdown-menu">
+                            <a href="/admin/database">DB 관리</a>
+                            <a href="#" onclick="alert('DB 백업 기능은 준비 중입니다.'); return false;">DB 백업</a>
+                            <a href="#" onclick="alert('DB 복원 기능은 준비 중입니다.'); return false;">DB 복원</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 모듈 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-modules">모듈</a>
+                        <div class="dropdown-menu">
+                            <a href="/admin/modules">모듈 목록</a>
+                            <a href="/admin/modules/create">모듈 추가</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 워크플로우 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-workflows">워크플로우</a>
+                        <div class="dropdown-menu">
+                            <a href="/admin/workflows">워크플로우 목록</a>
+                            <a href="/admin/workflows/create">워크플로우 생성</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 스케줄러 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-scheduler">스케줄러</a>
+                        <div class="dropdown-menu">
+                            <a href="/admin/scheduler">예약 작업 목록</a>
+                            <a href="/admin/scheduler/create">작업 예약</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 로그 메뉴 (드롭다운) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-logs">로그</a>
+                        <div class="dropdown-menu">
+                            <a href="/admin/logs">로그 보기</a>
+                            <a href="/admin/logs?type=activity">액티비티 로그</a>
+                            <a href="/admin/logs?type=error">에러 로그</a>
+                        </div>
+                    </li>
+                    
+                    <!-- 설정 -->
+                    <li class="nav-item">
+                        <a href="/admin/settings" class="nav-settings">설정</a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="admin-header-actions">
+                <a href="/" class="btn btn-secondary btn-sm">메인 페이지</a>
+                <button class="btn btn-secondary btn-sm">도움말</button>
+                <button class="btn btn-secondary btn-sm">로그아웃</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 브레드크럼 (현재 위치) -->
+    <nav class="breadcrumb" id="breadcrumb">
+        <div class="breadcrumb-item">
+            <a href="/admin">관리자</a>
+        </div>
+        <div class="breadcrumb-item active" id="current-page">대시보드</div>
+    </nav>
+
+    <script>
+        // 현재 페이지 감지 및 메뉴 활성화
+        function initializeNavigation() {
+            var currentPath = window.location.pathname;
+            var currentPage = document.getElementById('current-page');
+            
+            // 모든 네비게이션 링크 가져오기
+            var navLinks = document.querySelectorAll('.nav-item > a, .dropdown-menu a');
+            
+            // 현재 페이지와 일치하는 메뉴 찾기
+            navLinks.forEach(function(link) {
+                var linkPath = link.getAttribute('href');
+                if (linkPath && linkPath !== '#' && !linkPath.startsWith('javascript:')) {
+                    // 경로 비교 (쿼리 스트링 무시)
+                    var linkPathWithoutQuery = linkPath.split('?')[0];
+                    var currentPathWithoutQuery = currentPath.split('?')[0];
+                    
+                    if (currentPathWithoutQuery.endsWith(linkPathWithoutQuery)) {
+                        link.classList.add('active');
+                        
+                        // 브레드크럼 업데이트
+                        if (currentPage) {
+                            var pageName = link.textContent.trim();
+                            currentPage.textContent = pageName;
+                        }
+                        
+                        // 부모 네비게이션 아이템도 열기
+                        var parentItem = link.closest('.nav-item');
+                        if (parentItem) {
+                            parentItem.classList.add('open');
+                            var parentLink = parentItem.querySelector('> a');
+                            if (parentLink) {
+                                parentLink.classList.add('active');
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 모양 색상 적용
+            var pathParts = currentPath.split('/').filter(Boolean);
+            if (pathParts.length > 0) {
+                updateBreadcrumb(pathParts);
+            }
+        }
+        
+        // 브레드크럼 업데이트
+        function updateBreadcrumb(parts) {
+            var breadcrumb = document.getElementById('breadcrumb');
+            var currentPage = document.getElementById('current-page');
+            
+            if (!breadcrumb || !currentPage) return;
+            
+            // 기본 브레드크럼
+            var menuNames = {
+                'admin': '관리자',
+                'process': '서버 프로세스',
+                'detail': '세부 정보',
+                'logs': '로그 기록',
+                'database': '데이터베이스',
+                'modules': '모듈',
+                'workflows': '워크플로우',
+                'scheduler': '스케줄러',
+                'settings': '설정'
+            };
+            
+            // 브레드크럼 재구성
+            var html = '<div class="breadcrumb-item"><a href="/admin">관리자</a></div>';
+            var path = '/' + parts.join('/');
+            var accumulatedPath = '/admin';
+            
+            for (var i = 0; i < parts.length; i++) {
+                var part = parts[i];
+                accumulatedPath += '/' + part;
+                var displayName = menuNames[part] || part;
+                
+                if (i < parts.length - 1) {
+                    html += '<div class="breadcrumb-item"><a href="' + accumulatedPath + '">' + displayName + '</a></div>';
+                } else {
+                    html += '<div class="breadcrumb-item active">' + displayName + '</div>';
+                }
+            }
+            
+            breadcrumb.innerHTML = html;
+        }
+        
+        // 모바일 메뉴 토글
+        function toggleMobileMenu() {
+            var nav = document.getElementById('main-nav');
+            nav.classList.toggle('open');
+        }
+        
+        // DOM Ready 시 초기화
+        domReady(function() {
+            initializeNavigation();
+        });
+    </script>

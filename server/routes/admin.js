@@ -34,10 +34,7 @@ router.get('/process/logs', (req, res) => {
     res.sendFile(path.join(ADMIN_DIR, 'process/logs/index.html'));
 });
 
-// 데이터베이스 관리 (GET /admin/database)
-router.get('/database', (req, res) => {
-    res.sendFile(path.join(ADMIN_DIR, 'database/index.html'));
-});
+// 데이터베이스 관리 라우트는 app.js에서 /admin/database로 별도 마운트됨 (adminUi.js 사용)
 
 // 모듈 관리 (미구현)
 router.get('/modules', (req, res) => {

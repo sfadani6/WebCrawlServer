@@ -18,6 +18,7 @@ const fs               = require('fs-extra');
 const { DB_PATH }      = require('./db/helper');
 const createApiRouter  = require('./routes/api');
 const adminRouter      = require('./routes/admin');
+const adminDbRouter    = require('./routes/adminDb');
 
 // === Express 앱 설정 ===
 const app    = express();
@@ -56,7 +57,11 @@ app.get('/', (req, res) => {
 });
 
 // === 관리자 페이지 라우터 마운트 (server/routes/admin.js) ===
+// 주의: /admin/database는 반드시 /admin보다 먼저 등록해야 라우트 섀도잉이 발생하지 않음
+app.use('/admin/database', require('./routes/adminUi'));
+app.use('/admin/api', adminDbRouter);
 app.use('/admin', adminRouter);
+app.use('/api/nlp', require('./routes/nlp'));
 
 // === WebSocket 메시지 처리 (MCP 프로토콜) ===
 // R-004 (mcp.md) 1장: 메시지 헤더 필수 필드 참조

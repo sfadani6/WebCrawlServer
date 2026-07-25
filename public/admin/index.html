@@ -4,308 +4,126 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebCrawlServer - 관리자 대시보드</title>
-    
-    <!-- 공통 CSS -->
     <link rel="stylesheet" href="../css/styles.css">
-    <!-- 관리자 전용 CSS -->
     <link rel="stylesheet" href="css/admin.css">
 </head>
-<body>
-    <!-- 헤더 -->
-    <header class="admin-header">
-        <div class="admin-header-content">
-            <div class="admin-logo">
-                <a href="/admin">
-                    <strong>WebCrawlServer</strong>
-                    <span>Admin</span>
-                </a>
-            </div>
-            
-            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="메뉴 열기">☰</button>
-            
-            <nav class="admin-nav" id="main-nav">
-                <ul class="admin-nav-list">
-                    <!-- 대시보드 -->
-                    <li class="nav-item">
-                        <a href="/admin" class="nav-dashboard">대시보드</a>
-                    </li>
-                    
-                    <!-- 서버 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-server">서버</a>
-                        <div class="dropdown-menu">
-                            <div class="dropdown-header">서버 관리</div>
-                            <a href="/admin/process">프로세스 목록</a>
-                            <a href="/admin/process/detail?pid=1">프로세스 세부정보</a>
-                            <div class="dropdown-divider"></div>
-                            <div class="dropdown-header">로그</div>
-                            <a href="/admin/process/logs">로그 기록 목록</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 데이터베이스 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-database">데이터베이스</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/database">DB 관리</a>
-                            <a href="#" onclick="alert('DB 백업 기능은 준비 중입니다.'); return false;">DB 백업</a>
-                            <a href="#" onclick="alert('DB 복원 기능은 준비 중입니다.'); return false;">DB 복원</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 모듈 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-modules">모듈</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/modules">모듈 목록</a>
-                            <a href="/admin/modules/create">모듈 추가</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 워크플로우 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-workflows">워크플로우</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/workflows">워크플로우 목록</a>
-                            <a href="/admin/workflows/create">워크플로우 생성</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 스케줄러 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-scheduler">스케줄러</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/scheduler">예약 작업 목록</a>
-                            <a href="/admin/scheduler/create">작업 예약</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 로그 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-logs">로그</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/logs">로그 보기</a>
-                            <a href="/admin/logs?type=activity">액티비티 로그</a>
-                            <a href="/admin/logs?type=error">에러 로그</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 설정 -->
-                    <li class="nav-item">
-                        <a href="/admin/settings" class="nav-settings">설정</a>
-                    </li>
-                </ul>
-            </nav>
-            
-            <div class="admin-header-actions">
-                <a href="/" class="btn btn-secondary btn-sm">메인 페이지</a>
-                <button class="btn btn-secondary btn-sm">도움말</button>
-                <button class="btn btn-secondary btn-sm">로그아웃</button>
-            </div>
+<body class="admin-console-body">
+    <header class="console-topbar">
+        <div class="console-brand">
+            <button class="console-icon-button mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="관리 메뉴 열기">☰</button>
+            <a href="/admin" class="console-logo" aria-label="관리자 대시보드로 이동">
+                <span class="console-logo-mark">W</span>
+                <span class="console-logo-text">WebCrawlServer</span>
+            </a>
+        </div>
+        <form class="console-search" role="search">
+            <label class="sr-only" for="adminSearch">관리 기능 검색</label>
+            <input id="adminSearch" type="search" placeholder="관리 기능, 로그, 프로세스 검색">
+        </form>
+        <div class="console-topbar-actions">
+            <a href="/" class="btn btn-secondary btn-sm">메인</a>
+            <button class="console-icon-button" type="button" aria-label="도움말">?</button>
+            <button class="console-avatar" type="button" aria-label="관리자 계정">관</button>
         </div>
     </header>
 
-    <!-- 브레드크럼 (현재 위치) -->
-    <nav class="breadcrumb" id="breadcrumb">
-        <div class="breadcrumb-item"><a href="/admin">관리자</a></div>
-        <div class="breadcrumb-item active">대시보드</div>
-    </nav>
+    <div class="console-shell">
+        <aside class="console-sidebar" id="main-nav" aria-label="관리자 주요 메뉴">
+            <nav class="console-sidebar-nav">
+                <a class="console-nav-link active" href="/admin"><span>대시보드</span></a>
+                <a class="console-nav-link" href="/admin/process"><span>프로세스</span></a>
+                <a class="console-nav-link" href="/admin/process/logs"><span>프로세스 로그</span></a>
+                <a class="console-nav-link" href="/admin/database"><span>데이터베이스</span></a>
+                <a class="console-nav-link" href="/admin/modules"><span>모듈</span></a>
+                <a class="console-nav-link" href="/admin/workflows"><span>워크플로우</span></a>
+                <a class="console-nav-link" href="/admin/scheduler"><span>스케줄러</span></a>
+                <a class="console-nav-link" href="/admin/logs"><span>로그</span></a>
+                <a class="console-nav-link" href="/admin/settings"><span>설정</span></a>
+            </nav>
+        </aside>
 
-    <!-- 본문 -->
-    <main class="admin-main">
-        <div class="admin-container">
-            <!-- 페이지 제목 -->
-            <div class="admin-page-header">
-                <h1>관리자 대시보드</h1>
-                <p class="admin-page-subtitle">시스템 개요 및 실시간 상태 모니터링</p>
-            </div>
+        <main class="console-main">
+            <nav class="console-breadcrumb" aria-label="현재 위치">
+                <a href="/admin">관리자</a>
+                <span aria-hidden="true">/</span>
+                <span>대시보드</span>
+            </nav>
 
-            <!-- 알림 컨테이너 -->
+            <section class="console-hero">
+                <div>
+                    <p class="console-eyebrow">관리자 콘솔</p>
+                    <h1>시스템 운영 현황</h1>
+                    <p class="admin-page-subtitle">모듈, 워크플로우, 예약 작업, 로그를 한 화면에서 확인합니다.</p>
+                </div>
+                <div class="console-hero-actions">
+                    <a href="/admin/process" class="btn btn-primary btn-sm">프로세스 보기</a>
+                    <a href="/admin/database" class="btn btn-secondary btn-sm">DB 상태 보기</a>
+                </div>
+            </section>
+
             <div id="alert-container" class="mb-md"></div>
 
-            <!-- 통계 카드 -->
-            <section class="admin-stats-grid">
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-title">총 모듈</span>
-                    </div>
-                    <div class="stat-card-value" id="total-modules">0</div>
-                    <div class="stat-card-footer">
-                        <span class="stat-status online">정상</span>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-title">워크플로우</span>
-                    </div>
-                    <div class="stat-card-value" id="total-workflows">0</div>
-                    <div class="stat-card-footer">
-                        <span class="stat-status online">정상</span>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-title">예약 작업</span>
-                    </div>
-                    <div class="stat-card-value" id="total-scheduled">0</div>
-                    <div class="stat-card-footer">
-                        <span class="stat-status online">정상</span>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-card-title">활동 로그</span>
-                    </div>
-                    <div class="stat-card-value" id="total-logs">0</div>
-                    <div class="stat-card-footer">
-                        <span class="stat-status online">정상</span>
-                    </div>
-                </div>
+            <section class="console-metric-grid" aria-label="핵심 지표">
+                <article class="console-metric-card">
+                    <span class="console-metric-label">총 모듈</span>
+                    <strong id="total-modules">0</strong>
+                    <span class="stat-status online">정상</span>
+                </article>
+                <article class="console-metric-card">
+                    <span class="console-metric-label">워크플로우</span>
+                    <strong id="total-workflows">0</strong>
+                    <span class="stat-status online">정상</span>
+                </article>
+                <article class="console-metric-card">
+                    <span class="console-metric-label">예약 작업</span>
+                    <strong id="total-scheduled">0</strong>
+                    <span class="stat-status online">정상</span>
+                </article>
+                <article class="console-metric-card">
+                    <span class="console-metric-label">활동 로그</span>
+                    <strong id="total-logs">0</strong>
+                    <span class="stat-status online">정상</span>
+                </article>
             </section>
 
-            <!-- 상태 요약 -->
-            <section class="admin-section">
-                <div class="admin-section-header">
-                    <h2>시스템 상태</h2>
-                </div>
-                <div class="status-grid">
-                    <div class="status-item">
-                        <div class="status-item-header">
-                            <span class="status-indicator online"></span>
-                            <span>서버 상태</span>
-                        </div>
-                        <span class="status-value" id="server-status">정상 동작 중</span>
+            <div class="console-content-grid">
+                <section class="admin-section console-panel console-panel-wide">
+                    <div class="admin-section-header">
+                        <h2>최근 활동</h2>
+                        <a href="/admin/logs" class="btn btn-secondary btn-sm">전체 보기</a>
                     </div>
-                    <div class="status-item">
-                        <div class="status-item-header">
-                            <span class="status-indicator online"></span>
-                            <span>데이터베이스</span>
-                        </div>
-                        <span class="status-value" id="db-status">연결됨</span>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead><tr><th>타입</th><th>모듈</th><th>작업</th><th>상태</th><th>시간</th></tr></thead>
+                            <tbody id="recent-activities"><tr><td colspan="5" class="text-center">활동 내역을 불러오는 중입니다.</td></tr></tbody>
+                        </table>
                     </div>
-                    <div class="status-item">
-                        <div class="status-item-header">
-                            <span class="status-indicator online"></span>
-                            <span>WebSocket</span>
-                        </div>
-                        <span class="status-value" id="ws-status">활성화됨</span>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-item-header">
-                            <span class="status-indicator online"></span>
-                            <span>MCP 서버</span>
-                        </div>
-                        <span class="status-value" id="mcp-status">준비 완료</span>
-                    </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- 갓 수행된 작업 -->
-            <section class="admin-section">
-                <div class="admin-section-header">
-                    <h2>최근 활동</h2>
-                    <div class="admin-section-actions">
-                        <button class="btn btn-secondary btn-sm">모두 보기</button>
+                <section class="admin-section console-panel">
+                    <div class="admin-section-header"><h2>시스템 상태</h2></div>
+                    <div class="status-grid console-status-list">
+                        <div class="status-item"><div class="status-item-header"><span class="status-indicator online"></span><span>서버</span></div><span class="status-value" id="server-status">확인 중</span></div>
+                        <div class="status-item"><div class="status-item-header"><span class="status-indicator online"></span><span>데이터베이스</span></div><span class="status-value" id="db-status">확인 중</span></div>
+                        <div class="status-item"><div class="status-item-header"><span class="status-indicator online"></span><span>WebSocket</span></div><span class="status-value" id="ws-status">활성화됨</span></div>
+                        <div class="status-item"><div class="status-item-header"><span class="status-indicator online"></span><span>MCP</span></div><span class="status-value" id="mcp-status">준비 완료</span></div>
                     </div>
-                </div>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>타입</th>
-                                <th>모듈</th>
-                                <th>작업</th>
-                                <th>상태</th>
-                                <th>시간</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recent-activities">
-                            <tr>
-                                <td>워크플로우</td>
-                                <td>crawler</td>
-                                <td>데이터 수집</td>
-                                <td><span class="badge badge-success">성공</span></td>
-                                <td>2026-07-26 12:00:00</td>
-                            </tr>
-                            <tr>
-                                <td>스케줄러</td>
-                                <td>monitor</td>
-                                <td>상태 체크</td>
-                                <td><span class="badge badge-success">성공</span></td>
-                                <td>2026-07-26 11:50:00</td>
-                            </tr>
-                            <tr>
-                                <td>모듈</td>
-                                <td>db_monitor</td>
-                                <td>로그 기록</td>
-                                <td><span class="badge badge-success">성공</span></td>
-                                <td>2026-07-26 11:40:00</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+                </section>
 
-            <!-- 빠른 액션 -->
-            <section class="admin-section">
-                <div class="admin-section-header">
-                    <h2>빠른 액션</h2>
-                </div>
-                <div class="quick-actions">
-                    <div class="quick-action-group">
-                        <h3>모듈</h3>
-                        <div class="quick-action-buttons">
-                            <a href="/admin/modules/create" class="btn btn-primary btn-sm">모듈 추가</a>
-                            <a href="/admin/modules" class="btn btn-secondary btn-sm">모듈 목록</a>
-                        </div>
+                <section class="admin-section console-panel console-panel-wide">
+                    <div class="admin-section-header"><h2>빠른 작업</h2></div>
+                    <div class="quick-actions console-quick-actions">
+                        <a href="/admin/modules" class="console-action-card"><strong>모듈 관리</strong><span>수집 모듈 등록 및 상태 확인</span></a>
+                        <a href="/admin/workflows" class="console-action-card"><strong>워크플로우 관리</strong><span>자동화 흐름 조회 및 생성</span></a>
+                        <a href="/admin/scheduler" class="console-action-card"><strong>스케줄러 관리</strong><span>예약 실행 정책 확인</span></a>
+                        <a href="/admin/process" class="console-action-card"><strong>서버 프로세스</strong><span>실행 프로세스와 로그 위치 확인</span></a>
                     </div>
-                    <div class="quick-action-group">
-                        <h3>워크플로우</h3>
-                        <div class="quick-action-buttons">
-                            <a href="/admin/workflows/create" class="btn btn-primary btn-sm">워크플로우 생성</a>
-                            <a href="/admin/workflows" class="btn btn-secondary btn-sm">워크플로우 목록</a>
-                        </div>
-                    </div>
-                    <div class="quick-action-group">
-                        <h3>스케줄러</h3>
-                        <div class="quick-action-buttons">
-                            <a href="/admin/scheduler/create" class="btn btn-primary btn-sm">작업 예약</a>
-                            <a href="/admin/scheduler" class="btn btn-secondary btn-sm">예약 작업 목록</a>
-                        </div>
-                    </div>
-                    <div class="quick-action-group">
-                        <h3>서버 프로세스</h3>
-                        <div class="quick-action-buttons">
-                            <a href="/admin/process" class="btn btn-primary btn-sm">프로세스 목록</a>
-                            <a href="/admin/process/detail?pid=1" class="btn btn-secondary btn-sm">프로세스 세부정보</a>
-                        </div>
-                    </div>
-                    <div class="quick-action-group">
-                        <h3>데이터베이스</h3>
-                        <div class="quick-action-buttons">
-                            <a href="/admin/database" class="btn btn-primary btn-sm">DB 관리</a>
-                            <a href="#" class="btn btn-secondary btn-sm" onclick="alert('DB 백업 기능은 준비 중입니다.'); return false;">DB 백업</a>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
-    </main>
+                </section>
+            </div>
+        </main>
+    </div>
 
-    <!-- 푸터 -->
-    <footer class="admin-footer">
-        <div class="admin-container">
-            <p>&copy; 2026 WebCrawlServer. 모든 권리 보호.</p>
-        </div>
-    </footer>
-
-    <!-- JavaScript -->
-    <!-- 공통 JS -->
     <script src="../js/main.js"></script>
-    <!-- 관리자 전용 JS -->
     <script src="js/admin.js"></script>
 </body>
 </html>

@@ -17,6 +17,7 @@ const fs = require('fs-extra');
 // === Express 앱 설정 ===
 const app = express();
 const server = http.createServer(app);
+const DB_PATH = path.join(__dirname, '../database/main.db');
 
 // WebSocket 서버 생성 (MCP 프로토콜 지원)
 const wss = new WebSocketServer({ server });
@@ -39,6 +40,71 @@ app.get('/health', (req, res) => {
     server: 'WebCrawlServer',
     version: '0.1.0'
   });
+});
+
+// SQLite 조회 전용 헬퍼
+function queryDatabase(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    const db = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READONLY, (err) => {
+      if (err) {
+        return reject(err);
+      }
+
+      db.all(sql, params, (queryErr, rows) => {
+        db.close();
+        if (queryErr) {
+          return reject(queryErr);
+        }
+        resolve(rows);
+      });
+    });
+  });
+}
+
+// 관리자 대시보드 통계 API
+app.get('/api/stats', async (req, res, next) => {
+  try {
+    const [modules, workflows, scheduledJobs, activityLogs] = await Promise.all([
+      queryDatabase('SELECT COUNT(*) AS count FROM modules'),
+      queryDatabase('SELECT COUNT(*) AS count FROM workflows'),
+      queryDatabase('SELECT COUNT(*) AS count FROM scheduled_jobs'),
+      queryDatabase('SELECT COUNT(*) AS count FROM activity_logs')
+    ]);
+
+    res.json({
+      modules: modules[0]?.count || 0,
+      workflows: workflows[0]?.count || 0,
+      scheduledJobs: scheduledJobs[0]?.count || 0,
+      activityLogs: activityLogs[0]?.count || 0
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 관리자 최근 활동 API
+app.get('/api/activities', async (req, res, next) => {
+  const rawLimit = Number.parseInt(req.query.limit, 10);
+  const limit = Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 50) : 10;
+
+  try {
+    const rows = await queryDatabase(
+      `SELECT source AS type,
+              COALESCE(modules.name, '-') AS module,
+              activity_logs.action AS action,
+              activity_logs.status AS status,
+              activity_logs.created_at AS timestamp
+         FROM activity_logs
+         LEFT JOIN modules ON modules.id = activity_logs.module_id
+        ORDER BY activity_logs.created_at DESC
+        LIMIT ?`,
+      [limit]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
 });
 
 // 메인 페이지 - index.html 제공
@@ -248,10 +314,8 @@ async function initializeDatabase() {
   await fs.ensureDir(dbDir);
   console.log(`[DB] 데이터베이스 디렉토리 확인: ${dbDir}`);
 
-  const dbPath = path.join(dbDir, 'main.db');
-  
   return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(dbPath, (err) => {
+    const db = new sqlite3.Database(DB_PATH, (err) => {
       if (err) {
         console.error('[DB] 데이터베이스 연결 오류:', err);
         return reject(err);

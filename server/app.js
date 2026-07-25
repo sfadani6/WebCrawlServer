@@ -13,23 +13,106 @@ const http             = require('http');
 const { WebSocketServer } = require('ws');
 const sqlite3          = require('sqlite3').verbose();
 const fs               = require('fs-extra');
+const helmet           = require('helmet');
+const cors             = require('cors');
+const rateLimit        = require('express-rate-limit');
 
 // 분리된 모듈 로드
 const { DB_PATH }      = require('./db/helper');
 const createApiRouter  = require('./routes/api');
 const adminRouter      = require('./routes/admin');
 const adminDbRouter    = require('./routes/adminDb');
+const { basicAuth }     = require('./middleware/auth');
 
 // === Express 앱 설정 ===
 const app    = express();
 const server = http.createServer(app);
 
-// WebSocket 서버 생성 (MCP 프로토콜 지원)
-const wss = new WebSocketServer({ server });
+// WebSocket 인증 토큰 (환경변수에서 로드, 기본값: 개발용)
+const WS_TOKEN = process.env.WS_TOKEN || 'ws-secret-token-change-me';
 
-// === 미들웨어 설정 ===
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// WebSocket 서버 생성 (MCP 프로토콜 지원) - Origin 검증 및 인증 추가
+const wss = new WebSocketServer({
+  server,
+  verifyClient: (info, callback) => {
+    const origin = info.origin;
+    const reqUrl = info.req.url || '';
+    
+    // Origin 검증 - 허용된 origin만 연결 허용
+    const isOriginAllowed = allowedOrigins.includes(origin) || 
+      allowedOrigins.includes('*') || 
+      allowedOrigins.some(allowed => origin && origin.endsWith(allowed.slice(allowed.lastIndexOf('/') + 1)));
+    
+    if (!isOriginAllowed && origin !== undefined) {
+      console.log(`[WebSocket] 거부된 Origin: ${origin}`);
+      return callback(false, 403, 'Forbidden');
+    }
+    
+    // 토큰 검증 - 쿼리 파라미터에서 token 추출
+    try {
+      const url = new URL(reqUrl, `http://${info.req.headers.host || 'localhost'}`);
+      const token = url.searchParams.get('token');
+      
+      if (!token || token !== WS_TOKEN) {
+        console.log(`[WebSocket] 인증 실패: invalid token`);
+        return callback(false, 401, 'Unauthorized');
+      }
+    } catch (err) {
+      console.log(`[WebSocket] URL 파싱 오류:`, err.message);
+      return callback(false, 400, 'Bad Request');
+    }
+    
+    // 모든 검증 통과
+    callback(true);
+  }
+});
+
+// === 보안 미들웨어 설정 ===
+// 보안 헤더 추가 (helmet)
+app.use(helmet());
+
+// CORS 설정 - 허용된 origin만 접근 가능
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? 
+  process.env.ALLOWED_ORIGINS.split(',') : [
+    'http://localhost:3000',
+    'http://localhost:9600',
+    'http://127.0.0.1:9600'
+  ];
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
+}));
+
+// 요청 본문 크기 제한 (1MB)
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// 레이트 리밋 설정 (특히 /api/nlp 경로에 적용)
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15분
+  max: 100, // 15분당 100회 요청 최대
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 'error',
+    message: '너무 많은 요청입니다. 잠시 후 다시 시도하세요.'
+  }
+});
+
+// NLP API는 더 엄격한 레이트 리밋 적용
+const nlpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15분
+  max: 50, // 15분당 50회 요청 최대
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 'error',
+    message: 'NLP API 요청 한도를 초과했습니다. 잠시 후 다시 시도하세요.'
+  }
+});
 
 // 정적 파일 서비스 (관리자 페이지 및 공용 파일)
 app.use('/static', express.static(path.join(__dirname, '../public')));
@@ -48,9 +131,9 @@ app.get('/health', (req, res) => {
 });
 
 // === API 라우터 마운트 ===
-app.use('/api', createApiRouter(wss));
-app.use('/admin/api', adminDbRouter);
-app.use('/api/nlp', require('./routes/nlp'));
+app.use('/api', apiLimiter, createApiRouter(wss));
+app.use('/admin/api', basicAuth(), adminDbRouter);
+app.use('/api/nlp', nlpLimiter, require('./routes/nlp'));
 
 // === 통합 콘솔 SPA 라우터 마운트 (server/routes/adminUi.js) ===
 const adminUiRouter = require('./routes/adminUi');
@@ -76,6 +159,13 @@ wss.on('connection', (ws, req) => {
     timestamp: new Date().toISOString(),
     protocolVersion: '1.0'
   }));
+
+  // Heartbeat(connection keep-alive) 설정
+  // 30초마다 ping 전송, 응답이 없으면 연결 종료
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
 
   // MCP 프로토콜 필수 타입 정의 (R-004 1장)
   const MCP_MESSAGE_TYPES = ['request', 'script', 'response', 'event', 'heartbeat'];
@@ -188,13 +278,31 @@ wss.on('connection', (ws, req) => {
   });
 });
 
+// WebSocket Heartbeat 인터벌 - 30초마다 모든 클라이언트에 ping 전송
+// 죽은 연결(zombie connection) 감지 및 정리
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (!ws.isAlive) {
+      console.log(`[WebSocket] 비활성 클라이언트 연결 종료: ${ws.socket?.remoteAddress || 'unknown'}`);
+      return ws.terminate();
+    }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+
+// 서버 종료 시 heartbeat 인터벌 정리
+server.on('close', () => {
+  clearInterval(heartbeatInterval);
+});
+
 // === 오류 처리 미들웨어 ===
 app.use((err, req, res, next) => {
   console.error(`[Express] 서버 오류:`, err);
   res.status(500).json({
     status: 'error',
     message: '내부 서버 오류',
-    error: process.env.NODE_ENV === 'development' ? err.message : '오류 detalles 사용 불가'
+    error: process.env.NODE_ENV === 'development' ? err.message : '오류 상세 정보 사용 불가'
   });
 });
 

@@ -3,7 +3,7 @@ import DataEditor, { GridCellKind } from "@glideapps/glide-data-grid";
 import "@glideapps/glide-data-grid/dist/index.css";
 import { fetchJSON } from '../api';
 
-function SpreadsheetView({ tableName }) {
+function SpreadsheetView({ dbName = 'main.db', tableName }) {
   const [schema, setSchema] = useState([]);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -13,10 +13,11 @@ function SpreadsheetView({ tableName }) {
     if (!tableName) return;
     setLoading(true);
     
-    // Fetch schema and data
+    const dbParam = `?db=${encodeURIComponent(dbName)}`;
+
     Promise.all([
-      fetchJSON(`/admin/api/tables/${tableName}/schema`),
-      fetchJSON(`/admin/api/tables/${tableName}/rows?limit=1000&offset=0`)
+      fetchJSON(`/admin/api/tables/${tableName}/schema${dbParam}`),
+      fetchJSON(`/admin/api/tables/${tableName}/rows${dbParam}&limit=1000&offset=0`)
     ])
     .then(([schemaData, rowsData]) => {
       setSchema(schemaData || []);
@@ -34,7 +35,7 @@ function SpreadsheetView({ tableName }) {
       console.error('Failed to load table data', err);
       setLoading(false);
     });
-  }, [tableName]);
+  }, [dbName, tableName]);
 
   const getCellContent = useCallback(([col, row]) => {
     if (row >= rows.length || col >= columns.length) {
@@ -71,15 +72,16 @@ function SpreadsheetView({ tableName }) {
     updatedRows[row] = { ...rowData, [colName]: newValue.data };
     setRows(updatedRows);
 
-    fetch(`/admin/api/tables/${tableName}/rows/${rowId}`, {
+    const dbParam = `?db=${encodeURIComponent(dbName)}`;
+    fetch(`/admin/api/tables/${tableName}/rows/${rowId}${dbParam}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ [colName]: newValue.data })
     }).catch(err => {
       console.error('Failed to save cell', err);
-      setRows(rows); // Revert
+      setRows(rows);
     });
-  }, [rows, columns, tableName]);
+  }, [rows, columns, dbName, tableName]);
 
   const deleteSelectedRows = useCallback((selection) => {
      if (!selection || !selection.rows) return;
@@ -91,7 +93,8 @@ function SpreadsheetView({ tableName }) {
      const idsToDelete = indices.map(i => rows[i]?.rowid || rows[i]?.id).filter(Boolean);
      if (idsToDelete.length === 0) return;
      
-     fetch(`/admin/api/tables/${tableName}/rows`, {
+     const dbParam = `?db=${encodeURIComponent(dbName)}`;
+     fetch(`/admin/api/tables/${tableName}/rows${dbParam}`, {
        method: 'DELETE',
        headers: { 'Content-Type': 'application/json' },
        body: JSON.stringify({ ids: idsToDelete })
@@ -100,7 +103,7 @@ function SpreadsheetView({ tableName }) {
      }).catch(err => {
         console.error("Delete failed", err);
      });
-  }, [rows, tableName]);
+  }, [rows, dbName, tableName]);
 
   const addNewRow = async () => {
     const newRow = {};
@@ -111,7 +114,8 @@ function SpreadsheetView({ tableName }) {
     });
 
     try {
-      const res = await fetch(`/admin/api/tables/${tableName}/rows`, {
+      const dbParam = `?db=${encodeURIComponent(dbName)}`;
+      const res = await fetch(`/admin/api/tables/${tableName}/rows${dbParam}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newRow)
@@ -120,7 +124,6 @@ function SpreadsheetView({ tableName }) {
       if (data.id) {
         setRows(prev => [{ ...newRow, rowid: data.id, id: data.id }, ...prev]);
       } else {
-        // Fallback if no lastID returned easily
         setRows(prev => [{ ...newRow }, ...prev]);
       }
     } catch(err) {
@@ -130,27 +133,40 @@ function SpreadsheetView({ tableName }) {
 
   if (!tableName) {
     return (
-      <div className="spreadsheet-view" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%'}}>
-        <h3>관리할 테이블을 선택해주세요.</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--gcp-text-secondary)' }}>
+        <div style={{ fontSize: '32px', marginBottom: '8px' }}>👈</div>
+        <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--gcp-text-primary)' }}>좌측 목록에서 관리할 테이블을 선택하세요.</h3>
+        <p style={{ fontSize: '12px', marginTop: '4px' }}>인라인 셀 편집 및 가상 스크롤 그리드를 지원합니다.</p>
       </div>
     );
   }
 
   return (
-    <div className="spreadsheet-view" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#2a2a2a', borderBottom: '1px solid #444' }}>
-        <h2 style={{ margin: 0, color: '#fff' }}>{tableName}</h2>
-        <div>
-          <button 
-            onClick={addNewRow}
-            style={{ padding: '8px 16px', background: '#007acc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Table Toolbar */}
+      <div style={{
+        padding: '8px 16px',
+        display: 'flex',
+        justify: 'space-between',
+        alignItems: 'center',
+        backgroundColor: 'var(--gcp-bg-header)',
+        borderBottom: '1px solid var(--gcp-border)',
+        flexShrink: 0
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gcp-text-primary)' }}>📋 {tableName}</span>
+          <span className="gcp-badge gcp-badge-active">{rows.length} 행 (Rows)</span>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="gcp-btn" onClick={addNewRow} style={{ padding: '4px 10px', fontSize: '11.5px' }}>
             + 새 행 추가
           </button>
         </div>
       </div>
+
+      {/* Grid Content Area */}
       {loading ? (
-        <div style={{ padding: '20px' }}>데이터 로딩 중...</div>
+        <div style={{ padding: '20px', color: 'var(--gcp-text-secondary)' }}>테이블 데이터 로딩 중...</div>
       ) : (
         <div style={{ flexGrow: 1, position: 'relative' }}>
           {columns.length > 0 && (
@@ -166,14 +182,14 @@ function SpreadsheetView({ tableName }) {
               onDelete={deleteSelectedRows}
               rowMarkers="both"
               theme={{
-                bgCell: '#1e1e1e',
-                bgHeader: '#2a2a2a',
+                bgCell: '#18191c',
+                bgHeader: '#202124',
                 textDark: '#ffffff',
-                textHeader: '#ffffff',
-                borderColor: '#444444',
-                bgCellMedium: '#222222',
-                accentColor: '#007acc',
-                accentLight: '#007acc33'
+                textHeader: '#9aa0a6',
+                borderColor: '#33353b',
+                bgCellMedium: '#242529',
+                accentColor: '#8ab4f8',
+                accentLight: 'rgba(138, 180, 248, 0.2)'
               }}
             />
           )}

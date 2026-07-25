@@ -1,28 +1,79 @@
-// src/App.jsx
-import React, { useState } from 'react';
-import TableList from './components/TableList';
-import SpreadsheetView from './components/SpreadsheetView';
+import React, { useState, useEffect } from 'react';
+import Layout from './components/Layout';
+import OverviewPage from './components/OverviewPage';
+import DatabaseOverviewPage from './components/DatabaseOverviewPage';
+import UnimplementedPage from './components/UnimplementedPage';
 import './App.css';
 
 function App() {
+  const [currentPath, setCurrentPath] = useState(window.location.pathname || '/');
+  const [selectedDb, setSelectedDb] = useState(null);
   const [selectedTable, setSelectedTable] = useState('');
 
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname || '/');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleNavigate = (path) => {
+    window.history.pushState({}, '', path);
+    setCurrentPath(path);
+    if (!path.startsWith('/database')) {
+      setSelectedDb(null);
+      setSelectedTable('');
+    }
+  };
+
+  const renderContent = () => {
+    if (currentPath === '/' || currentPath === '/admin') {
+      return <OverviewPage onNavigate={handleNavigate} />;
+    }
+
+    if (currentPath.startsWith('/database')) {
+      return (
+        <DatabaseOverviewPage
+          selectedDb={selectedDb}
+          selectedTable={selectedTable}
+          onSelectDb={(db) => {
+            setSelectedDb(db);
+            if (!db) setSelectedTable('');
+          }}
+          onSelectTable={(table) => setSelectedTable(table)}
+        />
+      );
+    }
+
+    if (currentPath.startsWith('/modules')) {
+      return <UnimplementedPage pageName="모듈 관리" path="/modules" onNavigate={handleNavigate} />;
+    }
+
+    if (currentPath.startsWith('/workflows')) {
+      return <UnimplementedPage pageName="워크플로우 Engine" path="/workflows" onNavigate={handleNavigate} />;
+    }
+
+    if (currentPath.startsWith('/scheduler')) {
+      return <UnimplementedPage pageName="스케줄러 (Cron)" path="/scheduler" onNavigate={handleNavigate} />;
+    }
+
+    if (currentPath.startsWith('/logs')) {
+      return <UnimplementedPage pageName="활동 및 에러 로그" path="/logs" onNavigate={handleNavigate} />;
+    }
+
+    if (currentPath.startsWith('/settings')) {
+      return <UnimplementedPage pageName="시스템 설정" path="/settings" onNavigate={handleNavigate} />;
+    }
+
+    return <OverviewPage onNavigate={handleNavigate} />;
+  };
+
   return (
-    <div className="app-container" style={{ display: 'flex', height: '100vh' }}>
-      <aside style={{ width: '250px', borderRight: '1px solid #444', padding: '1rem', backgroundColor: '#2a2a2a', color: '#fff' }}>
-        <h2 style={{ marginBottom: '1rem' }}>테이블 목록</h2>
-        <TableList onSelect={setSelectedTable} />
-      </aside>
-      <main style={{ flexGrow: 1, padding: '1rem', overflow: 'auto', backgroundColor: '#1e1e1e', color: '#fff' }}>
-        {selectedTable ? (
-          <SpreadsheetView tableName={selectedTable} />
-        ) : (
-          <div style={{ textAlign: 'center', marginTop: '5rem' }}>
-            <h3>관리할 테이블을 선택해주세요.</h3>
-          </div>
-        )}
-      </main>
-    </div>
+    <Layout currentPath={currentPath} onNavigate={handleNavigate}>
+      {renderContent()}
+    </Layout>
   );
 }
 

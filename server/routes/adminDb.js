@@ -10,15 +10,114 @@ const { DB_PATH } = require('../db/helper');
 
 const router = express.Router();
 
+const fs = require('fs-extra');
+
 // DB 연결 헬퍼 (읽기·쓰기)
-function getDb() {
-  return new sqlite3.Database(DB_PATH);
+function getDb(dbName = 'main.db') {
+  // 보안: 디렉토리 트래버설 방지
+  const safeName = path.basename(dbName);
+  const targetPath = path.join(__dirname, '../../database', safeName.endsWith('.db') ? safeName : `${safeName}.db`);
+  return new sqlite3.Database(targetPath);
 }
+
+// ------------------- 데이터베이스 목록 및 요약 정보 -------------------
+// GET /admin/api/databases
+router.get('/databases', async (req, res, next) => {
+  try {
+    const dbDir = path.join(__dirname, '../../database');
+    await fs.ensureDir(dbDir);
+    const files = await fs.readdir(dbDir);
+    const dbFiles = files.filter(f => f.endsWith('.db'));
+
+    const list = [];
+    for (const file of dbFiles) {
+      const filePath = path.join(dbDir, file);
+      const stats = await fs.stat(filePath);
+      
+      // DB 요약 정보 가져오기
+      const dbInfo = await new Promise(resolve => {
+        const db = new sqlite3.Database(filePath, sqlite3.OPEN_READONLY, err => {
+          if (err) return resolve({ tablesCount: 0, journalMode: 'unknown' });
+          db.all("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", (err, rows) => {
+            const tablesCount = rows && rows[0] ? rows[0].count : 0;
+            db.get("PRAGMA journal_mode", (err, pragmaRow) => {
+              db.close();
+              resolve({
+                tablesCount,
+                journalMode: pragmaRow ? pragmaRow.journal_mode : 'unknown'
+              });
+            });
+          });
+        });
+      });
+
+      list.push({
+        name: file,
+        sizeBytes: stats.size,
+        sizeFormatted: `${(stats.size / 1024).toFixed(1)} KB`,
+        updatedAt: stats.mtime,
+        tablesCount: dbInfo.tablesCount,
+        journalMode: dbInfo.journalMode,
+        status: 'active'
+      });
+    }
+
+    res.json(list);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------- 신규 데이터베이스 생성 -------------------
+// POST /admin/api/databases
+router.post('/databases', express.json(), async (req, res, next) => {
+  try {
+    const { name } = req.body;
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ error: '유효한 데이터베이스 이름이 필요합니다.' });
+    }
+
+    const cleanName = path.basename(name).trim();
+    const dbFileName = cleanName.endsWith('.db') ? cleanName : `${cleanName}.db`;
+    const dbDir = path.join(__dirname, '../../database');
+    await fs.ensureDir(dbDir);
+    const filePath = path.join(dbDir, dbFileName);
+
+    if (await fs.pathExists(filePath)) {
+      return res.status(400).json({ error: '이미 존재하는 데이터베이스 이름입니다.' });
+    }
+
+    // 신규 DB 파일 생성 및 초기화
+    const db = new sqlite3.Database(filePath, async (err) => {
+      if (err) return next(err);
+      db.run('PRAGMA journal_mode=WAL;');
+      db.run('PRAGMA foreign_keys = ON;');
+      db.close();
+
+      const stats = await fs.stat(filePath);
+      res.json({
+        message: '데이터베이스가 성공적으로 생성되었습니다.',
+        database: {
+          name: dbFileName,
+          sizeBytes: stats.size,
+          sizeFormatted: `${(stats.size / 1024).toFixed(1)} KB`,
+          updatedAt: stats.mtime,
+          tablesCount: 0,
+          journalMode: 'wal',
+          status: 'active'
+        }
+      });
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ------------------- 테이블 목록 -------------------
 // GET /admin/api/tables
 router.get('/tables', (req, res, next) => {
-  const db = getDb();
+  const dbName = req.query.db || 'main.db';
+  const db = getDb(dbName);
   db.all("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", (err, rows) => {
     db.close();
     if (err) return next(err);
@@ -31,7 +130,7 @@ router.get('/tables', (req, res, next) => {
 // GET /admin/api/tables/:name/schema
 router.get('/tables/:name/schema', (req, res, next) => {
   const { name } = req.params;
-  const db = getDb();
+  const db = getDb(req.query.db);
   db.all(`PRAGMA table_info(${name})`, (err, rows) => {
     db.close();
     if (err) return next(err);
@@ -44,14 +143,14 @@ router.get('/tables/:name/schema', (req, res, next) => {
 router.get('/tables/:name/rows', (req, res, next) => {
   const { name } = req.params;
   const { limit = 20, offset = 0, order_by = 'rowid', order_dir = 'ASC', query } = req.query;
-  const db = getDb();
+  const db = getDb(req.query.db);
   let sql = `SELECT * FROM ${name}`;
   const params = [];
   if (query) {
     // 간단 LIKE 검색 (보안 상 제한된 구현)
     sql += ' WHERE 1=1';
     // 사용자가 전달한 추가 컬럼 파라미터들을 모두 LIKE 조건으로 적용
-    const filterCols = Object.keys(req.query).filter(k => !['limit','offset','order_by','order_dir','query'].includes(k));
+    const filterCols = Object.keys(req.query).filter(k => !['limit','offset','order_by','order_dir','query','db'].includes(k));
     if (filterCols.length) {
       sql += ' AND (' + filterCols.map(col => `${col} LIKE ?`).join(' AND ') + ')';
       filterCols.forEach(col => params.push(`%${req.query[col]}%`));
@@ -79,7 +178,7 @@ router.post('/tables/:name/rows', express.json(), (req, res, next) => {
   const vals = Object.values(newRow);
   const placeholders = cols.map(() => '?').join(', ');
   const sql = `INSERT INTO ${name} (${cols.join(', ')}) VALUES (${placeholders})`;
-  const db = getDb();
+  const db = getDb(req.query.db);
   db.run(sql, vals, function(err) {
     db.close();
     if (err) return next(err);

@@ -3,326 +3,224 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>서버 프로세스 목록 - WebCrawlServer</title>
-    
-    <!-- 공통 CSS -->
+    <title>서버 프로세스 - WebCrawlServer</title>
     <link rel="stylesheet" href="../../css/styles.css">
-    <!-- 관리자 전용 CSS -->
     <link rel="stylesheet" href="../css/admin.css">
 </head>
-<body>
-    <!-- 헤더 -->
-    <header class="admin-header">
-        <div class="admin-header-content">
-            <div class="admin-logo">
-                <a href="/admin">
-                    <strong>WebCrawlServer</strong>
-                    <span>Admin</span>
-                </a>
-            </div>
-            
-            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="메뉴 열기">☰</button>
-            
-            <nav class="admin-nav" id="main-nav">
-                <ul class="admin-nav-list">
-                    <!-- 대시보드 -->
-                    <li class="nav-item">
-                        <a href="/admin" class="nav-dashboard">대시보드</a>
-                    </li>
-                    
-                    <!-- 서버 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-server">서버</a>
-                        <div class="dropdown-menu">
-                            <div class="dropdown-header">서버 관리</div>
-                            <a href="/admin/process">프로세스 목록</a>
-                            <a href="/admin/process/detail?pid=1">프로세스 세부정보</a>
-                            <div class="dropdown-divider"></div>
-                            <div class="dropdown-header">로그</div>
-                            <a href="/admin/process/logs">로그 기록 목록</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 데이터베이스 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-database">데이터베이스</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/database">DB 관리</a>
-                            <a href="#" onclick="alert('DB 백업 기능은 준비 중입니다.'); return false;">DB 백업</a>
-                            <a href="#" onclick="alert('DB 복원 기능은 준비 중입니다.'); return false;">DB 복원</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 모듈 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-modules">모듈</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/modules">모듈 목록</a>
-                            <a href="/admin/modules/create">모듈 추가</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 워크플로우 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-workflows">워크플로우</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/workflows">워크플로우 목록</a>
-                            <a href="/admin/workflows/create">워크플로우 생성</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 스케줄러 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-scheduler">스케줄러</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/scheduler">예약 작업 목록</a>
-                            <a href="/admin/scheduler/create">작업 예약</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 로그 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-logs">로그</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/logs">로그 보기</a>
-                            <a href="/admin/logs?type=activity">액티비티 로그</a>
-                            <a href="/admin/logs?type=error">에러 로그</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 설정 -->
-                    <li class="nav-item">
-                        <a href="/admin/settings" class="nav-settings">설정</a>
-                    </li>
-                </ul>
-            </nav>
-            
-            <div class="admin-header-actions">
-                <a href="/admin" class="btn btn-secondary btn-sm">뒤로가기</a>
-            </div>
+<body class="admin-console-body">
+
+    <!-- 상단 앱 바 -->
+    <header class="console-topbar">
+        <div class="console-brand">
+            <button class="console-icon-button mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="관리 메뉴 열기">☰</button>
+            <a href="/admin" class="console-logo" aria-label="관리자 대시보드로 이동">
+                <span class="console-logo-mark">W</span>
+                <span class="console-logo-text">WebCrawlServer</span>
+            </a>
+        </div>
+        <form class="console-search" role="search">
+            <label class="sr-only" for="adminSearch">관리 기능 검색</label>
+            <input id="adminSearch" type="search" placeholder="관리 기능, 로그, 프로세스 검색">
+        </form>
+        <div class="console-topbar-actions">
+            <a href="/" class="btn btn-secondary btn-sm">메인</a>
+            <button class="console-icon-button" type="button" aria-label="도움말">?</button>
+            <button class="console-avatar" type="button" aria-label="관리자 계정">관</button>
         </div>
     </header>
 
-    <!-- 브레드크럼 (현재 위치) -->
-    <nav class="breadcrumb" id="breadcrumb">
-        <div class="breadcrumb-item"><a href="/admin">관리자</a></div>
-        <div class="breadcrumb-item active">서버 프로세스</div>
-    </nav>
+    <div class="console-shell">
+        <!-- 모바일 사이드바 오버레이 -->
+        <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()" aria-hidden="true"></div>
 
-    <!-- 본문 -->
-    <main class="admin-main">
-        <div class="admin-container">
-            <!-- 페이지 제목 -->
-            <div class="admin-page-header">
-                <h1>서버 프로세스 목록</h1>
-                <p class="admin-page-subtitle">현재 실행 중인 서버 프로세스 모니터링</p>
-            </div>
+        <!-- 좌측 사이드바 -->
+        <aside class="console-sidebar" id="main-nav" aria-label="관리자 주요 메뉴">
+            <nav class="console-sidebar-nav">
+                <a class="console-nav-link" href="/admin"><span>대시보드</span></a>
+                <a class="console-nav-link" href="/admin/process"><span>프로세스</span></a>
+                <a class="console-nav-link" href="/admin/process/logs"><span>프로세스 로그</span></a>
+                <a class="console-nav-link" href="/admin/database"><span>데이터베이스</span></a>
+                <a class="console-nav-link" href="/admin/modules"><span>모듈</span></a>
+                <a class="console-nav-link" href="/admin/workflows"><span>워크플로우</span></a>
+                <a class="console-nav-link" href="/admin/scheduler"><span>스케줄러</span></a>
+                <a class="console-nav-link" href="/admin/logs"><span>로그</span></a>
+                <a class="console-nav-link" href="/admin/settings"><span>설정</span></a>
+            </nav>
+        </aside>
+
+        <!-- 본문 -->
+        <main class="console-main">
+            <!-- 브레드크럼 -->
+            <nav class="console-breadcrumb" aria-label="현재 위치">
+                <a href="/admin">관리자</a>
+                <span aria-hidden="true">/</span>
+                <span>프로세스</span>
+            </nav>
+
+            <!-- 페이지 헤더 -->
+            <section class="console-hero">
+                <div>
+                    <p class="console-eyebrow">서버 관리</p>
+                    <h1>서버 프로세스</h1>
+                    <p class="admin-page-subtitle">현재 실행 중인 서버 프로세스를 모니터링합니다.</p>
+                </div>
+                <div class="console-hero-actions">
+                    <button class="btn btn-primary btn-sm" onclick="refreshProcessList()">새로고침</button>
+                    <a href="/admin/process/logs" class="btn btn-secondary btn-sm">로그 보기</a>
+                </div>
+            </section>
 
             <!-- 알림 컨테이너 -->
             <div id="alert-container" class="mb-md"></div>
 
-            <!-- 프로세스 통계 -->
-            <section class="admin-section">
-                <div class="admin-section-header">
-                    <h2>프로세스 개요</h2>
-                </div>
-                <div class="admin-stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <span class="stat-card-title">총 프로세스</span>
-                        </div>
-                        <div class="stat-card-value" id="total-processes">1</div>
-                        <div class="stat-card-footer">
-                            <span class="stat-status online">실행 중</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <span class="stat-card-title">CPU 사용량</span>
-                        </div>
-                        <div class="stat-card-value" id="cpu-usage">0%</div>
-                        <div class="stat-card-footer">
-                            <span class="stat-status online">정상</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <span class="stat-card-title">메모리 사용량</span>
-                        </div>
-                        <div class="stat-card-value" id="memory-usage">0 MB</div>
-                        <div class="stat-card-footer">
-                            <span class="stat-status online">정상</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-header">
-                            <span class="stat-card-title">uptime</span>
-                        </div>
-                        <div class="stat-card-value" id="uptime">0s</div>
-                        <div class="stat-card-footer">
-                            <span class="stat-status online">정상</span>
-                        </div>
-                    </div>
-                </div>
+            <!-- 프로세스 통계 카드 -->
+            <section class="console-metric-grid" aria-label="프로세스 지표">
+                <article class="console-metric-card">
+                    <span class="console-metric-label">총 프로세스</span>
+                    <strong id="total-processes">1</strong>
+                    <span class="stat-status online">실행 중</span>
+                </article>
+                <article class="console-metric-card">
+                    <span class="console-metric-label">CPU 사용량</span>
+                    <strong id="cpu-usage">-</strong>
+                    <span class="stat-status online">정상</span>
+                </article>
+                <article class="console-metric-card">
+                    <span class="console-metric-label">메모리 사용량</span>
+                    <strong id="memory-usage">-</strong>
+                    <span class="stat-status online">정상</span>
+                </article>
+                <article class="console-metric-card">
+                    <span class="console-metric-label">가동 시간</span>
+                    <strong id="uptime">-</strong>
+                    <span class="stat-status online">정상</span>
+                </article>
             </section>
 
-            <!-- 프로세스 목록 -->
-            <section class="admin-section">
-                <div class="admin-section-header">
-                    <h2>프로세스 목록</h2>
-                    <div class="admin-section-actions">
+            <div class="console-content-grid">
+                <!-- 프로세스 목록 -->
+                <section class="admin-section console-panel console-panel-wide">
+                    <div class="admin-section-header">
+                        <h2>프로세스 목록</h2>
                         <button class="btn btn-secondary btn-sm" onclick="refreshProcessList()">새로고침</button>
                     </div>
-                </div>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>프로세스 ID</th>
-                                <th>이름</th>
-                                <th>상태</th>
-                                <th>CPU 사용량</th>
-                                <th>메모리</th>
-                                <th>시작 시간</th>
-                                <th>액션</th>
-                            </tr>
-                        </thead>
-                        <tbody id="process-list">
-                            <tr>
-                                <td>1</td>
-                                <td>WebCrawlServer</td>
-                                <td><span class="badge badge-success">실행 중</span></td>
-                                <td>5%</td>
-                                <td>150 MB</td>
-                                <td>2026-07-26 10:00:00</td>
-                                <td>
-                                    <a href="/admin/process/detail?pid=1" class="btn btn-secondary btn-sm">자세히</a>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>프로세스 ID</th>
+                                    <th>이름</th>
+                                    <th>상태</th>
+                                    <th>CPU</th>
+                                    <th>메모리</th>
+                                    <th>시작 시간</th>
+                                    <th>액션</th>
+                                </tr>
+                            </thead>
+                            <tbody id="process-list">
+                                <tr>
+                                    <td>-</td>
+                                    <td>WebCrawlServer</td>
+                                    <td><span class="badge badge-success">실행 중</span></td>
+                                    <td id="proc-cpu">-</td>
+                                    <td id="proc-mem">-</td>
+                                    <td id="proc-start">-</td>
+                                    <td>
+                                        <a href="/admin/process/detail?pid=1" class="btn btn-secondary btn-sm">자세히</a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
 
-            <!-- 프로세스 정보 -->
-            <section class="admin-section">
-                <div class="admin-section-header">
-                    <h2>프로세스 정보</h2>
-                </div>
-                <div class="admin-toolbar">
-                    <div class="toolbar-group">
-                        <label>프로세스명:</label>
-                        <span id="process-name">WebCrawlServer</span>
+                <!-- 프로세스 세부 정보 -->
+                <section class="admin-section console-panel">
+                    <div class="admin-section-header"><h2>프로세스 정보</h2></div>
+                    <div class="console-status-list status-grid">
+                        <div class="status-item">
+                            <div class="status-item-header"><span class="status-indicator online"></span><span>프로세스명</span></div>
+                            <span class="status-value" id="process-name">WebCrawlServer</span>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-item-header"><span class="status-indicator online"></span><span>Node.js 버전</span></div>
+                            <span class="status-value" id="node-version">-</span>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-item-header"><span class="status-indicator online"></span><span>실행 파일</span></div>
+                            <span class="status-value" id="exec-file">server/app.js</span>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-item-header"><span class="status-indicator online"></span><span>상태</span></div>
+                            <span class="status-value" id="process-status">실행 중</span>
+                        </div>
                     </div>
-                    <div class="toolbar-group">
-                        <label>프로세스 ID:</label>
-                        <span id="process-id">1</span>
-                    </div>
-                    <div class="toolbar-group">
-                        <label>상태:</label>
-                        <span id="process-status" class="badge badge-success">실행 중</span>
-                    </div>
-                </div>
-                
-                <div class="grid">
-                    <div class="grid-item">
-                        <strong>시작 시간</strong>
-                        <span id="start-time">2026-07-26 10:00:00</span>
-                    </div>
-                    <div class="grid-item">
-                        <strong>Node.js 버전</strong>
-                        <span id="node-version">v18.x</span>
-                    </div>
-                    <div class="grid-item">
-                        <strong>실행 파일</strong>
-                        <span id="exec-file">server/app.js</span>
-                    </div>
-                    <div class="grid-item">
-                        <strong>인자</strong>
-                        <span id="exec-args">없음</span>
-                    </div>
-                </div>
-            </section>
-        </div>
-    </main>
+                </section>
+            </div>
+        </main>
+    </div>
 
-    <!-- 푸터 -->
-    <footer class="admin-footer">
-        <div class="admin-container">
-            <p>&copy; 2026 WebCrawlServer. 모든 권리 보호.</p>
-        </div>
-    </footer>
-
-    <!-- JavaScript -->
     <script src="../../js/main.js"></script>
     <script src="../js/admin.js"></script>
     <script>
-        // 페이지 로드 시 프로세스 정보 로드
+        // 사이드바 활성 링크 자동 감지
         domReady(function() {
+            var currentPath = window.location.pathname;
+            document.querySelectorAll('.console-nav-link').forEach(function(link) {
+                var href = link.getAttribute('href');
+                if (!href) return;
+                if (href === '/admin' && (currentPath === '/admin' || currentPath === '/admin/')) return;
+                if (href !== '/admin' && currentPath === href) {
+                    link.classList.add('active');
+                }
+            });
             loadProcessInfo();
-            
-            // 10초마다 새로고침
             setInterval(loadProcessInfo, 10000);
         });
-        
+
+        function toggleMobileMenu() {
+            var sidebar = document.getElementById('main-nav');
+            var overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('open');
+        }
+
+        function closeSidebar() {
+            document.getElementById('main-nav').classList.remove('open');
+            document.getElementById('sidebar-overlay').classList.remove('open');
+        }
+
         // 프로세스 정보 로드
         function loadProcessInfo() {
-            // 더미 데이터로 프로세스 정보 업데이트
-            var processInfo = {
-                name: 'WebCrawlServer',
-                pid: 1,
-                status: '실행 중',
-                startTime: '2026-07-26 10:00:00',
-                nodeVersion: 'v' + process.version.match(/^v(\d+)/)[1] + '.x',
-                execFile: 'server/app.js',
-                execArgs: '없음',
-                cpuUsage: Math.floor(Math.random() * 10) + '%',
-                memoryUsage: Math.floor(Math.random() * 50 + 100) + ' MB',
-                uptime: formatUptime(new Date() - new Date('2026-07-26T10:00:00Z'))
-            };
-            
-            updateProcessInfo(processInfo);
+            var cpuUsage   = Math.floor(Math.random() * 10) + '%';
+            var memUsage   = Math.floor(Math.random() * 50 + 100) + ' MB';
+            var uptimeMs   = Date.now() - new Date('2026-07-25T00:00:00Z').getTime();
+            var uptimeStr  = formatUptime(uptimeMs);
+            var nodeVer    = typeof process !== 'undefined' ? process.version : 'v18.x';
+
+            document.getElementById('cpu-usage').textContent    = cpuUsage;
+            document.getElementById('memory-usage').textContent = memUsage;
+            document.getElementById('uptime').textContent       = uptimeStr;
+            document.getElementById('proc-cpu').textContent     = cpuUsage;
+            document.getElementById('proc-mem').textContent     = memUsage;
+            document.getElementById('proc-start').textContent   = '2026-07-25 00:00:00';
+            document.getElementById('node-version').textContent = nodeVer;
         }
-        
-        // 프로세스 정보 업데이트
-        function updateProcessInfo(info) {
-            if (info.name) document.getElementById('process-name').textContent = info.name;
-            if (info.pid) document.getElementById('process-id').textContent = info.pid;
-            if (info.status) {
-                var badge = document.getElementById('process-status');
-                badge.textContent = info.status;
-                badge.className = 'badge badge-' + (info.status === '실행 중' ? 'success' : 'warning');
-            }
-            if (info.startTime) document.getElementById('start-time').textContent = info.startTime;
-            if (info.nodeVersion) document.getElementById('node-version').textContent = info.nodeVersion;
-            if (info.execFile) document.getElementById('exec-file').textContent = info.execFile;
-            if (info.execArgs) document.getElementById('exec-args').textContent = info.execArgs;
-            if (info.cpuUsage) document.getElementById('cpu-usage').textContent = info.cpuUsage;
-            if (info.memoryUsage) document.getElementById('memory-usage').textContent = info.memoryUsage;
-            if (info.uptime) document.getElementById('uptime').textContent = info.uptime;
-        }
-        
-        // 프로세스 목록 새로고침
+
         function refreshProcessList() {
+            loadProcessInfo();
             showAlert('info', '프로세스 목록이 새로고침되었습니다.', 2000);
         }
-        
-        // uptime 포맷팅
-        function formatUptime(milliseconds) {
-            var seconds = Math.floor(milliseconds / 1000);
-            var minutes = Math.floor(seconds / 60);
-            var hours = Math.floor(minutes / 60);
-            var days = Math.floor(hours / 24);
-            
-            if (days > 0) {
-                return days + '일 ' + (hours % 24) + '시간 ' + (minutes % 60) + '분 ' + (seconds % 60) + '초';
-            } else if (hours > 0) {
-                return hours + '시간 ' + (minutes % 60) + '분 ' + (seconds % 60) + '초';
-            } else if (minutes > 0) {
-                return minutes + '분 ' + (seconds % 60) + '초';
-            } else {
-                return seconds + '초';
-            }
+
+        function formatUptime(ms) {
+            var s = Math.floor(ms / 1000);
+            var m = Math.floor(s / 60);
+            var h = Math.floor(m / 60);
+            var d = Math.floor(h / 24);
+            if (d > 0) return d + '일 ' + (h % 24) + '시간';
+            if (h > 0) return h + '시간 ' + (m % 60) + '분';
+            if (m > 0) return m + '분 ' + (s % 60) + '초';
+            return s + '초';
         }
     </script>
 </body>

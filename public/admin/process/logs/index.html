@@ -3,555 +3,319 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>로그 기록 목록 - WebCrawlServer</title>
-    
-    <!-- 공통 CSS -->
+    <title>프로세스 로그 - WebCrawlServer</title>
     <link rel="stylesheet" href="../../../css/styles.css">
-    <!-- 관리자 전용 CSS -->
     <link rel="stylesheet" href="../../css/admin.css">
 </head>
-<body>
-    <!-- 헤더 -->
-    <header class="admin-header">
-        <div class="admin-header-content">
-            <div class="admin-logo">
-                <a href="/admin">
-                    <strong>WebCrawlServer</strong>
-                    <span>Admin</span>
-                </a>
-            </div>
-            
-            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="메뉴 열기">☰</button>
-            
-            <nav class="admin-nav" id="main-nav">
-                <ul class="admin-nav-list">
-                    <!-- 대시보드 -->
-                    <li class="nav-item">
-                        <a href="/admin" class="nav-dashboard">대시보드</a>
-                    </li>
-                    
-                    <!-- 서버 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-server">서버</a>
-                        <div class="dropdown-menu">
-                            <div class="dropdown-header">서버 관리</div>
-                            <a href="/admin/process">프로세스 목록</a>
-                            <a href="/admin/process/detail?pid=1">프로세스 세부정보</a>
-                            <div class="dropdown-divider"></div>
-                            <div class="dropdown-header">로그</div>
-                            <a href="/admin/process/logs">로그 기록 목록</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 데이터베이스 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-database">데이터베이스</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/database">DB 관리</a>
-                            <a href="#" onclick="alert('DB 백업 기능은 준비 중입니다.'); return false;">DB 백업</a>
-                            <a href="#" onclick="alert('DB 복원 기능은 준비 중입니다.'); return false;">DB 복원</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 모듈 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-modules">모듈</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/modules">모듈 목록</a>
-                            <a href="/admin/modules/create">모듈 추가</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 워크플로우 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-workflows">워크플로우</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/workflows">워크플로우 목록</a>
-                            <a href="/admin/workflows/create">워크플로우 생성</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 스케줄러 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-scheduler">스케줄러</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/scheduler">예약 작업 목록</a>
-                            <a href="/admin/scheduler/create">작업 예약</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 로그 메뉴 (드롭다운) -->
-                    <li class="nav-item">
-                        <a href="#" class="nav-logs">로그</a>
-                        <div class="dropdown-menu">
-                            <a href="/admin/logs">로그 보기</a>
-                            <a href="/admin/logs?type=activity">액티비티 로그</a>
-                            <a href="/admin/logs?type=error">에러 로그</a>
-                        </div>
-                    </li>
-                    
-                    <!-- 설정 -->
-                    <li class="nav-item">
-                        <a href="/admin/settings" class="nav-settings">설정</a>
-                    </li>
-                </ul>
-            </nav>
-            
-            <div class="admin-header-actions">
-                <a href="/admin/process" class="btn btn-secondary btn-sm">뒤로가기</a>
-            </div>
+<body class="admin-console-body">
+
+    <!-- 상단 앱 바 -->
+    <header class="console-topbar">
+        <div class="console-brand">
+            <button class="console-icon-button mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="관리 메뉴 열기">☰</button>
+            <a href="/admin" class="console-logo" aria-label="관리자 대시보드로 이동">
+                <span class="console-logo-mark">W</span>
+                <span class="console-logo-text">WebCrawlServer</span>
+            </a>
+        </div>
+        <form class="console-search" role="search">
+            <label class="sr-only" for="adminSearch">관리 기능 검색</label>
+            <input id="adminSearch" type="search" placeholder="관리 기능, 로그, 프로세스 검색">
+        </form>
+        <div class="console-topbar-actions">
+            <a href="/" class="btn btn-secondary btn-sm">메인</a>
+            <button class="console-icon-button" type="button" aria-label="도움말">?</button>
+            <button class="console-avatar" type="button" aria-label="관리자 계정">관</button>
         </div>
     </header>
 
-    <!-- 브레드크럼 (현재 위치) -->
-    <nav class="breadcrumb" id="breadcrumb">
-        <div class="breadcrumb-item"><a href="/admin">관리자</a></div>
-        <div class="breadcrumb-item"><a href="/admin/process">서버 프로세스</a></div>
-        <div class="breadcrumb-item active">로그 기록</div>
-    </nav>
+    <div class="console-shell">
+        <!-- 모바일 사이드바 오버레이 -->
+        <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()" aria-hidden="true"></div>
 
-    <!-- 본문 -->
-    <main class="admin-main">
-        <div class="admin-container">
-            <!-- 페이지 제목 -->
-            <div class="admin-page-header">
-                <h1>로그 기록 목록</h1>
-                <p class="admin-page-subtitle">서버 로그 파일 목록 및 내용 확인</p>
-            </div>
+        <!-- 좌측 사이드바 -->
+        <aside class="console-sidebar" id="main-nav" aria-label="관리자 주요 메뉴">
+            <nav class="console-sidebar-nav">
+                <a class="console-nav-link" href="/admin"><span>대시보드</span></a>
+                <a class="console-nav-link" href="/admin/process"><span>프로세스</span></a>
+                <a class="console-nav-link" href="/admin/process/logs"><span>프로세스 로그</span></a>
+                <a class="console-nav-link" href="/admin/database"><span>데이터베이스</span></a>
+                <a class="console-nav-link" href="/admin/modules"><span>모듈</span></a>
+                <a class="console-nav-link" href="/admin/workflows"><span>워크플로우</span></a>
+                <a class="console-nav-link" href="/admin/scheduler"><span>스케줄러</span></a>
+                <a class="console-nav-link" href="/admin/logs"><span>로그</span></a>
+                <a class="console-nav-link" href="/admin/settings"><span>설정</span></a>
+            </nav>
+        </aside>
+
+        <!-- 본문 -->
+        <main class="console-main">
+            <!-- 브레드크럼 -->
+            <nav class="console-breadcrumb" aria-label="현재 위치">
+                <a href="/admin">관리자</a>
+                <span aria-hidden="true">/</span>
+                <a href="/admin/process">프로세스</a>
+                <span aria-hidden="true">/</span>
+                <span>로그</span>
+            </nav>
+
+            <!-- 페이지 헤더 -->
+            <section class="console-hero">
+                <div>
+                    <p class="console-eyebrow">서버 관리</p>
+                    <h1>프로세스 로그</h1>
+                    <p class="admin-page-subtitle">서버 로그 파일 목록 및 내용을 확인합니다.</p>
+                </div>
+                <div class="console-hero-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="refreshLogList()">목록 새로고침</button>
+                    <button class="btn btn-secondary btn-sm" onclick="clearAllLogs()">모두 삭제</button>
+                </div>
+            </section>
 
             <!-- 알림 컨테이너 -->
             <div id="alert-container" class="mb-md"></div>
 
-            <!-- 로그 필터 및 검색 -->
-            <section class="admin-section">
-                <div class="admin-section-header">
-                    <h2>로그 필터</h2>
-                </div>
-                <div class="admin-toolbar">
-                    <div class="toolbar-group">
-                        <label>로그 타입:</label>
-                        <select id="log-type-filter" class="form-control" onchange="filterLogs()">
-                            <option value="">모두</option>
-                            <option value="server">서버 로그</option>
-                            <option value="activity">액티비티 로그</option>
-                            <option value="error">에러 로그</option>
-                            <option value="websocket">WebSocket 로그</option>
-                        </select>
-                    </div>
-                    <div class="toolbar-group">
-                        <label>검색:</label>
-                        <input type="text" id="log-search" class="form-control" placeholder="로그 검색..." onkeyup="filterLogs()">
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn btn-secondary btn-sm" onclick="refreshLogList()">새로고침</button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 로그 파일 목록 -->
-            <section class="admin-section">
-                <div class="admin-section-header">
-                    <h2>로그 파일 목록</h2>
-                    <div class="admin-section-actions">
-                        <button class="btn btn-secondary btn-sm" onclick="clearAllLogs()">모두 삭제</button>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>파일명</th>
-                                <th>타입</th>
-                                <th>크기</th>
-                                <th>마지막 수정</th>
-                                <th>액션</th>
-                            </tr>
-                        </thead>
-                        <tbody id="log-file-list">
-                            <tr>
-                                <td>server.log</td>
-                                <td><span class="badge badge-info">서버 로그</span></td>
-                                <td>15.2 KB</td>
-                                <td>2026-07-26 14:30:00</td>
-                                <td>
-                                    <a href="#" class="btn btn-secondary btn-sm" onclick="viewLogContent('server.log'); return false;">보기</a>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteLogFile('server.log')">삭제</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>websocket.log</td>
-                                <td><span class="badge badge-info">WebSocket</span></td>
-                                <td>89.5 KB</td>
-                                <td>2026-07-26 14:15:00</td>
-                                <td>
-                                    <a href="#" class="btn btn-secondary btn-sm" onclick="viewLogContent('websocket.log'); return false;">보기</a>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteLogFile('websocket.log')">삭제</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>error.log</td>
-                                <td><span class="badge badge-error">에러 로그</span></td>
-                                <td>3.1 KB</td>
-                                <td>2026-07-26 14:00:00</td>
-                                <td>
-                                    <a href="#" class="btn btn-secondary btn-sm" onclick="viewLogContent('error.log'); return false;">보기</a>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteLogFile('error.log')">삭제</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>access.log</td>
-                                <td><span class="badge badge-success">액세스 로그</span></td>
-                                <td>28.7 KB</td>
-                                <td>2026-07-26 14:28:00</td>
-                                <td>
-                                    <a href="#" class="btn btn-secondary btn-sm" onclick="viewLogContent('access.log'); return false;">보기</a>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteLogFile('access.log')">삭제</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- 로그 내용 보기 모달 -->
-            <div id="log-view-modal" class="admin-modal hidden" role="dialog" aria-hidden="true">
-                <div class="admin-modal-content">
-                    <div class="admin-modal-header">
-                        <h2 id="log-view-title">로그 파일 내용</h2>
-                        <button class="admin-modal-close" onclick="closeLogView()">&times;</button>
-                    </div>
-                    <div class="admin-modal-body">
-                        <div class="admin-toolbar">
-                            <div class="toolbar-group">
-                                <label>파일명:</label>
-                                <span id="viewing-file-name">-</span>
-                            </div>
-                            <div class="toolbar-group">
-                                <label>크기:</label>
-                                <span id="viewing-file-size">-</span>
-                            </div>
-                            <div class="toolbar-group">
-                                <label>줄 수:</label>
-                                <span id="viewing-file-lines">-</span>
-                            </div>
-                        </div>
-                        <div class="table-container">
-                            <div class="log-content" id="log-content"></div>
+            <div class="console-content-grid">
+                <!-- 로그 파일 목록 -->
+                <section class="admin-section console-panel console-panel-wide">
+                    <div class="admin-section-header">
+                        <h2>로그 파일 목록</h2>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <select id="log-type-filter" class="form-control" style="width:auto;min-width:120px;" onchange="filterLogs()">
+                                <option value="">전체 타입</option>
+                                <option value="server">서버 로그</option>
+                                <option value="activity">액티비티</option>
+                                <option value="error">에러 로그</option>
+                                <option value="websocket">WebSocket</option>
+                            </select>
+                            <input type="search" id="log-search" class="form-control" style="width:180px;" placeholder="로그 검색..." oninput="filterLogs()">
                         </div>
                     </div>
-                    <div class="admin-modal-footer">
-                        <button class="btn btn-secondary" onclick="downloadLogFile()">다운로드</button>
-                        <button class="btn btn-primary" onclick="closeLogView()">닫기</button>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr><th>파일명</th><th>타입</th><th>크기</th><th>마지막 수정</th><th>액션</th></tr>
+                            </thead>
+                            <tbody id="log-file-list">
+                                <tr><td colspan="5" class="text-center">로그 파일 목록을 불러오는 중...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-            </div>
+                </section>
 
-            <!-- 로그 내용 테이블 -->
-            <section class="admin-section">
-                <div class="admin-section-header">
-                    <h2>로그 내용</h2>
-                    <div class="admin-section-actions">
+                <!-- 필터 현황 -->
+                <section class="admin-section console-panel">
+                    <div class="admin-section-header"><h2>필터 현황</h2></div>
+                    <div class="console-status-list status-grid">
+                        <div class="status-item">
+                            <div class="status-item-header"><span class="status-indicator online"></span><span>선택 타입</span></div>
+                            <span class="status-value" id="filter-type-display">전체</span>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-item-header"><span class="status-indicator online"></span><span>검색어</span></div>
+                            <span class="status-value" id="filter-query-display">없음</span>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-item-header"><span class="status-indicator online"></span><span>표시 파일 수</span></div>
+                            <span class="status-value" id="filter-count-display">-</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 로그 내용 -->
+                <section class="admin-section console-panel console-panel-wide">
+                    <div class="admin-section-header">
+                        <h2>로그 내용</h2>
                         <button class="btn btn-secondary btn-sm" onclick="refreshLogContent()">새로고침</button>
                     </div>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr><th>#</th><th>시간</th><th>레벨</th><th>메시지</th></tr>
+                            </thead>
+                            <tbody id="log-content-list">
+                                <tr><td colspan="4" class="text-center">로그 내용을 불러오는 중...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="log-pagination"></div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- 로그 파일 보기 모달 -->
+    <div id="log-view-modal" class="admin-modal hidden" role="dialog" aria-hidden="true">
+        <div class="admin-modal-content">
+            <div class="admin-modal-header">
+                <h2 id="log-view-title">로그 파일 내용</h2>
+                <button class="admin-modal-close" onclick="closeLogView()">&times;</button>
+            </div>
+            <div class="admin-modal-body">
+                <div style="display:flex;gap:16px;margin-bottom:12px;font-size:13px;color:#5f6368;">
+                    <span>파일: <strong id="viewing-file-name">-</strong></span>
+                    <span>크기: <strong id="viewing-file-size">-</strong></span>
+                    <span>줄 수: <strong id="viewing-file-lines">-</strong></span>
                 </div>
                 <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>번호</th>
-                                <th>시간</th>
-                                <th>레벨</th>
-                                <th>메시지</th>
-                            </tr>
-                        </thead>
-                        <tbody id="log-content-list">
-                            <tr>
-                                <td>1</td>
-                                <td>2026-07-26 14:30:00</td>
-                                <td><span class="badge badge-success">INFO</span></td>
-                                <td>서버가 포트 9600에서 시작되었습니다.</td>
-                            </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>2026-07-26 14:29:00</td>
-                                <td><span class="badge badge-success">INFO</span></td>
-                                <td>데이터베이스 연결 성공</td>
-                            </tr>
-                            <tr>
-                                <td>3</td>
-                                <td>2026-07-26 14:28:00</td>
-                                <td><span class="badge badge-success">INFO</span></td>
-                                <td>WebSocket 서버 시작</td>
-                            </tr>
-                            <tr>
-                                <td>4</td>
-                                <td>2026-07-26 14:27:00</td>
-                                <td><span class="badge badge-warning">WARN</span></td>
-                                <td>스케줄러 작업이 지연되고 있습니다.</td>
-                            </tr>
-                            <tr>
-                                <td>5</td>
-                                <td>2026-07-26 14:25:00</td>
-                                <td><span class="badge badge-error">ERROR</span></td>
-                                <td>모듈 로드 실패: missing_module</td>
-                            </tr>
-                            <tr>
-                                <td>6</td>
-                                <td>2026-07-26 14:20:00</td>
-                                <td><span class="badge badge-success">INFO</span></td>
-                                <td>MCP 서버 준비 완료</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div id="log-content" style="font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto;max-height:400px;overflow-y:auto;background:#f8fafd;padding:12px;border-radius:8px;border:1px solid #dadce0;"></div>
                 </div>
-                <div class="pagination" id="log-pagination"></div>
-            </section>
+            </div>
+            <div class="admin-modal-footer">
+                <button class="btn btn-secondary" onclick="downloadLogFile()">다운로드</button>
+                <button class="btn btn-primary" onclick="closeLogView()">닫기</button>
+            </div>
         </div>
-    </main>
+    </div>
 
-    <!-- 푸터 -->
-    <footer class="admin-footer">
-        <div class="admin-container">
-            <p>&copy; 2026 WebCrawlServer. 모든 권리 보호.</p>
-        </div>
-    </footer>
-
-    <!-- JavaScript -->
     <script src="../../../js/main.js"></script>
     <script src="../../js/admin.js"></script>
     <script>
         var currentLogPage = 1;
         var itemsPerPage = 20;
         var currentFile = null;
-        
-        // 페이지 로드 시 로그 목록 로드
+        var allLogFiles = [
+            { name: 'server.log',    type: '서버 로그',    typeClass: 'info',    size: '15.2 KB', modified: '2026-07-25 14:30:00' },
+            { name: 'websocket.log', type: 'WebSocket',    typeClass: 'info',    size: '89.5 KB', modified: '2026-07-25 14:15:00' },
+            { name: 'error.log',     type: '에러 로그',    typeClass: 'error',   size: '3.1 KB',  modified: '2026-07-25 14:00:00' },
+            { name: 'access.log',    type: '액세스 로그',  typeClass: 'success', size: '28.7 KB', modified: '2026-07-25 14:28:00' }
+        ];
+        var allLogContent = [
+            { id:1, time:'2026-07-25 14:30:00', level:'INFO',  levelClass:'success', message:'서버가 포트 9600에서 시작되었습니다.' },
+            { id:2, time:'2026-07-25 14:29:00', level:'INFO',  levelClass:'success', message:'데이터베이스 연결 성공' },
+            { id:3, time:'2026-07-25 14:28:00', level:'INFO',  levelClass:'success', message:'WebSocket 서버 시작' },
+            { id:4, time:'2026-07-25 14:27:00', level:'WARN',  levelClass:'warning', message:'스케줄러 작업이 지연되고 있습니다.' },
+            { id:5, time:'2026-07-25 14:25:00', level:'ERROR', levelClass:'error',   message:'모듈 로드 실패: missing_module' },
+            { id:6, time:'2026-07-25 14:20:00', level:'INFO',  levelClass:'success', message:'MCP 서버 준비 완료' }
+        ];
+
+        // 사이드바 활성 링크 자동 감지
         domReady(function() {
-            loadLogFileList();
-            loadLogContent();
-            setupPagination();
+            var currentPath = window.location.pathname;
+            document.querySelectorAll('.console-nav-link').forEach(function(link) {
+                var href = link.getAttribute('href');
+                if (href && href !== '/admin' && currentPath === href) link.classList.add('active');
+            });
+            updateLogFileList(allLogFiles);
+            updateLogContent(allLogContent);
+            updateFilterStatus();
         });
-        
-        // 로그 파일 목록 로드
-        function loadLogFileList() {
-            // 더미 데이터 - 실제는 API 호출로 대체
-            var logFiles = [
-                { name: 'server.log', type: '서버 로그', typeClass: 'info', size: '15.2 KB', modified: '2026-07-26 14:30:00' },
-                { name: 'websocket.log', type: 'WebSocket', typeClass: 'info', size: '89.5 KB', modified: '2026-07-26 14:15:00' },
-                { name: 'error.log', type: '에러 로그', typeClass: 'error', size: '3.1 KB', modified: '2026-07-26 14:00:00' },
-                { name: 'access.log', type: '액세스 로그', typeClass: 'success', size: '28.7 KB', modified: '2026-07-26 14:28:00' }
-            ];
-            
-            updateLogFileList(logFiles);
+
+        function toggleMobileMenu() {
+            document.getElementById('main-nav').classList.toggle('open');
+            document.getElementById('sidebar-overlay').classList.toggle('open');
         }
-        
-        // 로그 파일 목록 업데이트
+        function closeSidebar() {
+            document.getElementById('main-nav').classList.remove('open');
+            document.getElementById('sidebar-overlay').classList.remove('open');
+        }
+
         function updateLogFileList(files) {
             var container = document.getElementById('log-file-list');
-            if (!container) return;
-            
-            container.innerHTML = '';
-            
-            files.forEach(function(file) {
-                var row = document.createElement('tr');
-                row.innerHTML = '
-                    <td>' + file.name + '</td>
-                    <td><span class="badge badge-' + file.typeClass + '">' + file.type + '</span></td>
-                    <td>' + file.size + '</td>
-                    <td>' + file.modified + '</td>
-                    <td>
-                        <a href="#" class="btn btn-secondary btn-sm" onclick="viewLogContent(\'' + file.name + '\'); return false;">보기</a>
-                        <button class="btn btn-danger btn-sm" onclick="deleteLogFile(\'' + file.name + '\')">삭제</button>
-                    </td>
-                ';
-                container.appendChild(row);
-            });
+            if (!files.length) { container.innerHTML = '<tr><td colspan="5" class="text-center">로그 파일이 없습니다.</td></tr>'; return; }
+            container.innerHTML = files.map(function(f) {
+                return '<tr>' +
+                    '<td>' + f.name + '</td>' +
+                    '<td><span class="badge badge-' + f.typeClass + '">' + f.type + '</span></td>' +
+                    '<td>' + f.size + '</td>' +
+                    '<td>' + f.modified + '</td>' +
+                    '<td style="display:flex;gap:4px;">' +
+                        '<a href="#" class="btn btn-secondary btn-sm" onclick="viewLogContent(\'' + f.name + '\');return false;">보기</a>' +
+                        '<button class="btn btn-danger btn-sm" onclick="deleteLogFile(\'' + f.name + '\')">삭제</button>' +
+                    '</td>' +
+                '</tr>';
+            }).join('');
+            document.getElementById('filter-count-display').textContent = files.length + '개';
         }
-        
-        // 로그 내용 로드
-        function loadLogContent() {
-            // 더미 데이터
-            var logs = [
-                { id: 1, time: '2026-07-26 14:30:00', level: 'INFO', levelClass: 'success', message: '서버가 포트 9600에서 시작되었습니다.' },
-                { id: 2, time: '2026-07-26 14:29:00', level: 'INFO', levelClass: 'success', message: '데이터베이스 연결 성공' },
-                { id: 3, time: '2026-07-26 14:28:00', level: 'INFO', levelClass: 'success', message: 'WebSocket 서버 시작' },
-                { id: 4, time: '2026-07-26 14:27:00', level: 'WARN', levelClass: 'warning', message: '스케줄러 작업이 지연되고 있습니다.' },
-                { id: 5, time: '2026-07-26 14:25:00', level: 'ERROR', levelClass: 'error', message: '모듈 로드 실패: missing_module' },
-                { id: 6, time: '2026-07-26 14:20:00', level: 'INFO', levelClass: 'success', message: 'MCP 서버 준비 완료' }
-            ];
-            
-            updateLogContent(logs);
-        }
-        
-        // 로그 내용 업데이트
+
         function updateLogContent(logs) {
             var container = document.getElementById('log-content-list');
-            if (!container) return;
-            
-            container.innerHTML = '';
-            
-            var startIdx = (currentLogPage - 1) * itemsPerPage;
-            var endIdx = Math.min(startIdx + itemsPerPage, logs.length);
-            
-            for (var i = startIdx; i < endIdx; i++) {
-                var log = logs[i];
-                var row = document.createElement('tr');
-                row.innerHTML = '
-                    <td>' + log.id + '</td>
-                    <td>' + log.time + '</td>
-                    <td><span class="badge badge-' + log.levelClass + '">' + log.level + '</span></td>
-                    <td>' + log.message + '</td>
-                ';
-                container.appendChild(row);
-            }
-            
-            setupPagination();
+            var start = (currentLogPage - 1) * itemsPerPage;
+            var slice = logs.slice(start, start + itemsPerPage);
+            if (!slice.length) { container.innerHTML = '<tr><td colspan="4" class="text-center">로그가 없습니다.</td></tr>'; return; }
+            container.innerHTML = slice.map(function(l) {
+                return '<tr><td>' + l.id + '</td><td>' + l.time + '</td>' +
+                    '<td><span class="badge badge-' + l.levelClass + '">' + l.level + '</span></td>' +
+                    '<td>' + l.message + '</td></tr>';
+            }).join('');
+            buildPagination(logs.length);
         }
-        
-        // 페이지네이션 설정
-        function setupPagination() {
-            var totalItems = 100; // 더미 total
-            var totalPages = Math.ceil(totalItems / itemsPerPage);
+
+        function buildPagination(total) {
+            var totalPages = Math.ceil(total / itemsPerPage);
             var pagination = document.getElementById('log-pagination');
-            
-            if (!pagination) return;
-            
             var html = '';
-            
-            // 이전 버튼
-            if (currentLogPage > 1) {
-                html += '<button onclick="goToPage(' + (currentLogPage - 1) + ')">이전</button>';
+            if (currentLogPage > 1) html += '<button onclick="goToPage(' + (currentLogPage-1) + ')">이전</button>';
+            for (var i = Math.max(1, currentLogPage-2); i <= Math.min(totalPages, currentLogPage+2); i++) {
+                html += '<button class="' + (i===currentLogPage?'active':'') + '" onclick="goToPage(' + i + ')">' + i + '</button>';
             }
-            
-            // 페이지 번호
-            var startPage = Math.max(1, currentLogPage - 2);
-            var endPage = Math.min(totalPages, currentLogPage + 2);
-            
-            for (var i = startPage; i <= endPage; i++) {
-                if (i === currentLogPage) {
-                    html += '<button class="active" onclick="goToPage(' + i + ')">' + i + '</button>';
-                } else {
-                    html += '<button onclick="goToPage(' + i + ')">' + i + '</button>';
-                }
-            }
-            
-            // 다음 버튼
-            if (currentLogPage < totalPages) {
-                html += '<button onclick="goToPage(' + (currentLogPage + 1) + ')">다음</button>';
-            }
-            
+            if (currentLogPage < totalPages) html += '<button onclick="goToPage(' + (currentLogPage+1) + ')">다음</button>';
             pagination.innerHTML = html;
         }
-        
-        // 페이지 이동
-        function goToPage(page) {
-            currentLogPage = page;
-            loadLogContent();
+
+        function goToPage(page) { currentLogPage = page; updateLogContent(allLogContent); }
+
+        function filterLogs() {
+            var typeFilter  = document.getElementById('log-type-filter').value;
+            var searchQuery = document.getElementById('log-search').value.toLowerCase();
+            var filtered    = allLogFiles.filter(function(f) {
+                var typeMatch   = !typeFilter || f.name.includes(typeFilter) || f.type.includes(typeFilter);
+                var searchMatch = !searchQuery || f.name.toLowerCase().includes(searchQuery);
+                return typeMatch && searchMatch;
+            });
+            updateLogFileList(filtered);
+            updateFilterStatus();
         }
-        
-        // 로그 내용 새로고침
-        function refreshLogContent() {
-            loadLogContent();
-            showAlert('info', '로그 내용이 새로고침되었습니다.', 2000);
+
+        function updateFilterStatus() {
+            var typeFilter  = document.getElementById('log-type-filter').value;
+            var searchQuery = document.getElementById('log-search').value;
+            document.getElementById('filter-type-display').textContent  = typeFilter  || '전체';
+            document.getElementById('filter-query-display').textContent = searchQuery || '없음';
         }
-        
-        // 로그 파일보기
+
+        function refreshLogList()    { updateLogFileList(allLogFiles); showAlert('info', '목록이 새로고침되었습니다.', 2000); }
+        function refreshLogContent() { updateLogContent(allLogContent); showAlert('info', '로그 내용이 새로고침되었습니다.', 2000); }
+
         function viewLogContent(fileName) {
             currentFile = fileName;
-            var modal = document.getElementById('log-view-modal');
-            var title = document.getElementById('log-view-title');
-            var fileNameSpan = document.getElementById('viewing-file-name');
-            var contentDiv = document.getElementById('log-content');
-            
-            title.textContent = fileName + ' - 로그 파일 내용';
-            fileNameSpan.textContent = fileName;
-            
-            // 더미 데이터 - 실제는 파일 읽기로 대체
-            var fileInfo = {
-                'server.log': { size: '15.2 KB', lines: 42 },
-                'websocket.log': { size: '89.5 KB', lines: 89 },
-                'error.log': { size: '3.1 KB', lines: 5 },
-                'access.log': { size: '28.7 KB', lines: 287 }
-            };
-            
-            var info = fileInfo[fileName] || { size: '-', lines: 0 };
-            document.getElementById('viewing-file-size').textContent = info.size;
-            document.getElementById('viewing-file-lines').textContent = info.lines + ' 줄';
-            
-            // 로그 내용 표시
-            contentDiv.innerHTML = '<pre>' + generateDummyLogContent(fileName) + '</pre>';
-            
-            modal.classList.remove('hidden');
-            modal.setAttribute('aria-hidden', 'false');
-        }
-        
-        // 로그 내용 생성 (더미)
-        function generateDummyLogContent(fileName) {
-            var logs = [];
-            var count = 50;
-            
-            for (var i = 1; i <= count; i++) {
-                var time = '2026-07-26 14:' + 
-                    String(Math.floor(Math.random() * 60)).padStart(2, '0') + ':' + 
-                    String(Math.floor(Math.random() * 60)).padStart(2, '0');
-                var levels = ['INFO', 'WARN', 'ERROR', 'DEBUG'];
-                var level = levels[Math.floor(Math.random() * levels.length)];
-                var messages = [
-                    '서버 동작 정상',
-                    '클라이언트 연결됨',
-                    '쿼리 실행 성공',
-                    '파일 읽기 완료',
-                    '데이터 처리 중',
-                    'Timeout 발생',
-                    '연결 종료됨'
-                ];
-                var message = messages[Math.floor(Math.random() * messages.length)];
-                
-                logs.push('[' + time + '] [' + level + '] ' + message);
+            document.getElementById('log-view-title').textContent    = fileName + ' — 로그 파일 내용';
+            document.getElementById('viewing-file-name').textContent  = fileName;
+            var info = allLogFiles.find(function(f) { return f.name === fileName; }) || {};
+            document.getElementById('viewing-file-size').textContent  = info.size  || '-';
+            document.getElementById('viewing-file-lines').textContent = '50 줄';
+            var lines = [];
+            for (var i = 1; i <= 50; i++) {
+                var levels = ['INFO','WARN','ERROR','DEBUG'];
+                var msgs   = ['서버 동작 정상','클라이언트 연결됨','쿼리 실행 성공','파일 읽기 완료','Timeout 발생','연결 종료됨'];
+                lines.push('[2026-07-25 14:' + String(Math.floor(Math.random()*60)).padStart(2,'0') + ':00] [' +
+                    levels[Math.floor(Math.random()*levels.length)] + '] ' +
+                    msgs[Math.floor(Math.random()*msgs.length)]);
             }
-            
-            return logs.join('\n');
+            document.getElementById('log-content').textContent = lines.join('\n');
+            var modal = document.getElementById('log-view-modal');
+            modal.classList.remove('hidden');
+            modal.setAttribute('aria-hidden','false');
         }
-        
-        // 로그 보기 닫기
+
         function closeLogView() {
             var modal = document.getElementById('log-view-modal');
             modal.classList.add('hidden');
-            modal.setAttribute('aria-hidden', 'true');
+            modal.setAttribute('aria-hidden','true');
         }
-        
-        // 로그 파일 삭제
+
         function deleteLogFile(fileName) {
-            if (confirm('정말로 "' + fileName + '" 파일을 삭제하시겠습니까?')) {
+            if (confirm('정말로 "' + fileName + '" 파일을 삭제하시겠습니까?'))
                 showAlert('success', fileName + ' 파일이 삭제되었습니다.', 3000);
-            }
         }
-        
-        // 모두 삭제
+
         function clearAllLogs() {
-            if (confirm('정말로 모든 로그 파일을 삭제하시겠습니까?')) {
+            if (confirm('정말로 모든 로그 파일을 삭제하시겠습니까?'))
                 showAlert('success', '모든 로그 파일이 삭제되었습니다.', 3000);
-            }
         }
-        
-        // 로그 파일 다운로드
+
         function downloadLogFile() {
-            if (currentFile) {
-                showAlert('info', currentFile + ' 파일이 다운로드准备되었습니다.', 3000);
-            }
-        }
-        
-        // 로그 필터링
-        function filterLogs() {
-            var typeFilter = document.getElementById('log-type-filter').value;
-            var searchQuery = document.getElementById('log-search').value.toLowerCase();
-            
-            showAlert('info', '로그 필터가 적용되었습니다: ' + (typeFilter || '모두') + ', 검색: ' + (searchQuery || '없음'), 2000);
-        }
-        
-        // 로그 파일 목록 새로고침
-        function refreshLogList() {
-            loadLogFileList();
-            showAlert('info', '로그 파일 목록이 새로고침되었습니다.', 2000);
+            if (currentFile) showAlert('info', currentFile + ' 파일 다운로드가 준비되었습니다.', 3000);
         }
     </script>
 </body>

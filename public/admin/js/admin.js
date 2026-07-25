@@ -9,6 +9,46 @@ domReady(function() {
     initializeDashboard();
 });
 
+// ===== 전역 키보드 탐색 (접근성) =====
+document.addEventListener('keydown', function(e) {
+    // Escape 키: 모바일 사이드바 닫기
+    if (e.key === 'Escape') {
+        var sidebar = document.getElementById('main-nav');
+        var overlay = document.getElementById('sidebar-overlay');
+        if (sidebar && sidebar.classList.contains('open')) {
+            sidebar.classList.remove('open');
+            if (overlay) overlay.classList.remove('open');
+            // 포커스를 토글 버튼으로 복원
+            var toggle = document.querySelector('.mobile-menu-toggle');
+            if (toggle) toggle.focus();
+        }
+        // 열린 모달 닫기
+        document.querySelectorAll('.admin-modal:not(.hidden)').forEach(function(modal) {
+            var closeBtn = modal.querySelector('.admin-modal-close');
+            if (closeBtn) closeBtn.click();
+        });
+    }
+    // Tab 순환 시 사이드바가 열려 있으면 포커스 트랩
+    if (e.key === 'Tab') {
+        var sidebar = document.getElementById('main-nav');
+        if (sidebar && sidebar.classList.contains('open')) {
+            var focusable = sidebar.querySelectorAll(
+                'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            if (!focusable.length) return;
+            var first = focusable[0];
+            var last  = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    }
+});
+
 // ===== 대시보드 초기화 =====
 function initializeDashboard() {
     // 통계 데이터 로드

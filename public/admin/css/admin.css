@@ -1017,6 +1017,48 @@
     border: 0;
 }
 
+/* 스킵 링크 (접근성: 키보드 포커스 시 화면에 표시) */
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 0;
+    padding: 8px 16px;
+    background: #1a73e8;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 0 0 4px 0;
+    z-index: 9999;
+    text-decoration: none;
+    transition: top 0.12s;
+}
+.skip-link:focus {
+    top: 0;
+    outline: 2px solid #174ea6;
+    outline-offset: 0;
+}
+
+/* 포커스 표시 강화 (focus-visible) */
+.console-nav-link:focus-visible {
+    outline: 2px solid #1a73e8;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+.console-icon-button:focus-visible,
+.console-avatar:focus-visible {
+    outline: 2px solid #1a73e8;
+    outline-offset: 2px;
+}
+.btn:focus-visible {
+    outline: 2px solid #1a73e8;
+    outline-offset: 2px;
+}
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid #1a73e8;
+    outline-offset: 0;
+}
+
 .admin-console-body {
     background: #f8fafd;
     color: #202124;

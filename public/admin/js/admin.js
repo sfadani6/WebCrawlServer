@@ -56,43 +56,62 @@ function updateStatistics(data) {
     if (totalLogs) totalLogs.textContent = data.activityLogs || 0;
 }
 
-// ===== 시스템 상태 로드 =====
+// ===== 시스템 상태 로드 (/api/status 기반) =====
 function loadSystemStatus() {
-    // 헬스 체크 API 호출
-    fetchJSON('/health')
+    fetchJSON('/api/status')
         .then(function(data) {
             updateSystemStatus(data);
         })
         .catch(function(error) {
             console.error('시스템 상태 로드 실패:', error);
-            updateSystemStatus({ status: 'offline' });
+            updateSystemStatus({
+                server: 'offline',
+                database: 'offline',
+                websocket: 'idle',
+                websocketClients: 0,
+                mcp: 'offline'
+            });
         });
 }
 
 // ===== 시스템 상태 업데이트 =====
 function updateSystemStatus(data) {
     var serverStatus = document.getElementById('server-status');
-    var dbStatus = document.getElementById('db-status');
-    var wsStatus = document.getElementById('ws-status');
-    var mcpStatus = document.getElementById('mcp-status');
-    
+    var dbStatus     = document.getElementById('db-status');
+    var wsStatus     = document.getElementById('ws-status');
+    var mcpStatus    = document.getElementById('mcp-status');
+
     if (serverStatus) {
-        var statusText = data.status === 'healthy' ? '정상 동작 중' : '오류 발생';
-        serverStatus.textContent = statusText;
+        serverStatus.textContent = data.server === 'online' ? '정상 동작 중' : '오류 발생';
     }
-    
     if (dbStatus) {
-        // 데이터베이스 상태 확인 (입력 예시)
-        dbStatus.textContent = '연결됨';
+        dbStatus.textContent = data.database === 'online' ? '연결됨' : '연결 끊김';
     }
-    
     if (wsStatus) {
-        wsStatus.textContent = '활성화됨';
+        var clients = data.websocketClients || 0;
+        wsStatus.textContent = clients > 0 ? '활성 (' + clients + '명 연결)' : '대기 중';
     }
-    
     if (mcpStatus) {
-        mcpStatus.textContent = '준비 완료';
+        mcpStatus.textContent = data.mcp === 'ready' ? '준비 완료' : '오류';
     }
+
+    // 상태 인디케이터 색상 업데이트
+    setIndicator('server-status',   data.server   === 'online');
+    setIndicator('db-status',       data.database === 'online');
+    setIndicator('ws-status',       data.websocket !== 'offline');
+    setIndicator('mcp-status',      data.mcp      === 'ready');
+}
+
+// 상태 인디케이터 (점) 클래스 전환
+function setIndicator(valueId, isOnline) {
+    var el = document.getElementById(valueId);
+    if (!el) return;
+    var item      = el.closest('.status-item');
+    if (!item) return;
+    var indicator = item.querySelector('.status-indicator');
+    if (!indicator) return;
+    indicator.classList.toggle('online',  isOnline);
+    indicator.classList.toggle('offline', !isOnline);
 }
 
 // ===== 최근 활동 로드 =====

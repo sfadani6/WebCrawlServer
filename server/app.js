@@ -107,6 +107,26 @@ app.get('/api/activities', async (req, res, next) => {
   }
 });
 
+// 시스템 상태 통합 API (R-006 monitoring.md 참조)
+app.get('/api/status', async (req, res, next) => {
+  let dbStatus = 'offline';
+  try {
+    const rows = await queryDatabase('SELECT 1 AS ok');
+    dbStatus = rows[0]?.ok === 1 ? 'online' : 'offline';
+  } catch {
+    dbStatus = 'offline';
+  }
+
+  res.json({
+    server: 'online',
+    database: dbStatus,
+    websocket: 'active',
+    websocketClients: wss.clients.size,
+    mcp: 'ready',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // 메인 페이지 - index.html 제공
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));

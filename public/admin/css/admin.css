@@ -1320,6 +1320,19 @@
     }
 }
 
+/* 모바일 사이드바 오버레이 */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.32);
+    z-index: 170;
+}
+
+.sidebar-overlay.open {
+    display: block;
+}
+
 @media (max-width: 700px) {
     .console-topbar {
         flex-wrap: wrap;

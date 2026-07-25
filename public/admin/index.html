@@ -28,9 +28,12 @@
     </header>
 
     <div class="console-shell">
+        <!-- 모바일 사이드바 오버레이 -->
+        <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()" aria-hidden="true"></div>
+
         <aside class="console-sidebar" id="main-nav" aria-label="관리자 주요 메뉴">
             <nav class="console-sidebar-nav">
-                <a class="console-nav-link active" href="/admin"><span>대시보드</span></a>
+                <a class="console-nav-link" href="/admin"><span>대시보드</span></a>
                 <a class="console-nav-link" href="/admin/process"><span>프로세스</span></a>
                 <a class="console-nav-link" href="/admin/process/logs"><span>프로세스 로그</span></a>
                 <a class="console-nav-link" href="/admin/database"><span>데이터베이스</span></a>
@@ -125,5 +128,37 @@
 
     <script src="../js/main.js"></script>
     <script src="js/admin.js"></script>
+    <script>
+        // 콘솔 사이드바 활성 링크 자동 감지
+        domReady(function() {
+            var currentPath = window.location.pathname;
+            var navLinks = document.querySelectorAll('.console-nav-link');
+            navLinks.forEach(function(link) {
+                var href = link.getAttribute('href');
+                if (!href) return;
+                if (href === '/admin' && (currentPath === '/admin' || currentPath === '/admin/')) {
+                    link.classList.add('active');
+                } else if (href !== '/admin' && currentPath.startsWith(href)) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // 사이드바 토글 (모바일)
+        function toggleMobileMenu() {
+            var sidebar = document.getElementById('main-nav');
+            var overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('open');
+        }
+
+        // 사이드바 닫기
+        function closeSidebar() {
+            var sidebar = document.getElementById('main-nav');
+            var overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.remove('open');
+            overlay.classList.remove('open');
+        }
+    </script>
 </body>
 </html>

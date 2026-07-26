@@ -10,12 +10,54 @@
 
 | 버전 | 날짜 | 제목 | 작성자 |
 |------|------|------|--------|
+| 0.1.4 | 2026-07-26 | P0-P3 일괄 처리 (8/27건) | Cline |
 | 0.1.3 | 2026-07-26 | 워크플로우 엔진 및 미구현 기능 6종 구현 | Cline |
 | 0.1.2 | 2026-07-26 | 페이지 구조 개선 및 드롭다운 메뉴 구현 | Mistral Vibe |
 
 ---
 
 ## 버전 이력
+
+### [0.1.4] - 2026-07-26
+
+#### 추가 (Added)
+- server/logs/logRotator.js: 로그 파일 로테이션 모듈 신규 생성
+- server/scheduler/cronParser.js: cron 로직 완전 재구현 (parseField, parseCron, getNextTime)
+- docs/CHANGELOG/P0-P3-batch-20260726202400.md: 상세 변경 로그
+- docs/CHANGELOG/P0-allowedOrigins-WSTOKEN-20260726202200.md: P0 버그 수정 로그
+
+#### 변경 (Changed)
+- server/app.js: allowedOrigins/WS_TOKEN 선언 위치 수정, ENV_VARS 환경변수 검증 추가
+- server/routes/adminDb.js: isValidTableName() 함수 추가 (SQL Injection 방지)
+- docs/rule/workflow-management.md: v1.1.0 → v1.2.0 (작업 흐름 강제 규정 반영)
+- docs/todo.md: 완료된 8개 항목 제거, 19개 미처리 항목만 유지
+
+#### 수정 (Fixed)
+- P0: WebSocket verifyClient에서 allowedOrigins 참조 시점 오류 수정
+- P0: WS_TOKEN 기본값 하드코딩 제거, 환경변수 필수화
+- P0: server/logs/logRotator.js 누락으로 인한 서버 크래시 해결
+
+#### 보안 (Security)
+- WS_TOKEN 환경변수 미설정 시 WebSocket 연결 전면 차단
+- adminDb.js 테이블명 화이트리스트 검증 추가 (SQL Injection 방지)
+- 서버 시작 시 7개 환경변수 누락 여부 검증 및 경고 로그 출력
+
+---
+
+### [0.1.3] - 2026-07-26
+
+#### 추가 (Added)
+- server/scripts/scriptEngine.js: MCP 스크립트 엔진 (steps 배열 파싱/실행)
+- server/scheduler/jobRunner.js: 예약 작업 실행 엔진
+- server/scheduler/cronParser.js: cron 표현식 파서 (초기 버전)
+- server/monitor/monitorWs.js: CPU/메모리 모니터링 WebSocket broadcast
+- server/middleware/retry.js: 최대 3회 재시도 로직
+- server/workflows/workflowEngine.js: YAML 워크플로우 실행 엔진
+
+#### 변경 (Changed)
+- server/app.js: 스케줄러/모니터/로그 모듈 연동
+
+---
 
 ### [0.1.2] - 2026-07-26
 
@@ -44,25 +86,6 @@
 - **모바일 대응**: 768px 이하에서 햄버거 메뉴로 네비게이션 표시
 - **페이지 구조 표준화**: 모든 페이지가 동일한 헤더/네비게이션/브레드크럼 사용
 - **접근성 개선**: 키보드 네비게이션 지원, ARIA 속성 적용
-
----
-
-### [Unreleased]
-
-#### 추가 (Added)
-- 
-
-#### 변경 (Changed)
-- 
-
-#### 삭제 (Removed)
-- 
-
-#### 수정 (Fixed)
-- 
-
-#### 보안 (Security)
-- 
 
 ---
 

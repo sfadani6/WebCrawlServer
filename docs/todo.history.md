@@ -13,24 +13,32 @@
 
 ---
 
+## 2026-07-26 이력
+
+### [완료] 20:24:00 - P0-P3 일괄 처리 (8/27건) (askLogs: ask-20260726202200.md)
+- **작업 항목**: todo.md 전체 항목 처리. P0 버그 3건 + P1 cronParser + P2 환경변수/SQL Injection + P3 logRotator
+- **변경 내용**:
+  - server/app.js: allowedOrigins/WS_TOKEN 참조 시점 수정, ENV_VARS 검증 추가
+  - server/logs/logRotator.js: 신규 생성 (로그 로테이션, 30일 보관, DB 정리)
+  - server/scheduler/cronParser.js: cron 로직 완전 재구현 (*, ,, -, / 지원)
+  - server/routes/adminDb.js: isValidTableName() 추가 (SQL Injection 방지)
+  - docs/rule/workflow-management.md: v1.2.0 (작업 흐름 강제 규정 반영)
+- **변경 이유**: 서버 정상 기동을 막는 P0 버그 우선 처리. cronParser 정확도 향상. 보안 강화
+- **결과**: ✅ 8건 완료, 19건 미처리
+- **관련 Rule**: R-005, R-008, R-009, R-013
+- **담당 AI**: Cline
+
 ---
 
 ## 이력 통계
 
 | 항목 | 값 |
 |------|-----|
-| 총 이력 수 | 13 |
-| 완료된 작업 | 13 |
+| 총 이력 수 | 1 |
+| 완료된 작업 | 1 |
 | 진행 중인 작업 | 0 |
 | 오류 발생 | 0 |
-| 마지막 업데이트 | 2026-07-26 19:30:00 |
-
----
-
-## 다음 작업
-- 우선순위 5: Express 서버 기본 구축 (server/app.js)
-- 우선순위 6: SQLite DB 초기 설정
-- 우선순위 7: MCP 프로토콜 기본 구현
+| 마지막 업데이트 | 2026-07-26 20:24:00 |
 
 ---
 

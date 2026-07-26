@@ -10,18 +10,8 @@
 | 항목 | 내용 |
 |------|------|
 | 프로젝트 | WebCrawlServer |
-| 현재 주기 | **프로젝트 전면 분석 및 미처리 항목 정리** |
+| 현재 주기 | **미처리 항목 관리** |
 | **환경 요구사항** | **모든 설치는 로컬만 허용, 글로벌 설치 금지** |
-
----
-
-## 긴급/버그 수정 (P0)
-
-| 우선순위 | 작업 항목 | 상태 | 상세 |
-|----------|----------|------|------|
-| P0 | **app.js WebSocket verifyClient에서 allowedOrigins 참조 오류** | ✅ 해결 | `allowedOrigins` 선언을 `verifyClient` 위로 이동. WS_TOKEN도 함께 상단으로 이동하여 참조 시점 문제 해결 |
-| P0 | **server/logs/logRotator.js 파일 누락** | ✅ 해결 | 로그 파일 로테이션 모듈 생성: 일자별 로그 파일 생성, 30일 보관 정책, activity_logs/error_logs DB 레코드 정리 기능 포함 |
-| P0 | **WS_TOKEN 기본값 하드코딩** | ✅ 해결 | 기본값 제거, 환경변수 미설정 시 경고 로그 출력 후 WebSocket 연결 거부 처리 |
 
 ---
 
@@ -42,7 +32,6 @@
 |----------|----------|------|------|
 | P1 | **scriptEngine.js 브라우저 자동화 액션 구현** | 🟡 스텁 상태 | `navigate`, `click`, `input`, `extract`, `waitFor` 타입이 모두 `{ status: 'stub', message: '... not implemented yet' }` 반환. 실제 브라우저 자동화(Puppeteer/Playwright) 연동 필요 |
 | P1 | **scheduler overlap_policy 'queue' 구현** | 🟡 미구현 | `jobRunner.js` 40~43행: queue 정책이 "미구현" 로그만 출력하고 return. 실제 큐잉 로직 구현 필요 |
-| P1 | **cronParser.js 실제 cron 로직 구현** | ✅ 해결 | `parseField()`/`parseCron()`/`getNextTime()` 완전 구현. `*`, `,`, `-`, `/` 특수문자 지원, 1년 범위 내 다음 실행 시각 정확히 계산 |
 | P1 | **nlp.js SQL 변환 패턴 확장** | 🟡 제한적 | 현재 2개 패턴(회원 삭제, 전체 조회)만 지원. 실제 NLP 엔진 연동 또는 패턴 확장 필요 |
 | P1 | **admin-ui/dist 빌드 산출물 확인** | 🟡 미확인 | `server/admin-ui/index.html` 존재 확인. dist 디렉토리 빌드는 로컬 `npm install` 후 `npx vite build` 필요 |
 
@@ -52,12 +41,11 @@
 
 | 우선순위 | 작업 항목 | 상태 | 상세 |
 |----------|----------|------|------|
-| P2 | **DB 연결 풀(Connection Pool) 도입** | 🔴 개선 필요 | 모든 모듈(`db/helper.js`, `jobRunner.js`, `workflowEngine.js`, `scriptEngine.js`, `monitorWs.js`, `adminDb.js`)에서 매 요청/함수 호출마다 새 DB 연결 생성 후 즉시 종료. `better-sqlite3` 또는 연결 풀 패턴 도입 필요 |
+| P2 | **DB 연결 풀(Connection Pool) 도입** | 🔴 개선 필요 | 모든 모듈에서 매 요청/함수 호출마다 새 DB 연결 생성 후 즉시 종료. `better-sqlite3` 또는 연결 풀 패턴 도입 필요 |
 | P2 | **DB 연결 중복 코드 제거** | 🔴 개선 필요 | DB 연결 생성/종료 패턴이 6개 이상의 파일에서 중복됨. 공통 DB 헬퍼로 통합 필요 |
 | P2 | **monitorWs.js 리소스 로그 과다 기록** | 🔴 개선 필요 | 10초마다 `activity_logs`에 INSERT. 장기 실행 시 로그 테이블이 급격히 증가. 샘플링 또는 별도 리소스 테이블 분리 고려 |
 | P2 | **에러 처리 미들웨어 통합** | 🔴 개선 필요 | `app.js`에 전역 에러 핸들러가 있지만 일부 라우터에서 `try/catch` 없이 동기 코드 사용. 모든 라우터의 에러 전파 일관성 확보 필요 |
 | P2 | **API 응답 형식 표준화** | 🔴 개선 필요 | `/api`는 `{ modules, workflows, ... }`, `/admin/api`는 `{ error, message }`, WebSocket은 `{ type, status, ... }` 등 응답 형식이 혼재. 표준 응답 래퍼 도입 필요 |
-| P2 | **환경변수 검증 및 기본값 경고** | ✅ 해결 | `app.js`에 `ENV_VARS` 배열 추가. 서버 시작 시 7개 환경변수 누락 여부를 검증하고 경고 로그 출력 |
 
 ---
 
@@ -76,7 +64,6 @@
 
 | 우선순위 | 작업 항목 | 상태 | 상세 |
 |----------|----------|------|------|
-| P2 | **adminDb.js SQL Injection 화이트리스트 검증 강화** | 🟡 부분 적용 | 컬럼명은 화이트리스트 검증하나 테이블명은 직접 문자열 연결 사용. 테이블명도 화이트리스트 또는 정규식 검증 필요 |
 | P2 | **레이트 리밋 바이패스 가능성** | 🟡 개선 필요 | `/admin/api`는 `adminApiLimiter` 적용, `/api`는 `apiLimiter` 적용. 그러나 일부 라우터가 다른 미들웨어 체인을 통해 우회될 가능성 확인 필요 |
 | P2 | **민감 정보 로그 노출** | 🟡 개선 필요 | WebSocket 메시지 로그(`console.log('[WebSocket] 수신 메시지:', data)`)에 민감 데이터가 포함될 수 있음. 로그 레벨에 따른 마스킹 필요 |
 
@@ -86,9 +73,9 @@
 
 | 우선순위 | 작업 항목 | 상태 | 상세 |
 |----------|----------|------|------|
-| P3 | **단위 테스트 도입** | 🔴 부재 | `server/` 전체에 테스트 파일이 하나도 없음. Jest 도입 및 핵심 모듈(`cronParser`, `scriptEngine`, `workflowEngine`) 테스트 코드 작성 필요 |
-| P3 | **통합 테스트 도입** | 🔴 부재 | API 엔드포인트(`/api/stats`, `/admin/api/tables` 등) 통합 테스트 부재. Supertest 등을 활용한 API 테스트 필요 |
-| P3 | **docs/rule/ 문서와 실제 구현 간 불일치 확인** | 🟡 미확인 | `AGENTS.md` 0.2절 Rule Registry의 각 문서(R-001~R-014)가 실제 코드 구현과 일치하는지 전면 검토 필요 |
+| P3 | **단위 테스트 도입** | 🔴 부재 | `server/` 전체에 테스트 파일이 하나도 없음. Jest 도입 및 핵심 모듈 테스트 코드 작성 필요 |
+| P3 | **통합 테스트 도입** | 🔴 부재 | API 엔드포인트 통합 테스트 부재. Supertest 등을 활용한 API 테스트 필요 |
+| P3 | **docs/rule/ 문서와 실제 구현 간 불일치 확인** | 🟡 미확인 | `AGENTS.md` 0.2절 Rule Registry의 각 문서가 실제 코드 구현과 일치하는지 전면 검토 필요 |
 | P3 | **API 문서화 (Swagger/OpenAPI)** | 🔴 부재 | REST API 엔드포인트에 대한 문서 부재. Swagger 또는 OpenAPI 스펙 작성 필요 |
 
 ---
@@ -97,9 +84,8 @@
 
 | 우선순위 | 작업 항목 | 상태 | 상세 |
 |----------|----------|------|------|
-| P3 | **Docker Compose 환경 구성** | 🟡 미구현 | `ecosystem.config.js`(PM2)는 있으나 Docker 환경 미구성. 로컬 개발/배포를 위한 Dockerfile 및 docker-compose.yml 작성 필요 |
-| P3 | **데이터베이스 마이그레이션 스크립트** | 🟡 미구현 | `schema_migrations` 테이블은 있으나 실제 마이그레이션 스크립트 및 도구 부재. 마이그레이션 프레임워크 도입 필요 |
-| P3 | **로그 로테이터 구현** | 🔴 미구현 | `app.js`에서 `startLogRotator()` 호출하지만 `server/logs/logRotator.js` 파일 자체가 없음. 로그 파일 로테이션 로직 구현 필요 |
+| P3 | **Docker Compose 환경 구성** | 🟡 미구현 | `ecosystem.config.js`(PM2)는 있으나 Docker 환경 미구성. Dockerfile 및 docker-compose.yml 작성 필요 |
+| P3 | **데이터베이스 마이그레이션 스크립트** | 🟡 미구현 | `schema_migrations` 테이블은 있으나 실제 마이그레이션 스크립트 및 도구 부재 |
 
 ---
 
@@ -108,7 +94,6 @@
 - **글로벌 설치 금지**: 모든 패키지는 로컬 프로젝트 내에서만 설치해야 함
 - **독립적인 환경**: 프로젝트는 자체 포함된 의존성만 사용해야 함
 - **서버 구성**: 모든 서버 구성은 로컬 환경에서 동작해야 함
-- **P0 버그 우선 처리**: `allowedOrigins` 참조 오류 및 `logRotator.js` 누락으로 인해 현재 서버가 정상 기동되지 않을 가능성 높음
 
 ---
 

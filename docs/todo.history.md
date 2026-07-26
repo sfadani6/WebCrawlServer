@@ -1,5 +1,24 @@
 # 작업 이력
 
+## 2026-07-27 DB 연결 풀 가이드 작성
+
+### 처리 요약
+- `docs/tips/db-connection-pool-guide.md` 작성 완료
+- SQLite 특성상 연결 풀 한계와 실용적 대안 제시
+
+### 완료 항목
+- P2 아키텍처: DB 연결 풀 도입 → 가이드 문서로 대체 (구현은 필요 시 선택)
+
+### 변경 파일
+- `docs/tips/db-connection-pool-guide.md`: 신규 작성
+- `docs/todo.history.md`: 이력 추가
+
+### 비고
+- SQLite는 파일 기반으로 풀 효과가 제한적이므로, 현재 싱글톤 구조 유지 권장
+- 필요 시 better-sqlite3 또는 직접 구현한 풀 클래스 사용 가능
+
+---
+
 ## 2026-07-26 ask.md 처리
 
 ### 처리 요약

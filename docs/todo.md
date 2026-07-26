@@ -54,6 +54,10 @@
 - `server/scripts/migrate.js` 작성 완료
 - `server/migrations/001_add_activity_logs_index.sql` 생성 및 적용 완료
 
+### P2 아키텍처: DB 연결 풀 가이드 작성
+- `docs/tips/db-connection-pool-guide.md` 작성 완료
+- SQLite 특성상 싱글톤 유지 권장, 필요 시 선택적 적용 가능
+
 ---
 
 ## 실행 중 / 대기 중
@@ -65,10 +69,6 @@
 ### P2-2: 테이블 CSV/JSON 내보내기/가져오기
 - 내보내기 구현 완료
 - 가져오기는 백엔드 미구현으로 UI 제한
-
-### P2 아키텍처: DB 연결 풀 도입
-- 모든 모듈이 매 요청마다 DB 연결 생성 후 종료
-- `better-sqlite3` 또는 연결 풀 패턴 도입 검토
 
 ### P2 아키텍처: API 응답 형식 표준화
 - 에러 응답은 표준화됨

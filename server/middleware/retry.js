@@ -79,8 +79,9 @@ async function withRetry(fn, retries = RETRY_CONFIG.maxRetries) {
       return withRetry(fn, retries - 1);
     }
     
-    // 실패 시 로그 및 알림
-    await logError('retry_exhausted', error.message, { maxRetries: RETRY_CONFIG.maxRetries });
+    // 실패 시 로그 및 알림 (민감정보 마스킹)
+    const safeMessage = String(error.message).replace(/(password|token|secret|key)\s*[:=]\s*\S+/gi, '$1=***');
+    await logError('retry_exhausted', safeMessage, { maxRetries: RETRY_CONFIG.maxRetries });
     if (process.env.ENABLE_SLACK_ALERT === 'true') {
       await sendSlackAlert(`최대 재시도 초과: ${error.message}`);
     }

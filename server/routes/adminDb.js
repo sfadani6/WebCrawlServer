@@ -16,12 +16,26 @@ const router = express.Router();
 const fs = require('fs-extra');
 
 /**
+ * 테이블명 유효성 검증 (SQL Injection 방지)
+ * 영문, 숫자, 언더바만 허용
+ * @param {string} name - 테이블 이름
+ * @returns {boolean} 유효 여부
+ */
+function isValidTableName(name) {
+  return typeof name === 'string' && /^[a-zA-Z0-9_]+$/.test(name);
+}
+
+/**
  * 테이블 스키마에서 실제 컬럼명 리스트를 조회합니다.
  * @param {string} tableName - 테이블 이름
  * @param {string} dbName - 데이터베이스 파일명
  * @returns {Promise<Array>} 컬럼명 배열
  */
 async function getTableColumns(tableName, dbName = 'main.db') {
+  // 보안: 테이블명 검증
+  if (!isValidTableName(tableName)) {
+    return Promise.reject(new Error(`유효하지 않은 테이블 이름: ${tableName}`));
+  }
   const targetPath = path.join(__dirname, '../../database', 
     path.basename(dbName).endsWith('.db') ? path.basename(dbName) : `${path.basename(dbName)}.db`);
   

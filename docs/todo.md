@@ -19,9 +19,9 @@
 
 | 우선순위 | 작업 항목 | 상태 | 상세 |
 |----------|----------|------|------|
-| P0 | **app.js WebSocket verifyClient에서 allowedOrigins 참조 오류** | 🔴 미해결 | `verifyClient` 콜백(42~72행)에서 `allowedOrigins` 변수가 정의(79~84행)되기 전에 참조됨. JavaScript 호이스팅으로 인해 `undefined` 상태로 평가되어 모든 WebSocket 연결이 차단됨. `allowedOrigins` 선언을 `verifyClient`보다 위로 이동해야 함 |
-| P0 | **server/logs/logRotator.js 파일 누락** | 🔴 미해결 | app.js 28행에서 `require('./logs/logRotator')`로 참조하지만 `server/logs/logRotator.js` 파일이 존재하지 않음. 서버 시작 시 모듈 로드 실패로 크래시 발생 |
-| P0 | **WS_TOKEN 기본값 하드코딩** | 🔴 미해결 | app.js 35행: `const WS_TOKEN = process.env.WS_TOKEN \|\| 'default-ws-token'` — 기본 토큰이 소스코드에 하드코딩되어 보안 위험. 환경변수 미설정 시 경고 로그 출력 필요 |
+| P0 | **app.js WebSocket verifyClient에서 allowedOrigins 참조 오류** | ✅ 해결 | `allowedOrigins` 선언을 `verifyClient` 위로 이동. WS_TOKEN도 함께 상단으로 이동하여 참조 시점 문제 해결 |
+| P0 | **server/logs/logRotator.js 파일 누락** | ✅ 해결 | 로그 파일 로테이션 모듈 생성: 일자별 로그 파일 생성, 30일 보관 정책, activity_logs/error_logs DB 레코드 정리 기능 포함 |
+| P0 | **WS_TOKEN 기본값 하드코딩** | ✅ 해결 | 기본값 제거, 환경변수 미설정 시 경고 로그 출력 후 WebSocket 연결 거부 처리 |
 
 ---
 
@@ -42,9 +42,9 @@
 |----------|----------|------|------|
 | P1 | **scriptEngine.js 브라우저 자동화 액션 구현** | 🟡 스텁 상태 | `navigate`, `click`, `input`, `extract`, `waitFor` 타입이 모두 `{ status: 'stub', message: '... not implemented yet' }` 반환. 실제 브라우저 자동화(Puppeteer/Playwright) 연동 필요 |
 | P1 | **scheduler overlap_policy 'queue' 구현** | 🟡 미구현 | `jobRunner.js` 40~43행: queue 정책이 "미구현" 로그만 출력하고 return. 실제 큐잉 로직 구현 필요 |
-| P1 | **cronParser.js 실제 cron 로직 구현** | 🟡 단순화됨 | `getNextTime()`이 실제 cron 계산 없이 1분 후만 반환. `node-cron` 라이브러리 도입 또는 정확한 cron 계산 로직 구현 필요 |
+| P1 | **cronParser.js 실제 cron 로직 구현** | ✅ 해결 | `parseField()`/`parseCron()`/`getNextTime()` 완전 구현. `*`, `,`, `-`, `/` 특수문자 지원, 1년 범위 내 다음 실행 시각 정확히 계산 |
 | P1 | **nlp.js SQL 변환 패턴 확장** | 🟡 제한적 | 현재 2개 패턴(회원 삭제, 전체 조회)만 지원. 실제 NLP 엔진 연동 또는 패턴 확장 필요 |
-| P1 | **admin-ui/dist 빌드 산출물 확인** | 🟡 미확인 | `server/routes/adminUi.js`에서 `server/admin-ui/dist`를 정적 파일 경로로 사용. dist 디렉토리 존재 여부 및 최신 빌드 상태 확인 필요 |
+| P1 | **admin-ui/dist 빌드 산출물 확인** | 🟡 미확인 | `server/admin-ui/index.html` 존재 확인. dist 디렉토리 빌드는 로컬 `npm install` 후 `npx vite build` 필요 |
 
 ---
 
@@ -57,7 +57,7 @@
 | P2 | **monitorWs.js 리소스 로그 과다 기록** | 🔴 개선 필요 | 10초마다 `activity_logs`에 INSERT. 장기 실행 시 로그 테이블이 급격히 증가. 샘플링 또는 별도 리소스 테이블 분리 고려 |
 | P2 | **에러 처리 미들웨어 통합** | 🔴 개선 필요 | `app.js`에 전역 에러 핸들러가 있지만 일부 라우터에서 `try/catch` 없이 동기 코드 사용. 모든 라우터의 에러 전파 일관성 확보 필요 |
 | P2 | **API 응답 형식 표준화** | 🔴 개선 필요 | `/api`는 `{ modules, workflows, ... }`, `/admin/api`는 `{ error, message }`, WebSocket은 `{ type, status, ... }` 등 응답 형식이 혼재. 표준 응답 래퍼 도입 필요 |
-| P2 | **환경변수 검증 및 기본값 경고** | 🔴 개선 필요 | `WS_TOKEN`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `API_KEY`, `ALLOWED_ORIGINS` 등 환경변수가 누락될 경우 기본값으로 silent fallback. 서버 시작 시 누락된 환경변수 경고 로그 필요 |
+| P2 | **환경변수 검증 및 기본값 경고** | ✅ 해결 | `app.js`에 `ENV_VARS` 배열 추가. 서버 시작 시 7개 환경변수 누락 여부를 검증하고 경고 로그 출력 |
 
 ---
 

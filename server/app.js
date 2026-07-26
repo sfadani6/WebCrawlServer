@@ -27,12 +27,42 @@ const { startScheduler } = require('./scheduler/jobRunner');
 const { startMonitor } = require('./monitor/monitorWs');
 const { startLogRotator } = require('./logs/logRotator');
 
+// === 환경변수 검증 ===
+// R-013 (security.md): 민감 정보는 환경변수로만 설정
+const ENV_VARS = [
+  { key: 'WS_TOKEN', desc: 'WebSocket 인증 토큰', required: true },
+  { key: 'ADMIN_USERNAME', desc: '관리자 아이디', required: false },
+  { key: 'ADMIN_PASSWORD', desc: '관리자 비밀번호', required: false },
+  { key: 'API_KEY', desc: 'API 키', required: false },
+  { key: 'ALLOWED_ORIGINS', desc: 'CORS 허용 Origin 목록', required: false },
+  { key: 'LOG_RETENTION_DAYS', desc: '로그 보관 일수', required: false },
+  { key: 'NODE_ENV', desc: '실행 환경 (development/production)', required: false }
+];
+
+for (const ev of ENV_VARS) {
+  if (ev.required && !process.env[ev.key]) {
+    console.warn(`[보안 경고] ${ev.desc}(${ev.key}) 환경변수가 설정되지 않았습니다.`);
+  }
+}
+
+// === 보안 관련 상수 정의 (WebSocket/CORS에서 공유) ===
+// CORS 설정 - 허용된 origin만 접근 가능
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? 
+  process.env.ALLOWED_ORIGINS.split(',') : [
+    'http://localhost:3000',
+    'http://localhost:9600',
+    'http://127.0.0.1:9600'
+  ];
+
+// WebSocket 인증 토큰 (환경변수)
+const WS_TOKEN = process.env.WS_TOKEN;
+if (!WS_TOKEN) {
+  console.warn('[보안 경고] WS_TOKEN 환경변수가 설정되지 않았습니다. WebSocket 연결이 차단됩니다.');
+}
+
 // === Express 앱 설정 ===
 const app    = express();
 const server = http.createServer(app);
-
-// WebSocket 인증 토큰 (환경변수 또는 기본값)
-const WS_TOKEN = process.env.WS_TOKEN || 'default-ws-token';
 
 // WebSocket 서버 생성 (MCP 프로토콜 지원) - Origin 검증 및 인증 추가
 // 보안: 메시지 크기 제한 (1MB)
@@ -44,12 +74,17 @@ const wss = new WebSocketServer({
     const reqUrl = info.req.url || '';
     
     // Origin 검증 - 허용된 origin만 연결 허용
-    // 단순화: allowedOrigins 배열에 포함된 origin만 허용
     const isOriginAllowed = allowedOrigins.includes(origin) || allowedOrigins.includes('*');
     
     if (!isOriginAllowed && origin !== undefined) {
       console.log(`[WebSocket] 거부된 Origin: ${origin}`);
       return callback(false, 403, 'Forbidden');
+    }
+    
+    // 토큰 검증 - WS_TOKEN이 설정되지 않았으면 모든 연결 거부
+    if (!WS_TOKEN) {
+      console.log(`[WebSocket] WS_TOKEN 미설정, 연결 거부`);
+      return callback(false, 503, '서버 설정이 완료되지 않았습니다. WS_TOKEN을 설정하세요.');
     }
     
     // 토큰 검증 - 쿼리 파라미터에서 token 추출
@@ -74,14 +109,6 @@ const wss = new WebSocketServer({
 // === 보안 미들웨어 설정 ===
 // 보안 헤더 추가 (helmet)
 app.use(helmet());
-
-// CORS 설정 - 허용된 origin만 접근 가능
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? 
-  process.env.ALLOWED_ORIGINS.split(',') : [
-    'http://localhost:3000',
-    'http://localhost:9600',
-    'http://127.0.0.1:9600'
-  ];
 
 app.use(cors({
   origin: allowedOrigins,

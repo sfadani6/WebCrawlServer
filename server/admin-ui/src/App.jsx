@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import OverviewPage from './components/OverviewPage';
 import DatabaseOverviewPage from './components/DatabaseOverviewPage';
+import SettingsPage from './components/SettingsPage';
 import UnimplementedPage from './components/UnimplementedPage';
 import './App.css';
 
@@ -64,7 +65,7 @@ function App() {
     }
 
     if (currentPath.startsWith('/settings')) {
-      return <UnimplementedPage pageName="시스템 설정" path="/settings" onNavigate={handleNavigate} />;
+      return <SettingsPage />;
     }
 
     return <OverviewPage onNavigate={handleNavigate} />;

@@ -186,14 +186,26 @@ router.get('/tables', (req, res, next) => {
 
 // ------------------- 테이블 스키마 조회 -------------------
 // GET /admin/api/tables/:name/schema
-router.get('/tables/:name/schema', (req, res, next) => {
-  const { name } = req.params;
-  const db = getDb(req.query.db);
-  db.all(`PRAGMA table_info(${name})`, (err, rows) => {
-    db.close();
-    if (err) return next(err);
-    res.json(rows);
-  });
+router.get('/tables/:name/schema', async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const dbName = req.query.db || 'main.db';
+    
+    // 보안: 테이블 존재 여부 확인
+    const tableExistsFlag = await tableExists(name, dbName);
+    if (!tableExistsFlag) {
+      return res.status(404).json({ error: '테이블을 찾을 수 없습니다.' });
+    }
+    
+    const db = getDb(dbName);
+    db.all(`PRAGMA table_info(${name})`, (err, rows) => {
+      db.close();
+      if (err) return next(err);
+      res.json(rows);
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ------------------- 테이블 레코드 조회 -------------------
@@ -474,6 +486,208 @@ router.post('/tables/:name/restore', express.json(), async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ------------------- 데이터베이스 삭제 -------------------
+// DELETE /admin/api/databases/:name
+router.delete('/databases/:name', async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const cleanName = path.basename(name).trim();
+    const dbFileName = cleanName.endsWith('.db') ? cleanName : `${cleanName}.db`;
+
+    // main.db 삭제 금지
+    if (dbFileName.toLowerCase() === 'main.db') {
+      return res.status(400).json({ error: 'main.db는 시스템 기초 베이스이므로 삭제할 수 없습니다.' });
+    }
+
+    const dbDir = path.join(__dirname, '../../database');
+    const filePath = path.join(dbDir, dbFileName);
+
+    if (!await fs.pathExists(filePath)) {
+      return res.status(404).json({ error: '존재하지 않는 데이터베이스 파일입니다.' });
+    }
+
+    // SQLite 파일 및 저널 파일 삭제
+    await fs.remove(filePath);
+    await fs.remove(`${filePath}-wal`).catch(() => {});
+    await fs.remove(`${filePath}-shm`).catch(() => {});
+
+    res.json({ message: `${dbFileName} 데이터베이스가 성공적으로 삭제되었습니다.` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------- 테이블 생성 (DDL) -------------------
+// POST /admin/api/tables
+router.post('/tables', express.json(), async (req, res, next) => {
+  try {
+    const { tableName, columns } = req.body;
+    const dbName = req.query.db || 'main.db';
+
+    if (!tableName || typeof tableName !== 'string' || !/^[a-zA-Z0-9_]+$/.test(tableName)) {
+      return res.status(400).json({ error: '유효한 테이블 이름을 입력하세요. (영문, 숫자, 언더바만 가능)' });
+    }
+
+    if (!Array.isArray(columns) || columns.length === 0) {
+      return res.status(400).json({ error: '최소 1개 이상의 컬럼이 필요합니다.' });
+    }
+
+    const colDefs = columns.map(c => {
+      const name = (c.name || '').trim();
+      const type = (c.type || 'TEXT').toUpperCase();
+      const constraints = (c.constraints || '').trim();
+      if (!/^[a-zA-Z0-9_]+$/.test(name)) {
+        throw new Error(`유효하지 않은 컬럼 이름: ${name}`);
+      }
+      return `${name} ${type} ${constraints}`;
+    });
+
+    const sql = `CREATE TABLE ${tableName} (${colDefs.join(', ')})`;
+    const db = getDb(dbName);
+    db.run(sql, err => {
+      db.close();
+      if (err) return next(err);
+      res.json({ message: `테이블 '${tableName}'이(가) 성공적으로 생성되었습니다.` });
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ------------------- 테이블 삭제 (DDL) -------------------
+// DELETE /admin/api/tables/:name
+router.delete('/tables/:name', async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const dbName = req.query.db || 'main.db';
+
+    if (!/^[a-zA-Z0-9_]+$/.test(name)) {
+      return res.status(400).json({ error: '유효하지 않은 테이블 이름입니다.' });
+    }
+
+    // main.db의 코어 테이블 삭제 보호 (선택적 경고)
+    const protectedTables = ['modules', 'workflows', 'scheduled_jobs', 'activity_logs', 'error_logs', 'schema_migrations', 'configattr', 'config'];
+    if (dbName === 'main.db' && protectedTables.includes(name.toLowerCase())) {
+      return res.status(400).json({ error: `'${name}' 테이블은 main.db 시스템 코어 테이블이므로 삭제할 수 없습니다.` });
+    }
+
+    const sql = `DROP TABLE ${name}`;
+    const db = getDb(dbName);
+    db.run(sql, err => {
+      db.close();
+      if (err) return next(err);
+      res.json({ message: `테이블 '${name}'이(가) 성공적으로 삭제되었습니다.` });
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------- Config 설정 관리 API (main.db) -------------------
+// GET /admin/api/config
+router.get('/config', (req, res, next) => {
+  const db = getDb('main.db');
+  const sql = `
+    SELECT 
+      c.idx,
+      c.attr_id,
+      ca.name as attr_name,
+      ca.description as attr_desc,
+      c.val1,
+      c.val2,
+      c.memo,
+      c.created_at
+    FROM config c
+    LEFT JOIN configattr ca ON c.attr_id = ca.idx
+    ORDER BY c.idx ASC
+  `;
+  db.all(sql, (err, rows) => {
+    db.close();
+    if (err) return next(err);
+    res.json(rows);
+  });
+});
+
+// POST /admin/api/config
+router.post('/config', express.json(), (req, res, next) => {
+  const { attr_id, val1, val2, memo } = req.body;
+  if (!attr_id) return res.status(400).json({ error: '속성을 선택해야 합니다.' });
+  const db = getDb('main.db');
+  const sql = `INSERT INTO config (attr_id, val1, val2, memo) VALUES (?, ?, ?, ?)`;
+  db.run(sql, [attr_id, val1 || '', val2 || '', memo || ''], function(err) {
+    db.close();
+    if (err) return next(err);
+    res.json({ idx: this.lastID, message: '설정 항목이 추가되었습니다.' });
+  });
+});
+
+// PUT /admin/api/config/:idx
+router.put('/config/:idx', express.json(), (req, res, next) => {
+  const { idx } = req.params;
+  const { attr_id, val1, val2, memo } = req.body;
+  const db = getDb('main.db');
+  const sql = `UPDATE config SET attr_id = ?, val1 = ?, val2 = ?, memo = ? WHERE idx = ?`;
+  db.run(sql, [attr_id, val1 || '', val2 || '', memo || '', idx], function(err) {
+    db.close();
+    if (err) return next(err);
+    res.json({ changed: this.changes, message: '설정이 저장되었습니다.' });
+  });
+});
+
+// DELETE /admin/api/config/:idx
+router.delete('/config/:idx', (req, res, next) => {
+  const { idx } = req.params;
+  const db = getDb('main.db');
+  db.run(`DELETE FROM config WHERE idx = ?`, [idx], function(err) {
+    db.close();
+    if (err) return next(err);
+    res.json({ deleted: this.changes });
+  });
+});
+
+// DELETE /admin/api/config_clear
+router.delete('/config_clear', (req, res, next) => {
+  const db = getDb('main.db');
+  db.run(`DELETE FROM config`, function(err) {
+    db.close();
+    if (err) return next(err);
+    res.json({ deleted: this.changes, message: 'config 테이블 데이터가 전체 초기화되었습니다.' });
+  });
+});
+
+// GET /admin/api/configattr
+router.get('/configattr', (req, res, next) => {
+  const db = getDb('main.db');
+  db.all(`SELECT * FROM configattr ORDER BY idx ASC`, (err, rows) => {
+    db.close();
+    if (err) return next(err);
+    res.json(rows);
+  });
+});
+
+// POST /admin/api/configattr
+router.post('/configattr', express.json(), (req, res, next) => {
+  const { name, description } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: '속성 이름이 필요합니다.' });
+  const db = getDb('main.db');
+  db.run(`INSERT INTO configattr (name, description) VALUES (?, ?)`, [name.trim(), description || ''], function(err) {
+    db.close();
+    if (err) return next(err);
+    res.json({ idx: this.lastID, name: name.trim(), description: description || '' });
+  });
+});
+
+// DELETE /admin/api/configattr/:idx
+router.delete('/configattr/:idx', (req, res, next) => {
+  const { idx } = req.params;
+  const db = getDb('main.db');
+  db.run(`DELETE FROM configattr WHERE idx = ?`, [idx], function(err) {
+    db.close();
+    if (err) return next(err);
+    res.json({ deleted: this.changes });
+  });
 });
 
 module.exports = router;

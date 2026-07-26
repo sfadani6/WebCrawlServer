@@ -20,7 +20,6 @@ const rateLimit        = require('express-rate-limit');
 // 분리된 모듈 로드
 const { DB_PATH }      = require('./db/helper');
 const createApiRouter  = require('./routes/api');
-const adminRouter      = require('./routes/admin');
 const adminDbRouter    = require('./routes/adminDb');
 const { basicAuth }     = require('./middleware/auth');
 
@@ -28,20 +27,21 @@ const { basicAuth }     = require('./middleware/auth');
 const app    = express();
 const server = http.createServer(app);
 
-// WebSocket 인증 토큰 (환경변수에서 로드, 기본값: 개발용)
-const WS_TOKEN = process.env.WS_TOKEN || 'ws-secret-token-change-me';
+// WebSocket 인증 토큰 (환경변수 또는 기본값)
+const WS_TOKEN = process.env.WS_TOKEN || 'default-ws-token';
 
 // WebSocket 서버 생성 (MCP 프로토콜 지원) - Origin 검증 및 인증 추가
+// 보안: 메시지 크기 제한 (1MB)
 const wss = new WebSocketServer({
   server,
+  maxPayload: 1024 * 1024, // 1MB
   verifyClient: (info, callback) => {
     const origin = info.origin;
     const reqUrl = info.req.url || '';
     
     // Origin 검증 - 허용된 origin만 연결 허용
-    const isOriginAllowed = allowedOrigins.includes(origin) || 
-      allowedOrigins.includes('*') || 
-      allowedOrigins.some(allowed => origin && origin.endsWith(allowed.slice(allowed.lastIndexOf('/') + 1)));
+    // 단순화: allowedOrigins 배열에 포함된 origin만 허용
+    const isOriginAllowed = allowedOrigins.includes(origin) || allowedOrigins.includes('*');
     
     if (!isOriginAllowed && origin !== undefined) {
       console.log(`[WebSocket] 거부된 Origin: ${origin}`);
@@ -114,9 +114,21 @@ const nlpLimiter = rateLimit({
   }
 });
 
-// 정적 파일 서비스 (관리자 페이지 및 공용 파일)
+// 관리자 API 레이트 리밋 설정 (DB 조작 및 실시간 편집 지원)
+const adminApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15분
+  max: 1000, // 15분당 1000회
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 'error',
+    message: '관리자 API 요청 한도를 초과했습니다. 잠시 후 다시 시도하세요.'
+  }
+});
+
+// 정적 파일 서비스 (CSS, JS 등 공용 리소스)
+// React SPA는 adminUiRouter에서 제공하므로, 정적 파일 미들웨어는 /static 경로로만 제한
 app.use('/static', express.static(path.join(__dirname, '../public')));
-app.use(express.static(path.join(__dirname, '../public')));
 
 // === 기본 라우트 ===
 
@@ -132,7 +144,7 @@ app.get('/health', (req, res) => {
 
 // === API 라우터 마운트 ===
 app.use('/api', apiLimiter, createApiRouter(wss));
-app.use('/admin/api', basicAuth(), adminDbRouter);
+app.use('/admin/api', adminApiLimiter, basicAuth(), adminDbRouter);
 app.use('/api/nlp', nlpLimiter, require('./routes/nlp'));
 
 // === 통합 콘솔 SPA 라우터 마운트 (server/routes/adminUi.js) ===
@@ -151,6 +163,9 @@ app.use('/', adminUiRouter);
 wss.on('connection', (ws, req) => {
   const clientIp = req.socket.remoteAddress;
   console.log(`[WebSocket] 클라이언트 연결: ${clientIp}`);
+
+  // IP 주소 저장 (하트비트 로그에서 사용)
+  ws.clientIp = clientIp;
 
   // 연결 시 초기 메시지 전송
   ws.send(JSON.stringify({
@@ -283,7 +298,7 @@ wss.on('connection', (ws, req) => {
 const heartbeatInterval = setInterval(() => {
   wss.clients.forEach((ws) => {
     if (!ws.isAlive) {
-      console.log(`[WebSocket] 비활성 클라이언트 연결 종료: ${ws.socket?.remoteAddress || 'unknown'}`);
+      console.log(`[WebSocket] 비활성 클라이언트 연결 종료: ${ws.clientIp || 'unknown'}`);
       return ws.terminate();
     }
     ws.isAlive = false;
@@ -432,6 +447,25 @@ async function initializeDatabase() {
           description TEXT NOT NULL,
           applied_sql TEXT NOT NULL,
           applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+
+        // configattr 테이블 (설정 속성 정의)
+        `CREATE TABLE IF NOT EXISTS configattr (
+          idx INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          description TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+
+        // config 테이블 (설정 값 저장)
+        `CREATE TABLE IF NOT EXISTS config (
+          idx INTEGER PRIMARY KEY AUTOINCREMENT,
+          attr_id INTEGER NOT NULL,
+          val1 TEXT,
+          val2 TEXT,
+          memo TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (attr_id) REFERENCES configattr(idx) ON DELETE CASCADE
         )`
       ];
 
@@ -450,9 +484,15 @@ async function initializeDatabase() {
           } else {
             completed++;
             if (completed === total) {
-              console.log(`[DB] 모든 코어 테이블 생성 완료 (${total}개)`);
-              db.close();
-              resolve();
+              // 초기 configattr 데이터 시딩
+              db.run(`INSERT OR IGNORE INTO configattr (idx, name, description) VALUES 
+                (1, '브라우저', '브라우저 실행 경로 및 인자 설정'),
+                (2, '크롤러', '크롤러 동시 실행 및 딜레이 설정'),
+                (3, '시스템', '서버 시스템 전반 환경 설정')`, (err) => {
+                console.log(`[DB] 모든 코어 테이블 생성 완료 (${total}개) 및 configattr 시딩 완료`);
+                db.close();
+                resolve();
+              });
             }
           }
         });

@@ -20,7 +20,7 @@ function Layout({ currentPath, onNavigate, children }) {
         borderBottom: '1px solid var(--gcp-border)',
         display: 'flex',
         alignItems: 'center',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         padding: '0 16px',
         zIndex: 100
       }}>
@@ -88,7 +88,7 @@ function Layout({ currentPath, onNavigate, children }) {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justify: 'space-between',
+                    justifyContent: 'space-between',
                     padding: '8px 16px',
                     border: 'none',
                     backgroundColor: isActive ? 'rgba(138, 180, 248, 0.12)' : 'transparent',

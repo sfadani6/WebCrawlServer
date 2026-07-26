@@ -42,13 +42,36 @@ function DatabaseOverviewPage({ selectedDb, selectedTable, onSelectDb, onSelectT
       setNewDbName('');
       setCreating(false);
       loadDatabases();
-      // 생성된 DB 바로 선택
       if (res.database && res.database.name) {
         onSelectDb(res.database.name);
       }
     } catch (err) {
       setErrorMsg(err.message || '데이터베이스 생성 실패');
       setCreating(false);
+    }
+  };
+
+  const handleDeleteDatabase = async (dbName) => {
+    if (dbName.toLowerCase() === 'main.db') {
+      alert('main.db는 기초 베이스이므로 삭제할 수 없습니다.');
+      return;
+    }
+
+    if (!window.confirm(`정말 '${dbName}' 데이터베이스를 완전히 삭제하시겠습니까?\n이 작업은 복구할 수 없습니다.`)) {
+      return;
+    }
+
+    try {
+      await fetchJSON(`/admin/api/databases/${encodeURIComponent(dbName)}`, {
+        method: 'DELETE'
+      });
+      alert(`'${dbName}' 데이터베이스가 삭제되었습니다.`);
+      loadDatabases();
+      if (selectedDb === dbName) {
+        onSelectDb(null);
+      }
+    } catch (err) {
+      alert(err.message || '데이터베이스 삭제 실패');
     }
   };
 
@@ -89,7 +112,7 @@ function DatabaseOverviewPage({ selectedDb, selectedTable, onSelectDb, onSelectT
         {/* 좌측 테이블 Explorer + 우측 Spreadsheet View */}
         <div style={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
           <aside style={{
-            width: '230px',
+            width: '240px',
             backgroundColor: 'var(--gcp-bg-sidebar)',
             borderRight: '1px solid var(--gcp-border)',
             padding: '12px',
@@ -115,7 +138,7 @@ function DatabaseOverviewPage({ selectedDb, selectedTable, onSelectDb, onSelectT
         <div>
           <h1 style={{ fontSize: '18px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--gcp-text-primary)' }}>데이터베이스 요약 및 관리</h1>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--gcp-text-secondary)' }}>
-            서버에 등록된 SQLite 데이터베이스 목록과 요약 정보를 확인하고 신규 DB를 생성합니다.
+            서버에 등록된 SQLite 데이터베이스 목록과 요약 정보를 확인하고 신규 DB 생성 및 삭제를 수행합니다.
           </p>
         </div>
         <button className="gcp-btn" onClick={() => setShowCreateModal(true)}>
@@ -139,36 +162,57 @@ function DatabaseOverviewPage({ selectedDb, selectedTable, onSelectDb, onSelectT
                 <th>데이터베이스 파일명</th>
                 <th>크기 (Size)</th>
                 <th>테이블 수</th>
-                <th>저널 모드 (Journal Mode)</th>
+                <th>저널 모드</th>
                 <th>최종 수정일시</th>
                 <th>상태</th>
-                <th style={{ textAlign: 'right' }}>관리 및 조작</th>
+                <th style={{ textAlign: 'right', width: '200px' }}>관리 및 조작</th>
               </tr>
             </thead>
             <tbody>
-              {databases.map((db, idx) => (
-                <tr key={idx}>
-                  <td style={{ fontWeight: 600, color: 'var(--gcp-accent)', cursor: 'pointer' }} onClick={() => onSelectDb(db.name)}>
-                    🗄️ {db.name}
-                  </td>
-                  <td>{db.sizeFormatted}</td>
-                  <td><span className="gcp-badge gcp-badge-active">{db.tablesCount} 개 테이블</span></td>
-                  <td style={{ fontFamily: 'monospace' }}>{db.journalMode.toUpperCase()}</td>
-                  <td style={{ color: 'var(--gcp-text-secondary)', fontSize: '11.5px' }}>
-                    {new Date(db.updatedAt).toLocaleString('ko-KR')}
-                  </td>
-                  <td><span className="gcp-badge gcp-badge-active">● ACTIVE</span></td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button 
-                      className="gcp-btn" 
-                      style={{ padding: '3px 10px', fontSize: '11px' }}
-                      onClick={() => onSelectDb(db.name)}
-                    >
-                      테이블 관리 →
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {databases.map((db, idx) => {
+                const isMainDb = db.name.toLowerCase() === 'main.db';
+                return (
+                  <tr key={idx}>
+                    <td style={{ fontWeight: 600, color: 'var(--gcp-accent)', cursor: 'pointer' }} onClick={() => onSelectDb(db.name)}>
+                      🗄️ {db.name} {isMainDb && <span className="gcp-badge" style={{ backgroundColor: 'rgba(138,180,248,0.2)', color: 'var(--gcp-accent)', marginLeft: '6px' }}>시스템 핵심 DB</span>}
+                    </td>
+                    <td>{db.sizeFormatted}</td>
+                    <td><span className="gcp-badge gcp-badge-active">{db.tablesCount} 개 테이블</span></td>
+                    <td style={{ fontFamily: 'monospace' }}>{db.journalMode.toUpperCase()}</td>
+                    <td style={{ color: 'var(--gcp-text-secondary)', fontSize: '11.5px' }}>
+                      {new Date(db.updatedAt).toLocaleString('ko-KR')}
+                    </td>
+                    <td><span className="gcp-badge gcp-badge-active">● ACTIVE</span></td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <button 
+                          className="gcp-btn" 
+                          style={{ padding: '3px 8px', fontSize: '11px' }}
+                          onClick={() => onSelectDb(db.name)}
+                        >
+                          테이블 관리
+                        </button>
+                        <button 
+                          className="gcp-btn gcp-btn-secondary" 
+                          style={{ 
+                            padding: '3px 8px', 
+                            fontSize: '11px',
+                            color: isMainDb ? 'var(--gcp-text-secondary)' : 'var(--gcp-status-red)',
+                            borderColor: isMainDb ? 'var(--gcp-border)' : 'rgba(242,139,130,0.3)',
+                            opacity: isMainDb ? 0.4 : 1,
+                            cursor: isMainDb ? 'not-allowed' : 'pointer'
+                          }}
+                          disabled={isMainDb}
+                          onClick={() => handleDeleteDatabase(db.name)}
+                          title={isMainDb ? 'main.db는 기초 베이스이므로 삭제 불가' : 'DB 파일 완전히 삭제'}
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

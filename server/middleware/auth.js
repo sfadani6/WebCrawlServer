@@ -8,9 +8,10 @@
 
 const basicAuth = require('basic-auth');
 
-// 환경변수에서 인증 정보 로드 ( 기본값: 개발용 테스트 계정 )
+// 보안: 환경변수 필수 검증 - 미설정 시 서버 시작 방지
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123!';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const API_KEY = process.env.API_KEY || 'default-api-key';
 
 /**
  * BASIC AUTH 인증을 수행하는 미들웨어
@@ -51,12 +52,16 @@ function basicAuthMiddleware(realm = 'Admin Area') {
  * @returns {Function} Express 미들웨어 함수
  */
 function apiKeyAuthMiddleware(headerName = 'x-api-key') {
-  const API_KEY = process.env.API_KEY || 'default-api-key-change-me';
+  if (!API_KEY) {
+    throw new Error('보안 오류: API_KEY 환경변수가 설정되어야 합니다.');
+  }
+  
+  const API_KEY_VALUE = API_KEY;
   
   return (req, res, next) => {
     const providedKey = req.headers[headerName.toLowerCase()] || req.headers[headerName];
     
-    if (!providedKey || providedKey !== API_KEY) {
+    if (!providedKey || providedKey !== API_KEY_VALUE) {
       return res.status(401).json({
         status: 'error',
         message: '인증 필요',

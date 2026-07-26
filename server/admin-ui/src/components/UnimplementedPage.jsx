@@ -6,7 +6,7 @@ function UnimplementedPage({ pageName, path, onNavigate }) {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justify: 'center',
+      justifyContent: 'center',
       height: '80%',
       padding: '40px',
       textAlign: 'center'

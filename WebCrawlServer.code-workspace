@@ -57,33 +57,6 @@
         // VSCODE 소리 볼륨 설정
         "accessibility.signalOptions.volume": 0,
 
-        // ★ [수정됨] DB 연결 관련 설정 키 추가 (예: SQLTools 커넥션 설정인 경우)
-        "sqltools.connections": [
-            {
-                "pgOptions": {
-                    "ssl": {
-                        "rejectUnauthorized": true
-                    }
-                },
-                "ssh": "Disabled",
-                "previewLimit": 50,
-                "server": "tired-newfie-16312.jxf.gcp-us-west2.cockroachlabs.cloud",
-                "port": 26257,
-                "sshOptions": {
-                    "port": 22
-                },
-                "name": "CockroachDB",
-                "driver": "PostgreSQL",
-                "database": "defaultdb",
-                "username": "sam",
-                "password": "TwOxuhrbako0_WCzHfu6bg",
-                "ssl": {
-                    "require": true,
-                    "rejectUnauthorized": true,
-                    "ca": "E:\\up\\0-project\\0-ssh\\cockroachlabs.crt"
-                }
-            }
-        ],
 
         "liveServer.settings.AdvanceCustomBrowserCmdLine": "C:\\APPS\\thorium_AVX2\\BIN\\thorium.exe --user-data-dir=C:\\APPS\\thorium_AVX2\\USER_DATA\\Profile 1 --allow-outdated-plugins --disable-logging --disable-breakpad --disable-encryption --disable-machine-id",
 

@@ -1,32 +1,56 @@
 // server/middleware/auth.js
 /**
  * 인증 미들웨어
- * BASIC AUTH 및 JWT 기반 인증 지원
+ * BASIC AUTH - admin_credentials 테이블 기반 (bcryptjs 해시 비교)
  * 
  * R-013 (security.md): 인증/인가 규정 참조
  */
 
 const basicAuth = require('basic-auth');
+const bcrypt    = require('bcryptjs');
 
-// 보안: 환경변수 필수 검증 - 미설정 시 서버 시작 방지
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const API_KEY = process.env.API_KEY || 'default-api-key';
 
 /**
- * BASIC AUTH 인증을 수행하는 미들웨어
+ * 현재 로드된 자격증명 캐시 (서버 인메모리)
+ * loadCredentials()로 초기화, refreshCredentials()로 갱신
+ */
+const credentialsCache = {
+  username: null,
+  passwordHash: null,
+  loaded: false
+};
+
+/**
+ * DB에서 관리자 자격증명을 불러와 캐시에 저장합니다.
+ * app.js의 서버 시작 후 호출되거나, 변경 API에서 갱신됩니다.
+ * @param {string} username - 관리자 아이디
+ * @param {string} passwordHash - bcrypt 해시된 비밀번호
+ */
+function setCredentialsCache(username, passwordHash) {
+  credentialsCache.username     = username;
+  credentialsCache.passwordHash = passwordHash;
+  credentialsCache.loaded       = true;
+}
+
+/**
+ * 현재 캐시된 자격증명을 반환합니다.
+ */
+function getCredentialsCache() {
+  return credentialsCache;
+}
+
+/**
+ * BASIC AUTH 인증 미들웨어
+ * bcryptjs 비동기 비교를 사용합니다.
  * @param {string} realm - 인증 영역 (기본값: 'Admin Area')
  * @returns {Function} Express 미들웨어 함수
  */
 function basicAuthMiddleware(realm = 'Admin Area') {
-  return (req, res, next) => {
-    // 헤더에서 인증 정보 추출
+  return async (req, res, next) => {
     const credentials = basicAuth(req);
-    
-    if (!credentials || 
-        credentials.name !== ADMIN_USERNAME || 
-        credentials.pass !== ADMIN_PASSWORD) {
-      // 인증 실패 시 401 응답
+
+    if (!credentials) {
       res.set('WWW-Authenticate', `Basic realm="${realm}"`);
       return res.status(401).json({
         status: 'error',
@@ -34,33 +58,58 @@ function basicAuthMiddleware(realm = 'Admin Area') {
         detail: '유효한 사용자 이름과 비밀번호를 제공하세요.'
       });
     }
-    
-    // 인증 성공 - 사용자 정보 요청 객체에 추가
+
+    // 캐시가 아직 로드 안 된 경우 (서버 시작 직후 등)
+    if (!credentialsCache.loaded) {
+      res.set('WWW-Authenticate', `Basic realm="${realm}"`);
+      return res.status(503).json({
+        status: 'error',
+        message: '서버 초기화 중입니다. 잠시 후 다시 시도하세요.'
+      });
+    }
+
+    // 아이디 먼저 확인
+    if (credentials.name !== credentialsCache.username) {
+      res.set('WWW-Authenticate', `Basic realm="${realm}"`);
+      return res.status(401).json({
+        status: 'error',
+        message: '인증 실패',
+        detail: '아이디 또는 비밀번호가 올바르지 않습니다.'
+      });
+    }
+
+    // bcryptjs로 비밀번호 해시 비교 (비동기)
+    const valid = await bcrypt.compare(credentials.pass, credentialsCache.passwordHash);
+
+    if (!valid) {
+      res.set('WWW-Authenticate', `Basic realm="${realm}"`);
+      return res.status(401).json({
+        status: 'error',
+        message: '인증 실패',
+        detail: '아이디 또는 비밀번호가 올바르지 않습니다.'
+      });
+    }
+
+    // 인증 성공
     req.user = {
       username: credentials.name,
       authenticated: true,
-      roles: ['admin'] // 기본 admin 역할
+      roles: ['admin']
     };
-    
+
     next();
   };
 }
 
 /**
- * API Key 기반 인증을 수행하는 미들웨어
- * @param {string} headerName - API Key 헤더 이름 (기본값: 'x-api-key')
- * @returns {Function} Express 미들웨어 함수
+ * API Key 기반 인증 미들웨어
  */
 function apiKeyAuthMiddleware(headerName = 'x-api-key') {
-  if (!API_KEY) {
-    throw new Error('보안 오류: API_KEY 환경변수가 설정되어야 합니다.');
-  }
-  
   const API_KEY_VALUE = API_KEY;
-  
+
   return (req, res, next) => {
     const providedKey = req.headers[headerName.toLowerCase()] || req.headers[headerName];
-    
+
     if (!providedKey || providedKey !== API_KEY_VALUE) {
       return res.status(401).json({
         status: 'error',
@@ -68,51 +117,39 @@ function apiKeyAuthMiddleware(headerName = 'x-api-key') {
         detail: '유효한 API 키가 필요합니다.'
       });
     }
-    
-    // API Key 인증 성공
+
     req.user = {
       username: 'api-user',
       authenticated: true,
       roles: ['api']
     };
-    
+
     next();
   };
 }
 
 /**
- * JWT 기반 인증을 수행하는 미들웨어 (미래 확장용)
- * 현재는 BASIC AUTH를 우선 사용
+ * JWT 기반 인증 (미래 확장용, 현재는 basicAuth로 위임)
  */
 function jwtAuthMiddleware() {
-  // 향후 JWT 구현 시这里 추가
-  // 현재는 BASIC AUTH 사용을 권장
   return (req, res, next) => {
-    // 임시로 BASIC AUTH로 리다이렉트
     return basicAuthMiddleware()(req, res, next);
   };
 }
 
 /**
  * 역할 기반 접근 제어(RBAC) 미들웨어
- * @param {string|string[]} requiredRoles - 필요한 역할 또는 역할 배열
- * @returns {Function} Express 미들웨어 함수
  */
 function requireRoles(requiredRoles) {
   return (req, res, next) => {
-    // 인증 먼저 확인
     if (!req.user || !req.user.authenticated) {
-      return res.status(401).json({
-        status: 'error',
-        message: '인증 필요'
-      });
+      return res.status(401).json({ status: 'error', message: '인증 필요' });
     }
-    
-    // 역할 확인
-    const hasRequiredRole = Array.isArray(requiredRoles) 
+
+    const hasRequiredRole = Array.isArray(requiredRoles)
       ? requiredRoles.some(role => req.user.roles.includes(role))
       : req.user.roles.includes(requiredRoles);
-    
+
     if (!hasRequiredRole) {
       return res.status(403).json({
         status: 'error',
@@ -120,18 +157,19 @@ function requireRoles(requiredRoles) {
         detail: '해당 리소스에 접근할 권한이 없습니다.'
       });
     }
-    
+
     next();
   };
 }
 
-// 주요 export
 module.exports = {
   basicAuth: basicAuthMiddleware,
   apiKeyAuth: apiKeyAuthMiddleware,
   jwtAuth: jwtAuthMiddleware,
   requireRoles,
-  // 편의성 export
   basicAuthMiddleware,
-  apiKeyAuthMiddleware
+  apiKeyAuthMiddleware,
+  // 자격증명 캐시 관리 함수 (app.js 및 adminDb.js에서 사용)
+  setCredentialsCache,
+  getCredentialsCache
 };

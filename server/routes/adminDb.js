@@ -8,6 +8,8 @@ const express = require('express');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const { DB_PATH } = require('../db/helper');
+const bcrypt = require('bcryptjs');
+const { setCredentialsCache } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -688,6 +690,89 @@ router.delete('/configattr/:idx', (req, res, next) => {
     if (err) return next(err);
     res.json({ deleted: this.changes });
   });
+});
+
+// =============================================================
+// 관리자 계정 관리 API
+// =============================================================
+
+/**
+ * GET /admin/api/auth/info
+ * 현재 관리자 아이디 조회 (비번은 전달하지 않음)
+ */
+router.get('/auth/info', (req, res, next) => {
+  const db = getDb('main.db');
+  db.get(`SELECT username, updated_at FROM admin_credentials WHERE id = 1`, (err, row) => {
+    db.close();
+    if (err) return next(err);
+    if (!row) return res.status(404).json({ error: '관리자 계정 정보를 찾지 못했습니다.' });
+    res.json({ username: row.username, updated_at: row.updated_at });
+  });
+});
+
+/**
+ * PUT /admin/api/auth/credentials
+ * 관리자 아이디 및 비번 변경
+ * Body: { currentPassword, newUsername, newPassword }
+ */
+router.put('/auth/credentials', async (req, res, next) => {
+  const { currentPassword, newUsername, newPassword } = req.body;
+
+  if (!currentPassword) {
+    return res.status(400).json({ error: '현재 비번을 입력해야 합니다.' });
+  }
+  if (!newUsername || !newUsername.trim()) {
+    return res.status(400).json({ error: '새 아이디를 입력해야 합니다.' });
+  }
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: '새 비번은 6자 이상이어야 합니다.' });
+  }
+
+  try {
+    const db = getDb('main.db');
+
+    // 현재 비번 확인
+    const row = await new Promise((resolve, reject) => {
+      db.get(`SELECT password FROM admin_credentials WHERE id = 1`, (err, r) => {
+        if (err) reject(err); else resolve(r);
+      });
+    });
+
+    if (!row) {
+      db.close();
+      return res.status(404).json({ error: '관리자 계정이 존재하지 않습니다.' });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, row.password);
+    if (!valid) {
+      db.close();
+      return res.status(403).json({ error: '현재 비번이 일치하지 않습니다.' });
+    }
+
+    // 새 비번 해시화 (cost=12)
+    const newHash = await bcrypt.hash(newPassword, 12);
+
+    // DB 업데이트
+    await new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE admin_credentials SET username = ?, password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
+        [newUsername.trim(), newHash],
+        function(err) {
+          db.close();
+          if (err) reject(err); else resolve(this.changes);
+        }
+      );
+    });
+
+    // 인메모리 캐시 갱신 (다음 요청부터 즉시 적용)
+    setCredentialsCache(newUsername.trim(), newHash);
+
+    console.log(`[AUTH] 관리자 계정 변경 완료: ${newUsername.trim()}`);
+    res.json({ message: '관리자 계정이 성공적으로 변경되었습니다.', username: newUsername.trim() });
+
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

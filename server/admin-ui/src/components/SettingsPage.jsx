@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchJSON } from '../api';
+import { fetchJSON, saveCredentials, getStoredCredentials } from '../api';
 
 function SettingsPage() {
   const [configList, setConfigList] = useState([]);
@@ -12,6 +12,12 @@ function SettingsPage() {
   const [showAttrModal, setShowAttrModal] = useState(false);
   const [newAttrName, setNewAttrName] = useState('');
   const [newAttrDesc, setNewAttrDesc] = useState('');
+
+  // 관리자 계정 변경 상태
+  const [adminInfo, setAdminInfo] = useState({ username: '', updated_at: '' });
+  const [authForm, setAuthForm] = useState({ currentPassword: '', newUsername: '', newPassword: '', confirmPassword: '' });
+  const [authSaving, setAuthSaving] = useState(false);
+  const [authMsg, setAuthMsg] = useState({ type: '', text: '' }); // type: 'success' | 'error'
 
   const loadData = () => {
     setLoading(true);
@@ -31,6 +37,18 @@ function SettingsPage() {
 
   useEffect(() => {
     loadData();
+    // 관리자 아이디 조회
+    fetchJSON('/admin/api/auth/info')
+      .then(info => {
+        if (info) {
+          setAdminInfo(info);
+          setAuthForm(prev => ({ ...prev, newUsername: info.username }));
+        }
+      })
+      .catch(() => {
+        const stored = getStoredCredentials();
+        setAuthForm(prev => ({ ...prev, newUsername: stored.username }));
+      });
   }, []);
 
   const handleCellChange = (rowIndex, field, value) => {
@@ -144,9 +162,234 @@ function SettingsPage() {
     }
   };
 
+  // 관리자 계정 변경 핸들러
+  const handleAuthFormChange = (field, value) => {
+    setAuthForm(prev => ({ ...prev, [field]: value }));
+    setAuthMsg({ type: '', text: '' });
+  };
+
+  const handleChangeCredentials = async (e) => {
+    e.preventDefault();
+    setAuthMsg({ type: '', text: '' });
+
+    if (!authForm.currentPassword) {
+      return setAuthMsg({ type: 'error', text: '현재 비번을 입력하세요.' });
+    }
+    if (!authForm.newUsername.trim()) {
+      return setAuthMsg({ type: 'error', text: '새 아이디를 입력하세요.' });
+    }
+    if (!authForm.newPassword) {
+      return setAuthMsg({ type: 'error', text: '새 비번을 입력하세요.' });
+    }
+    if (authForm.newPassword.length < 6) {
+      return setAuthMsg({ type: 'error', text: '새 비번은 6자 이상이어야 합니다.' });
+    }
+    if (authForm.newPassword !== authForm.confirmPassword) {
+      return setAuthMsg({ type: 'error', text: '새 비번과 비번 확인이 일치하지 않습니다.' });
+    }
+
+    setAuthSaving(true);
+    try {
+      const result = await fetchJSON('/admin/api/auth/credentials', {
+        method: 'PUT',
+        body: JSON.stringify({
+          currentPassword: authForm.currentPassword,
+          newUsername: authForm.newUsername.trim(),
+          newPassword: authForm.newPassword
+        })
+      });
+
+      // localStorage 자격증명 갱신 (다음 API 호출부터 새 자격증명 사용)
+      saveCredentials(authForm.newUsername.trim(), authForm.newPassword);
+
+      setAdminInfo(prev => ({ ...prev, username: result.username }));
+      setAuthForm(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
+      setAuthMsg({ type: 'success', text: `관리자 계정이 '${result.username}'으로 변경되었습니다. 다음 로그인 시 새 아이디/비번을 사용하세요.` });
+    } catch (err) {
+      setAuthMsg({ type: 'error', text: err.message || '계정 변경 실패' });
+    } finally {
+      setAuthSaving(false);
+    }
+  };
+
   return (
     <div style={{ padding: '20px 24px' }}>
+
+      {/* ======================================================== */}
+      {/* 관리자 계정 변경 카드 */}
+      {/* ======================================================== */}
+      <div style={{
+        backgroundColor: 'var(--gcp-bg-card)',
+        border: '1px solid var(--gcp-border)',
+        borderRadius: '6px',
+        marginBottom: '24px',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: 'var(--gcp-bg-header)',
+          borderBottom: '1px solid var(--gcp-border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
+        }}>
+          <span style={{ fontSize: '16px' }}>🔐</span>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--gcp-text-primary)' }}>
+              관리자 계정 설정
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', marginTop: '1px' }}>
+              현재 아이디: <strong style={{ color: 'var(--gcp-accent)' }}>{adminInfo.username || '-'}</strong>
+              {adminInfo.updated_at && (
+                <span style={{ marginLeft: '10px' }}>
+                  마지막 변경: {new Date(adminInfo.updated_at).toLocaleString('ko-KR')}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleChangeCredentials} style={{ padding: '16px 20px' }}>
+          {/* 알림 메시지 */}
+          {authMsg.text && (
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: '4px',
+              fontSize: '12.5px',
+              marginBottom: '16px',
+              backgroundColor: authMsg.type === 'success'
+                ? 'rgba(129, 201, 149, 0.15)'
+                : 'rgba(242, 139, 130, 0.15)',
+              border: `1px solid ${authMsg.type === 'success' ? 'var(--gcp-status-green)' : 'var(--gcp-status-red)'}`,
+              color: authMsg.type === 'success' ? 'var(--gcp-status-green)' : 'var(--gcp-status-red)'
+            }}>
+              {authMsg.type === 'success' ? '✅ ' : '⚠️ '}{authMsg.text}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
+            {/* 현재 비밀번호 */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--gcp-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                현재 비밀번호 (필수 확인)
+              </label>
+              <input
+                type="password"
+                placeholder="현재 비밀번호를 입력하세요"
+                value={authForm.currentPassword}
+                onChange={e => handleAuthFormChange('currentPassword', e.target.value)}
+                autoComplete="current-password"
+                style={{
+                  width: '100%',
+                  maxWidth: '320px',
+                  padding: '7px 10px',
+                  backgroundColor: 'var(--gcp-bg-main)',
+                  border: '1px solid var(--gcp-border)',
+                  color: 'var(--gcp-text-primary)',
+                  borderRadius: '4px',
+                  fontSize: '12.5px',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* 새 아이디 */}
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--gcp-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                새 아이디 (Username)
+              </label>
+              <input
+                type="text"
+                placeholder="새 관리자 아이디"
+                value={authForm.newUsername}
+                onChange={e => handleAuthFormChange('newUsername', e.target.value)}
+                autoComplete="username"
+                style={{
+                  width: '100%',
+                  padding: '7px 10px',
+                  backgroundColor: 'var(--gcp-bg-main)',
+                  border: '1px solid var(--gcp-border)',
+                  color: 'var(--gcp-text-primary)',
+                  borderRadius: '4px',
+                  fontSize: '12.5px',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* 새 비밀번호 */}
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--gcp-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                새 비밀번호 (6자 이상)
+              </label>
+              <input
+                type="password"
+                placeholder="새 비밀번호 (6자 이상)"
+                value={authForm.newPassword}
+                onChange={e => handleAuthFormChange('newPassword', e.target.value)}
+                autoComplete="new-password"
+                style={{
+                  width: '100%',
+                  padding: '7px 10px',
+                  backgroundColor: 'var(--gcp-bg-main)',
+                  border: '1px solid var(--gcp-border)',
+                  color: 'var(--gcp-text-primary)',
+                  borderRadius: '4px',
+                  fontSize: '12.5px',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* 비밀번호 확인 */}
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--gcp-text-secondary)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                새 비밀번호 확인
+              </label>
+              <input
+                type="password"
+                placeholder="새 비밀번호 재입력"
+                value={authForm.confirmPassword}
+                onChange={e => handleAuthFormChange('confirmPassword', e.target.value)}
+                autoComplete="new-password"
+                style={{
+                  width: '100%',
+                  padding: '7px 10px',
+                  backgroundColor: 'var(--gcp-bg-main)',
+                  border: '1px solid var(--gcp-border)',
+                  color: authForm.confirmPassword && authForm.newPassword !== authForm.confirmPassword
+                    ? 'var(--gcp-status-red)' : 'var(--gcp-text-primary)',
+                  borderRadius: '4px',
+                  fontSize: '12.5px',
+                  outline: 'none'
+                }}
+              />
+              {authForm.confirmPassword && authForm.newPassword !== authForm.confirmPassword && (
+                <div style={{ fontSize: '11px', color: 'var(--gcp-status-red)', marginTop: '3px' }}>
+                  비밀번호가 일치하지 않습니다.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ marginTop: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="submit"
+              className="gcp-btn"
+              disabled={authSaving}
+              style={{ padding: '7px 18px' }}
+            >
+              {authSaving ? '변경 중...' : '🔑 아이디 / 비밀번호 변경'}
+            </button>
+            <span style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)' }}>
+              변경 후 브라우저 localStorage가 자동으로 갱신됩니다.
+            </span>
+          </div>
+        </form>
+      </div>
+
       {/* Header section */}
+
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '18px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--gcp-text-primary)' }}>

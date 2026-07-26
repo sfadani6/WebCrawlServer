@@ -21,7 +21,8 @@ const rateLimit        = require('express-rate-limit');
 const { DB_PATH }      = require('./db/helper');
 const createApiRouter  = require('./routes/api');
 const adminDbRouter    = require('./routes/adminDb');
-const { basicAuth }     = require('./middleware/auth');
+const { basicAuth, setCredentialsCache } = require('./middleware/auth');
+const bcrypt           = require('bcryptjs');
 
 // === Express 앱 설정 ===
 const app    = express();
@@ -466,6 +467,14 @@ async function initializeDatabase() {
           memo TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (attr_id) REFERENCES configattr(idx) ON DELETE CASCADE
+        )`,
+
+        // admin_credentials 테이블 (관리자 계정 저장)
+        `CREATE TABLE IF NOT EXISTS admin_credentials (
+          id INTEGER PRIMARY KEY DEFAULT 1 CHECK(id = 1),
+          username TEXT NOT NULL,
+          password TEXT NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`
       ];
 
@@ -489,9 +498,27 @@ async function initializeDatabase() {
                 (1, '브라우저', '브라우저 실행 경로 및 인자 설정'),
                 (2, '크롤러', '크롤러 동시 실행 및 딜레이 설정'),
                 (3, '시스템', '서버 시스템 전반 환경 설정')`, (err) => {
-                console.log(`[DB] 모든 코어 테이블 생성 완료 (${total}개) 및 configattr 시딩 완료`);
-                db.close();
-                resolve();
+
+                // admin_credentials 초기값 시딩 (최초 한 번만)
+                db.get(`SELECT id FROM admin_credentials WHERE id = 1`, async (err, row) => {
+                  if (!row) {
+                    // 초기 관리자 계정 설정
+                    const INIT_USER = process.env.ADMIN_USERNAME || 'adminkim';
+                    const INIT_PASS = process.env.ADMIN_PASSWORD || 'akssj#kasjf';
+                    const hash = await bcrypt.hash(INIT_PASS, 12);
+                    db.run(
+                      `INSERT OR IGNORE INTO admin_credentials (id, username, password) VALUES (1, ?, ?)`,
+                      [INIT_USER, hash],
+                      (err) => {
+                        if (err) console.error('[DB] 관리자 계정 시딩 오류:', err);
+                        else console.log(`[DB] 관리자 계정 초기화 완료 (username: ${INIT_USER})`);
+                      }
+                    );
+                  }
+                  console.log(`[DB] 모든 코어 테이블 생성 완료 (${total + 1}개) 및 초기 시딩 완료`);
+                  db.close();
+                  resolve();
+                });
               });
             }
           }
@@ -507,6 +534,29 @@ const PORT = process.env.PORT || 9600;
 
 // DB 초기화 후 서버 시작
 initializeDatabase()
+  .then(() => {
+    // 관리자 자격증명을 DB에서 로드하여 auth 미들웨어 캐시에 설정
+    return new Promise((resolve, reject) => {
+      const db = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READONLY, (err) => {
+        if (err) return reject(err);
+        db.get(`SELECT username, password FROM admin_credentials WHERE id = 1`, (err, row) => {
+          db.close();
+          if (err) return reject(err);
+          if (row) {
+            setCredentialsCache(row.username, row.password);
+            console.log(`[AUTH] 관리자 계정 캐시 로드 완료 (username: ${row.username})`);
+          } else {
+            // 테이블에 아직 행이 없으면 (시딩 중) 기본값으로 폴백
+            bcrypt.hash('akssj#kasjf', 12).then(hash => {
+              setCredentialsCache('adminkim', hash);
+              console.log('[AUTH] 관리자 계정 폴백 캐시 설정 (adminkim)');
+            });
+          }
+          resolve();
+        });
+      });
+    });
+  })
   .then(() => {
     server.listen(PORT, () => {
       console.log(`========================================`);

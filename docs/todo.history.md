@@ -1,5 +1,24 @@
 # 작업 이력
 
+## 2026-07-27 에러 처리 미들웨어 가이드 작성
+
+### 처리 요약
+- `docs/tips/error-handling-guide.md` 작성 완료
+- 기존 `server/middleware/response.js`, `server/app.js` 구조 문서화
+
+### 완료 항목
+- P2 아키텍처: 에러 처리 미들웨어 통합 → 가이드 문서로 보완
+
+### 변경 파일
+- `docs/tips/error-handling-guide.md`: 신규 작성
+- `docs/todo.history.md`: 이력 추가
+
+### 비고
+- `response.js`의 `success`/`fail`/`paginated` 래퍼 구조 정리
+- WebSocket 에러 응답 형식 포함
+
+---
+
 ## 2026-07-27 DB 연결 풀 가이드 작성
 
 ### 처리 요약

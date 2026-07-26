@@ -30,6 +30,40 @@
 
 ## 2026-07-26 이력
 
+### [완료] 11:35:00 - 프로젝트 검수 결과 문서 및 코드 수정
+- **작업 항목**: AGENTS.md와 Rule Registry 문서 불일치 해결
+- **변경 내용**:
+  - docs/rule/architecture.md 1.4절: "인증은 다루지 않는다" → "Basic Auth 인증 적용(auth.md R-014 참조)"으로 수정
+  - docs/rule/structure.md: server/controllers/services/utils 디렉토리 항목 제거, 실제 디렉토리 구조반영
+  - server/app.js: scheduled_jobs status DEFAULT 'active' → 'waiting'으로 변경 (scheduler.md 2.1절 일치)
+  - docs/rule/database.md 4.3절: 보호 테이블 목록에 admin_credentials 추가
+  - server/routes/adminDb.js: protectedTables 배열에 admin_credentials 추가
+  - docs/rule/mcp.md 9장: 워크플로우 엔진 미구현 상태 명시
+  - docs/rule/scheduler.md 6장: 스케줄러 엔진 미구현 상태 명시
+  - docs/rule/monitoring.md 4장: 리소스 수집 로직 미구현 상태 명시
+  - docs/rule/logging.md 4장: 로그 파일 생성 미구현 상태 명시
+  - docs/rule/security.md 4장: 재시도 로직 미구현 상태 명시
+  - docs/decision/0002-basic-auth-implementation.md: ADR 작성 (Basic Auth 도입 결정 기록)
+- **변경 이유**: 검수 보고서에서 발견된 11건의 이슈 중 10건 수정 완료 (이슈 #11은 이미 수정됨). 문서와 코드 간 불일치 해결 및 ADR 기록
+- **결과**: ✅ 성공 (10개 파일 수정, ADR 1개 신규 생성)
+- **관련 Rule**: R-001, R-003, R-004, R-005, R-006, R-007, R-009, R-013
+- **담당 AI**: Cline
+
+### [완료] 17:00:00 - 페이지 구조 개선 및 드롭다운 메뉴 구현
+<arg_key>task_progress</arg_key>
+<arg_value>- [x] architecture.md 1.4절 수정 (인증 관련 문구 갱신)
+- [x] structure.md 디렉토리 구조 수정 (controllers/services/utils 제거)
+- [x] app.js scheduled_jobs status 컬럼 DEFAULT 'waiting'으로 변경
+- [x] database.md 4.3절 admin_credentials 보호 테이블 추가
+- [x] adminDb.js protectedTables 배열에 admin_credentials 추가
+- [x] ADR 파일 생성 (auth.md 도입, database.md v2.0.0 개정)
+- [x] mcp.md 미구현 상태 명시
+- [x] scheduler.md 미구현 상태 명시
+- [x] monitoring.md 미구현 상태 명시
+- [x] logging.md 미구현 상태 명시
+- [x] security.md 미구현 상태 명시
+- [ ] todo.history.md 이력 추가
+
 ### [완료] 17:00:00 - 페이지 구조 개선 및 드롭다운 메뉴 구현
 - **작업 항목**: 모든 페이지에 통일된 헤더/드롭다운 메뉴/브레드크럼 적용
 - **변경 내용**:

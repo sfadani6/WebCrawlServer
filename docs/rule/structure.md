@@ -17,10 +17,14 @@
 WebCrawlServer/
 ├── server/
 │   ├── app.js               # 서버 진입점
-│   ├── routes/               # 라우팅 정의 (/admin, /plugin)
-│   ├── controllers/          # 요청 처리 로직
-│   ├── services/             # 비즈니스 로직
-│   └── utils/                # 공통 유틸리티
+│   ├── db/                   # DB 헬퍼 및 초기화
+│   ├── middleware/           # Express 미들웨어 (Basic Auth 등)
+│   ├── routes/               # API 라우팅 정의
+│   │   ├── api.js            # 플러그인 API
+│   │   ├── adminDb.js        # 관리자 DB API
+│   │   ├── adminUi.js        # 관리자 UI (SPA 라우팅)
+│   │   └── nlp.js            # NLP API
+│   └── admin-ui/             # 관리자 UI (React 빌드 산출물)
 │
 ├── modules/                  # 모듈별 독립 디렉토리 (관리자 페이지에서 자동 생성)
 │   └── <module_name>/

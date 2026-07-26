@@ -396,6 +396,8 @@ async function initializeDatabase() {
         )`,
         
         // scheduled_jobs 테이블
+        // status 값: waiting(대기 중), running(실행 중), paused(일시 중지), disabled(비활성화), completed(완료), failed(실패)
+        // scheduler.md R-005 2.1절 참조
         `CREATE TABLE IF NOT EXISTS scheduled_jobs (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL UNIQUE,
@@ -403,7 +405,7 @@ async function initializeDatabase() {
           cron_expression TEXT,
           once_at TIMESTAMP,
           interval_seconds INTEGER,
-          status TEXT NOT NULL DEFAULT 'active',
+          status TEXT NOT NULL DEFAULT 'waiting',
           overlap_policy TEXT NOT NULL DEFAULT 'skip',
           last_executed_at TIMESTAMP,
           next_execution_at TIMESTAMP,

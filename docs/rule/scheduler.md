@@ -13,6 +13,22 @@
 
 ---
 
+## 6. 현재 구현 상태
+
+### 6.1 구현 완료
+- `scheduled_jobs` 테이블 생성 (status, overlap_policy 컬럼 포함)
+- status 값: waiting, running, paused, disabled, completed, failed (문서와 일치하도록 DEFAULT 'waiting' 적용)
+
+### 6.2 미구현 (향후 개발 예정)
+- **cron 라이브러리 연동**: node-cron 또는 동급 라이브러리가 아직 연동되지 않음
+- **스케줄러 엔진**: 예약 작업 등록, 실행, 상태 관리 로직 미구현
+- **Overlap/Queue/Skip 정책 실행**: protectedTables에 명시된 정책 로직만 있고 실제 실행 로직 미구현
+- **서버 시작 시 작업 등록**: `enabled = true`인 작업들을 스케줄러에 자동 등록하지 않음
+
+> **참고**: 위 미구현 항목은 `architecture.md` 1.4절의 현재 개발 범위에 따라 순차적으로 개발 예정이며, 구현 시 이 문서를 갱신한다.
+
+---
+
 ## 1. 실행 방식
 - **예약 실행(once)**: 지정한 특정 일시에 1회 실행
 - **주기 실행(interval)**: 고정 간격(예: n분/n시간마다)으로 반복 실행

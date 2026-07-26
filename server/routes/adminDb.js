@@ -569,8 +569,8 @@ router.delete('/tables/:name', async (req, res, next) => {
       return res.status(400).json({ error: '유효하지 않은 테이블 이름입니다.' });
     }
 
-    // main.db의 코어 테이블 삭제 보호 (선택적 경고)
-    const protectedTables = ['modules', 'workflows', 'scheduled_jobs', 'activity_logs', 'error_logs', 'schema_migrations', 'configattr', 'config'];
+    // main.db의 코어 테이블 삭제 보호 (database.md 4.3절 참조)
+    const protectedTables = ['modules', 'workflows', 'scheduled_jobs', 'activity_logs', 'error_logs', 'schema_migrations', 'configattr', 'config', 'admin_credentials'];
     if (dbName === 'main.db' && protectedTables.includes(name.toLowerCase())) {
       return res.status(400).json({ error: `'${name}' 테이블은 main.db 시스템 코어 테이블이므로 삭제할 수 없습니다.` });
     }

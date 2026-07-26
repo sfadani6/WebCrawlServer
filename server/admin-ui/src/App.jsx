@@ -11,7 +11,6 @@ function App() {
   const [selectedDb, setSelectedDb] = useState(null);
   const [selectedTable, setSelectedTable] = useState('');
 
-  // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
       setCurrentPath(window.location.pathname || '/');
@@ -20,12 +19,26 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  useEffect(() => {
+    if (selectedDb) {
+      sessionStorage.setItem('selectedDb', JSON.stringify(selectedDb));
+    }
+  }, [selectedDb]);
+
+  useEffect(() => {
+    if (selectedTable) {
+      sessionStorage.setItem('selectedTable', selectedTable);
+    }
+  }, [selectedTable]);
+
   const handleNavigate = (path) => {
     window.history.pushState({}, '', path);
     setCurrentPath(path);
     if (!path.startsWith('/database')) {
       setSelectedDb(null);
       setSelectedTable('');
+      sessionStorage.removeItem('selectedDb');
+      sessionStorage.removeItem('selectedTable');
     }
   };
 
@@ -41,7 +54,10 @@ function App() {
           selectedTable={selectedTable}
           onSelectDb={(db) => {
             setSelectedDb(db);
-            if (!db) setSelectedTable('');
+            if (!db) {
+              setSelectedTable('');
+              sessionStorage.removeItem('selectedTable');
+            }
           }}
           onSelectTable={(table) => setSelectedTable(table)}
         />
@@ -51,15 +67,12 @@ function App() {
     if (currentPath.startsWith('/modules')) {
       return <UnimplementedPage pageName="모듈 관리" path="/modules" onNavigate={handleNavigate} />;
     }
-
     if (currentPath.startsWith('/workflows')) {
       return <UnimplementedPage pageName="워크플로우 Engine" path="/workflows" onNavigate={handleNavigate} />;
     }
-
     if (currentPath.startsWith('/scheduler')) {
       return <UnimplementedPage pageName="스케줄러 (Cron)" path="/scheduler" onNavigate={handleNavigate} />;
     }
-
     if (currentPath.startsWith('/logs')) {
       return <UnimplementedPage pageName="활동 및 에러 로그" path="/logs" onNavigate={handleNavigate} />;
     }

@@ -342,14 +342,14 @@ server.on('close', () => {
   clearInterval(heartbeatInterval);
 });
 
-// === 오류 처리 미들웨어 ===
+// === 오류 처리 미들웨어 (표준 응답 적용) ===
 app.use((err, req, res, next) => {
   console.error(`[Express] 서버 오류:`, err);
-  res.status(500).json({
-    status: 'error',
-    message: '내부 서버 오류',
-    error: process.env.NODE_ENV === 'development' ? err.message : '오류 상세 정보 사용 불가'
-  });
+  const isDev = process.env.NODE_ENV === 'development';
+  const details = isDev ? { error: err.message, stack: err.stack } : undefined;
+  // 표준 응답 래퍼 사용
+  const { fail } = require('./middleware/response');
+  return fail(res, '내부 서버 오류', 500, details);
 });
 
 // === 404 처리 ===

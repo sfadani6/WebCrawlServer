@@ -13,6 +13,7 @@
 
 const express          = require('express');
 const { queryDatabase } = require('../db/helper');
+const { success, fail } = require('../middleware/response');
 
 /**
  * wss(WebSocketServer) 인스턴스를 받아 Express 라우터를 반환합니다.
@@ -41,14 +42,14 @@ function createApiRouter(wss) {
                 stats[row.k] = row.c;
             });
 
-            res.json({
+            return success(res, {
                 modules:      stats.modules      || 0,
                 workflows:    stats.workflows    || 0,
                 scheduledJobs: stats.jobs         || 0,
                 activityLogs: stats.logs         || 0
             });
         } catch (err) {
-            next(err);
+            return fail(res, '대시보드 통계 조회 실패', 500, { error: err.message });
         }
     });
 

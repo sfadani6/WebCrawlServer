@@ -56,16 +56,17 @@ README.md                    프로젝트 설명 — 외부/신규 참여자를 
 | R-004 | docs/rule/mcp.md | MCP 프로토콜, 워크플로우 스텝 타입 |
 | R-005 | docs/rule/scheduler.md | 스케줄러, 작업 상태, 동시 실행 정책 |
 | R-006 | docs/rule/monitoring.md | 모니터링, 리소스 사용량 수집 |
-| R-007 | docs/rule/database.md | DB 스키마, 마이그레이션, 백업 |
+| R-007 | docs/rule/database.md | DB 스키마, 마이그레이션, 백업, 관리자 UI API |
 | R-008 | docs/rule/workflow-management.md | ask/todo 운영 절차, 이력 관리, ADR |
 | R-009 | docs/rule/logging.md | 로그 기록 정책, 로그 분류 |
 | R-010 | docs/rule/versioning.md | Git, 버전 관리, 문서 버전 형식 |
 | R-011 | docs/rule/coding.md | 코드 작성 규칙 |
 | R-012 | docs/rule/communication.md | 커뮤니케이션 가이드, 응답 구조 |
-| R-013 | docs/rule/security.md | 예외 처리 및 보안 규정 |
+| R-013 | docs/rule/security.md | 예외 처리 및 일반 보안 정책 |
+| R-014 | docs/rule/auth.md | 페이지 인증, Basic Auth, bcryptjs, 자격증명 변경 API |
 
-- 새 규칙 문서가 필요해지면 이 표와 `docs/rule/instructions.md`의 표를 함께 갱신하고 다음 번호(R-014...)를 부여한다. 두 표가 어긋나면 이 표(`AGENTS.md`)가 우선한다.
-- 코드 작성 전 항상 관련 Rule ID의 문서를 먼저 확인한다. 어느 문서에 해당하는지 애매하면 `docs/rule/instructions.md`(R-000)의 안내를 먼저 확인한다. 작업 범위가 기존 13개 문서로 해소되지 않거나 내용이 불명확한 경우, 사용자에게 확인 후 해당 문서(또는 신규 문서)에 내용을 보강한다.
+- 새 규칙 문서가 필요해지면 이 표와 `docs/rule/instructions.md`의 표를 함께 갱신하고 다음 번호(R-015...)를 부여한다. 두 표가 어긋나면 이 표(`AGENTS.md`)가 우선한다.
+- 코드 작성 전 항상 관련 Rule ID의 문서를 먼저 확인한다. 어느 문서에 해당하는지 애매하면 `docs/rule/instructions.md`(R-000)의 안내를 먼저 확인한다. 작업 범위가 기존 14개 문서로 해소되지 않거나 내용이 불명확한 경우, 사용자에게 확인 후 해당 문서(또는 신규 문서)에 내용을 보강한다.
 
 ---
 

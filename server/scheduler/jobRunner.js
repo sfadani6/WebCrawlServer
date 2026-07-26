@@ -3,15 +3,20 @@
  * 
  * R-005 (scheduler.md) 5장: overlap 정책(skip/queue/parallel)
  * R-005 6장: 실행 및 로그 기록
+ * 
+ * DB 연결: server/db/helper.js 공통 헬퍼 사용
  */
 
-const sqlite3 = require('sqlite3').verbose();
-const { DB_PATH } = require('../db/helper');
+const { execute, queryOne, DB_PATH } = require('../db/helper');
 const { executeScript } = require('../scripts/scriptEngine');
 const cronParser = require('./cronParser');
 
 // 실행 중인 작업 추적 (job_id -> Promise)
 const runningJobs = new Map();
+
+// 큐 대기열 (queue 정책용)
+const jobQueue = [];
+let isProcessingQueue = false;
 
 /**
  * cron 표현식을 다음 실행 시각으로 변환
@@ -24,72 +29,91 @@ function getNextCronTime(cronExpr) {
 }
 
 /**
- * 작업 실행
- * @param {Object} job - scheduled_jobs 레코드
- * @param {Object} wss - WebSocket 서버
+ * 큐에 대기 중인 작업을 순차 처리
  */
-async function runJob(job, wss) {
-  const jobId = job.id;
-  
-  // 이미 실행 중이면 skip 정책 확인
-  if (runningJobs.has(jobId)) {
-    if (job.overlap_policy === 'skip') {
-      console.log(`[Scheduler] 작업 ${jobId} 이미 실행 중, skip`);
-      return;
+async function processQueue() {
+  if (isProcessingQueue || jobQueue.length === 0) return;
+  isProcessingQueue = true;
+
+  while (jobQueue.length > 0) {
+    const { job, wss } = jobQueue.shift();
+    try {
+      await executeJobInternal(job, wss);
+    } catch (error) {
+      console.error(`[Scheduler] 큐 작업 ${job.id} 실행 오류:`, error);
     }
-    if (job.overlap_policy === 'queue') {
-      // queue 정책은 현재 미구현 - 추후 확장
-      console.log(`[Scheduler] 작업 ${jobId} queue 정책 미구현`);
-      return;
-    }
-    // parallel은 동시 실행 허용
   }
-  
+
+  isProcessingQueue = false;
+}
+
+/**
+ * 작업 내부 실행 로직
+ */
+async function executeJobInternal(job, wss) {
+  const jobId = job.id;
   runningJobs.set(jobId, true);
-  
+
   try {
-    // 워크플로우 실행 (workflow_id 가 있는 경우)
     if (job.workflow_id) {
-      const workflow = await getWorkflowById(job.workflow_id);
+      const workflow = await queryOne(`SELECT * FROM workflows WHERE id = ?`, [job.workflow_id]);
       if (workflow && workflow.yaml_content) {
         const steps = parseWorkflowSteps(workflow.yaml_content);
         await executeScript(`scheduled_${jobId}`, steps, wss);
       }
     }
-    
-    // 실행 완료 시각 업데이트
-    await updateJobExecution(jobId);
-    
+
+    await execute(
+      `UPDATE scheduled_jobs SET last_executed_at = CURRENT_TIMESTAMP, status = 'waiting' WHERE id = ?`,
+      [jobId]
+    );
+
   } catch (error) {
     console.error(`[Scheduler] 작업 ${jobId} 실행 오류:`, error);
-    await logActivity(jobId, 'scheduler', 'error', error.message);
+    await execute(
+      `INSERT INTO activity_logs (source, action, status, message, workflow_id) VALUES (?, ?, ?, ?, ?)`,
+      ['scheduler', 'run_job', 'error', error.message, jobId]
+    );
   } finally {
     runningJobs.delete(jobId);
   }
 }
 
 /**
- * 워크플로우 조회
+ * 작업 실행
+ * @param {Object} job - scheduled_jobs 레코드
+ * @param {Object} wss - WebSocket 서버
  */
-function getWorkflowById(workflowId) {
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) return reject(err);
-      db.get(`SELECT * FROM workflows WHERE id = ?`, [workflowId], (err, row) => {
-        db.close();
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
-  });
+async function runJob(job, wss) {
+  const jobId = job.id;
+
+  // 이미 실행 중이면 overlap 정책 확인
+  if (runningJobs.has(jobId)) {
+    switch (job.overlap_policy) {
+      case 'skip':
+        console.log(`[Scheduler] 작업 ${jobId} 이미 실행 중, skip`);
+        return;
+      case 'queue':
+        console.log(`[Scheduler] 작업 ${jobId} 큐에 추가`);
+        jobQueue.push({ job, wss });
+        processQueue();
+        return;
+      case 'parallel':
+        // parallel은 동시 실행 허용 (아래에서 실행)
+        break;
+      default:
+        console.log(`[Scheduler] 알 수 없는 overlap_policy: ${job.overlap_policy}, skip 처리`);
+        return;
+    }
+  }
+
+  await executeJobInternal(job, wss);
 }
 
 /**
  * YAML 워크플로우 파싱 (steps 배열 추출)
  */
 function parseWorkflowSteps(yamlContent) {
-  // js-yaml 을 사용한 YAML 파싱 (향후 구현)
-  // 현재는 간단히 steps 배열 반환
   try {
     const parsed = require('js-yaml').load(yamlContent);
     return parsed?.steps || [];
@@ -100,61 +124,19 @@ function parseWorkflowSteps(yamlContent) {
 }
 
 /**
- * 작업 실행 시각 업데이트
- */
-function updateJobExecution(jobId) {
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) return reject(err);
-      db.run(
-        `UPDATE scheduled_jobs SET last_executed_at = CURRENT_TIMESTAMP, status = 'waiting' WHERE id = ?`,
-        [jobId],
-        (err) => {
-          db.close();
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
-  });
-}
-
-/**
- * 활동 로그 기록
- */
-function logActivity(jobId, source, action, status, message) {
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) return reject(err);
-      db.run(
-        `INSERT INTO activity_logs (source, action, status, message, workflow_id) VALUES (?, ?, ?, ?, ?)`,
-        [source, action, status, message, jobId],
-        (err) => {
-          db.close();
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
-  });
-}
-
-/**
  * 스케줄러 시작 - 주기적 작업 체크
  * @param {Object} wss - WebSocket 서버
  * @param {number} intervalMs - 체크 간격 (밀리초)
  */
 function startScheduler(wss, intervalMs = 30000) {
   console.log(`[Scheduler] 스케줄러 시작 (체크 간격: ${intervalMs}ms)`);
-  
+
   setInterval(async () => {
     try {
       const dueJobs = await getDueJobs();
-      
+
       for (const job of dueJobs) {
-        // status 가 waiting 인 작업만 실행
         if (job.status !== 'waiting') continue;
-        
         runJob(job, wss);
       }
     } catch (error) {
@@ -166,51 +148,25 @@ function startScheduler(wss, intervalMs = 30000) {
 /**
  * 실행 시각이 된 작업 조회
  */
-function getDueJobs() {
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) return reject(err);
-      
-      const now = new Date().toISOString();
-      db.all(
-        `SELECT * FROM scheduled_jobs WHERE status = 'waiting' 
-         AND (next_execution_at IS NULL OR next_execution_at <= ?)`,
-        [now],
-        (err, rows) => {
-          db.close();
-          if (err) reject(err);
-          else resolve(rows || []);
-        }
-      );
-    });
-  });
+async function getDueJobs() {
+  const now = new Date().toISOString();
+  const rows = await queryOne(
+    `SELECT * FROM scheduled_jobs WHERE status = 'waiting' 
+     AND (next_execution_at IS NULL OR next_execution_at <= ?)`,
+    [now]
+  );
+  return rows ? [rows] : [];
 }
 
 /**
  * 작업 수동 실행 (관리자 페이지에서 호출)
  */
 async function runJobNow(jobId, wss) {
-  const job = await getJobById(jobId);
+  const job = await queryOne(`SELECT * FROM scheduled_jobs WHERE id = ?`, [jobId]);
   if (!job) {
     throw new Error(`작업 없음: ${jobId}`);
   }
   await runJob(job, wss);
-}
-
-/**
- * 작업 단건 조회
- */
-function getJobById(jobId) {
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) return reject(err);
-      db.get(`SELECT * FROM scheduled_jobs WHERE id = ?`, [jobId], (err, row) => {
-        db.close();
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
-  });
 }
 
 module.exports = {

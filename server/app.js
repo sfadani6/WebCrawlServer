@@ -362,14 +362,10 @@ app.use((req, res) => {
 
 // === DB 초기화 === 
 // R-007 (database.md) 1장: SQLite3 파일은 database/main.db에 고정
-// R-007 1장: DB 연결 전 디렉토리 존재 여부 확인, 없으면 생성
-// R-007 1장: WAL 모드 활성화
-// R-007 6장: PRAGMA foreign_keys = ON
-async function initializeDatabase() {
+function initializeDatabase() {
   const dbDir = path.join(__dirname, '../database');
-  
-  // 디렉토리 생성
-  await fs.ensureDir(dbDir);
+
+  fs.ensureDirSync(dbDir);
   console.log(`[DB] 데이터베이스 디렉토리 확인: ${dbDir}`);
 
   return new Promise((resolve, reject) => {
@@ -381,39 +377,19 @@ async function initializeDatabase() {
 
       console.log('[DB] SQLite 데이터베이스 연결 성공');
 
-      // WAL 모드 활성화 (R-007 1장)
-      db.run('PRAGMA journal_mode=WAL;', (err) => {
-        if (err) {
-          console.error('[DB] WAL 모드 설정 오류:', err);
-        } else {
-          console.log('[DB] WAL 모드 활성화');
-        }
-      });
+      db.run('PRAGMA journal_mode=WAL;', () => {});
+      db.run('PRAGMA foreign_keys = ON;', () => {});
 
-      // 외래 키 제약 활성화 (R-007 6장)
-      db.run('PRAGMA foreign_keys = ON;', (err) => {
-        if (err) {
-          console.error('[DB] 외래 키 설정 오류:', err);
-        } else {
-          console.log('[DB] 외래 키 제약 활성화');
-        }
-      });
-
-      // 코어 테이블 생성 (R-007 3장)
       const coreTables = [
-        // modules 테이블
         `CREATE TABLE IF NOT EXISTS modules (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL UNIQUE,
           type TEXT NOT NULL,
           config TEXT,
           tags TEXT,
-          metadata TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`,
-        
-        // workflows 테이블
         `CREATE TABLE IF NOT EXISTS workflows (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL UNIQUE,
@@ -424,10 +400,6 @@ async function initializeDatabase() {
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (module_id) REFERENCES modules(id)
         )`,
-        
-        // scheduled_jobs 테이블
-        // status 값: waiting(대기 중), running(실행 중), paused(일시 중지), disabled(비활성화), completed(완료), failed(실패)
-        // scheduler.md R-005 2.1절 참조
         `CREATE TABLE IF NOT EXISTS scheduled_jobs (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL UNIQUE,
@@ -443,8 +415,6 @@ async function initializeDatabase() {
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (workflow_id) REFERENCES workflows(id)
         )`,
-        
-        // activity_logs 테이블
         `CREATE TABLE IF NOT EXISTS activity_logs (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           source TEXT NOT NULL,
@@ -459,8 +429,6 @@ async function initializeDatabase() {
           FOREIGN KEY (module_id) REFERENCES modules(id),
           FOREIGN KEY (workflow_id) REFERENCES workflows(id)
         )`,
-        
-        // error_logs 테이블
         `CREATE TABLE IF NOT EXISTS error_logs (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           error_type TEXT NOT NULL,
@@ -471,8 +439,6 @@ async function initializeDatabase() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (activity_log_id) REFERENCES activity_logs(id)
         )`,
-        
-        // schema_migrations 테이블 (R-007 5장)
         `CREATE TABLE IF NOT EXISTS schema_migrations (
           migration_id TEXT PRIMARY KEY,
           target_type TEXT NOT NULL,
@@ -481,16 +447,12 @@ async function initializeDatabase() {
           applied_sql TEXT NOT NULL,
           applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`,
-
-        // configattr 테이블 (설정 속성 정의)
         `CREATE TABLE IF NOT EXISTS configattr (
           idx INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL UNIQUE,
           description TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`,
-
-        // config 테이블 (설정 값 저장)
         `CREATE TABLE IF NOT EXISTS config (
           idx INTEGER PRIMARY KEY AUTOINCREMENT,
           attr_id INTEGER NOT NULL,
@@ -500,8 +462,6 @@ async function initializeDatabase() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (attr_id) REFERENCES configattr(idx) ON DELETE CASCADE
         )`,
-
-        // admin_credentials 테이블 (관리자 계정 저장)
         `CREATE TABLE IF NOT EXISTS admin_credentials (
           id INTEGER PRIMARY KEY DEFAULT 1 CHECK(id = 1),
           username TEXT NOT NULL,
@@ -512,11 +472,7 @@ async function initializeDatabase() {
 
       let completed = 0;
       const total = coreTables.length;
-
-      if (total === 0) {
-        db.close();
-        return resolve();
-      }
+      if (total === 0) { db.close(); return resolve(); }
 
       coreTables.forEach((sql) => {
         db.run(sql, (err) => {
@@ -525,33 +481,42 @@ async function initializeDatabase() {
           } else {
             completed++;
             if (completed === total) {
-              // 초기 configattr 데이터 시딩
-              db.run(`INSERT OR IGNORE INTO configattr (idx, name, description) VALUES 
-                (1, '브라우저', '브라우저 실행 경로 및 인자 설정'),
-                (2, '크롤러', '크롤러 동시 실행 및 딜레이 설정'),
-                (3, '시스템', '서버 시스템 전반 환경 설정')`, (err) => {
+              db.run(
+                `INSERT OR IGNORE INTO configattr (idx, name, description) VALUES 
+                 (1, '브라우저', '브라우저 실행 경로 및 인자 설정'),
+                 (2, '크롤러', '크롤러 동시 실행 및 딜레이 설정'),
+                 (3, '시스템', '서버 시스템 전반 환경 설정')`,
+                (err) => {
+                  if (err) console.error('[DB] configattr 시딩 오류:', err);
 
-                // admin_credentials 초기값 시딩 (최초 한 번만)
-                db.get(`SELECT id FROM admin_credentials WHERE id = 1`, async (err, row) => {
-                  if (!row) {
-                    // 초기 관리자 계정 설정
-                    const INIT_USER = process.env.ADMIN_USERNAME || 'adminkim';
-                    const INIT_PASS = process.env.ADMIN_PASSWORD || 'akssj#kasjf';
-                    const hash = await bcrypt.hash(INIT_PASS, 12);
-                    db.run(
-                      `INSERT OR IGNORE INTO admin_credentials (id, username, password) VALUES (1, ?, ?)`,
-                      [INIT_USER, hash],
-                      (err) => {
-                        if (err) console.error('[DB] 관리자 계정 시딩 오류:', err);
-                        else console.log(`[DB] 관리자 계정 초기화 완료 (username: ${INIT_USER})`);
-                      }
-                    );
-                  }
-                  console.log(`[DB] 모든 코어 테이블 생성 완료 (${total + 1}개) 및 초기 시딩 완료`);
-                  db.close();
-                  resolve();
-                });
-              });
+                  db.get(`SELECT id FROM admin_credentials WHERE id = 1`, (err, row) => {
+                    if (err) {
+                      console.error('[DB] 관리자 계정 조회 오류:', err);
+                      db.close();
+                      return resolve();
+                    }
+
+                    if (!row) {
+                      const INIT_USER = process.env.ADMIN_USERNAME || 'adminkim';
+                      const INIT_PASS = process.env.ADMIN_PASSWORD || 'akssj#kasjf';
+                      const hash = bcrypt.hashSync(INIT_PASS, 12);
+                      db.run(
+                        `INSERT OR IGNORE INTO admin_credentials (id, username, password) VALUES (1, ?, ?)`,
+                        [INIT_USER, hash],
+                        (err) => {
+                          if (err) console.error('[DB] 관리자 계정 시딩 오류:', err);
+                          else console.log(`[DB] 관리자 계정 초기화 완료 (username: ${INIT_USER})`);
+                          db.close();
+                          resolve();
+                        }
+                      );
+                    } else {
+                      db.close();
+                      resolve();
+                    }
+                  });
+                }
+              );
             }
           }
         });

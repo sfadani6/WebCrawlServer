@@ -9,6 +9,10 @@ const fs = require('fs-extra');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const { DB_PATH } = require('../db/helper');
+const https = require('https');
+const http = require('http');
+const { parse } = require('json2csv');
+const { JSDOM } = require('jsdom');
 
 // 실행 컨텍스트 저장소 (웹워크플로우 별 변수)
 const executionContexts = new Map();
@@ -125,30 +129,53 @@ async function executeStep(step, context, wss) {
         );
         break;
         
-      case 'navigate':
-        // 향후 구현: 브라우저 자동화
-        result = { status: 'stub', message: 'navigate not implemented yet' };
+      case 'navigate': {
+        const targetUrl = step.params?.url;
+        if (!targetUrl) {
+          result = { status: 'error', message: 'navigate requires url' };
+          break;
+        }
+        try {
+          const html = await fetchHtml(targetUrl);
+          context.variables.set('_lastHtml', html);
+          context.variables.set('_lastUrl', targetUrl);
+          result = { status: 'success', url: targetUrl, htmlLength: html.length };
+        } catch (error) {
+          result = { status: 'error', message: `navigate failed: ${error.message}` };
+        }
         break;
+      }
         
       case 'click':
-        // 향후 구현: 브라우저 자동화
-        result = { status: 'stub', message: 'click not implemented yet' };
-        break;
-        
       case 'input':
-        // 향후 구현: 브라우저 자동화
-        result = { status: 'stub', message: 'input not implemented yet' };
+        result = { status: 'error', message: `${step.type}은 현재 스텁 구현입니다. 브라우저 자동화가 필요합니다.` };
         break;
         
-      case 'extract':
-        // 향후 구현: 브라우저 자동화
-        result = { status: 'stub', message: 'extract not implemented yet' };
+      case 'extract': {
+        const selector = step.params?.selector;
+        const extractType = step.params?.type || 'text';
+        const html = context.variables.get('_lastHtml');
+        if (!html) {
+          result = { status: 'error', message: '이전 navigate 결과가 없습니다.' };
+          break;
+        }
+        try {
+          const data = extractFromHtml(html, selector, extractType);
+          const varName = step.params?.target ? String(step.params.target) : '_extractResult';
+          context.variables.set(varName, data);
+          result = { status: 'success', count: data.length, data };
+        } catch (error) {
+          result = { status: 'error', message: `extract failed: ${error.message}` };
+        }
         break;
+      }
         
-      case 'waitFor':
-        // 향후 구현: 대기 로직
-        result = { status: 'stub', message: 'waitFor not implemented yet' };
+      case 'waitFor': {
+        const ms = Number(step.params?.ms || step.params?.milliseconds || 1000);
+        await new Promise((resolve) => setTimeout(resolve, ms));
+        result = { status: 'success', waitedMs: ms };
         break;
+      }
         
       case 'custom':
         // 액션 스크립트 위임
@@ -246,11 +273,57 @@ async function logError(sourceId, sourceType, error) {
 }
 
 /**
+ * URL에서 HTML 가져오기
+ */
+async function fetchHtml(targetUrl) {
+  const parsed = new URL(targetUrl);
+  return new Promise((resolve, reject) => {
+    const lib = parsed.protocol === 'https:' ? https : http;
+    const req = lib.request(targetUrl, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => {
+      req.destroy();
+      reject(new Error('요청 시간 초과'));
+    });
+    req.end();
+  });
+}
+
+/**
+ * HTML에서 원하는 데이터 추출
+ */
+function extractFromHtml(html, selector, extractType) {
+  const dom = new JSDOM(html);
+  const results = [];
+  const elements = selector ? dom.window.document.querySelectorAll(selector) : [dom.window.document.body];
+
+  elements.forEach((el) => {
+    if (extractType === 'html') {
+      results.push(el.innerHTML);
+    } else if (extractType === 'attribute') {
+      const attr = 'href';
+      results.push(el.getAttribute(attr) || '');
+    } else {
+      results.push(el.textContent.trim());
+    }
+  });
+
+  return results;
+}
+
+/**
  * 모듈 내보내기
  */
 module.exports = {
   executeScript,
   executeStep,
   getExecutionContext,
-  executionContexts
+  executionContexts,
+  fetchHtml,
+  extractFromHtml
 };

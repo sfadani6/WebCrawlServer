@@ -11,6 +11,11 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
   const [dirtyRows, setDirtyRows] = useState({}); // { [rowId]: true }
   const [savingRows, setSavingRows] = useState({}); // { [rowId]: true }
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'canvas'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [sortColumn, setSortColumn] = useState('');
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const loadData = useCallback(() => {
     if (!tableName) return;
@@ -114,6 +119,48 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
     } catch (err) {
       alert(`행 삭제 실패: ${err.message}`);
     }
+  };
+
+  const handleImport = () => {
+    alert('가져오기 기능은 현재 백엔드 API 미구현으로 사용할 수 없습니다.');
+  };
+
+  // 파일 내보내기
+  const handleExport = (format) => {
+    if (!tableName || !rows.length) {
+      alert('내보낼 데이터가 없습니다.');
+      return;
+    }
+
+    let content = '';
+    let mimeType = '';
+    let extension = '';
+
+    if (format === 'csv') {
+      const header = schema.map(col => col.name).join(',');
+      const body = rows.map(row => schema.map(col => {
+        const val = row[col.name];
+        const str = val === null || val === undefined ? '' : String(val);
+        return `"${str.replace(/"/g, '""')}"`;
+      }).join(','));
+      content = [header, ...body].join('\n');
+      mimeType = 'text/csv';
+      extension = 'csv';
+    } else {
+      content = JSON.stringify(rows, null, 2);
+      mimeType = 'application/json';
+      extension = 'json';
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${tableName}_export_${Date.now()}.${extension}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // 새 행 추가
@@ -223,6 +270,9 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
               캔버스 대용량 뷰
             </button>
           </div>
+          <button className="gcp-btn gcp-btn-secondary" onClick={() => handleExport('csv')} style={{ padding: '4px 8px', fontSize: '11px' }}>CSV 내보내기</button>
+          <button className="gcp-btn gcp-btn-secondary" onClick={() => handleExport('json')} style={{ padding: '4px 8px', fontSize: '11px' }}>JSON 내보내기</button>
+          <button className="gcp-btn gcp-btn-secondary" onClick={handleImport} style={{ padding: '4px 8px', fontSize: '11px' }}>가져오기</button>
           <button className="gcp-btn" onClick={addNewRow} style={{ padding: '4px 10px', fontSize: '11.5px' }}>
             + 새 행 추가
           </button>

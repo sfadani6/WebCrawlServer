@@ -8,6 +8,7 @@ function Layout({ currentPath, onNavigate, children }) {
     { id: 'workflows', path: '/workflows', label: '워크플로우', icon: '⚙️', badge: '미구현' },
     { id: 'scheduler', path: '/scheduler', label: '스케줄러', icon: '⏱️', badge: '미구현' },
     { id: 'logs', path: '/logs', label: '로그', icon: '📋', badge: '미구현' },
+    { id: 'crawler', path: '/crawler', label: '크롤러', icon: '🕷️' },
     { id: 'settings', path: '/settings', label: '설정', icon: '🔧', badge: '미구현' },
   ];
 

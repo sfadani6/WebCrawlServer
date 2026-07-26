@@ -4,16 +4,36 @@ import OverviewPage from './components/OverviewPage';
 import DatabaseOverviewPage from './components/DatabaseOverviewPage';
 import SettingsPage from './components/SettingsPage';
 import UnimplementedPage from './components/UnimplementedPage';
+import ModulesPage from './components/ModulesPage';
+import WorkflowsPage from './components/WorkflowsPage';
+import SchedulerPage from './components/SchedulerPage';
+import LogsPage from './components/LogsPage';
+import CrawlerPage from './components/CrawlerPage';
 import './App.css';
 
 function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname || '/');
-  const [selectedDb, setSelectedDb] = useState(null);
-  const [selectedTable, setSelectedTable] = useState('');
+  const [selectedDb, setSelectedDb] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('selectedDb');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const [selectedTable, setSelectedTable] = useState(() => sessionStorage.getItem('selectedTable') || '');
 
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPath(window.location.pathname || '/');
+      const path = window.location.pathname || '/';
+      setCurrentPath(path);
+      if (path.startsWith('/database')) {
+        try {
+          const raw = sessionStorage.getItem('selectedDb');
+          setSelectedDb(raw ? JSON.parse(raw) : null);
+          setSelectedTable(sessionStorage.getItem('selectedTable') || '');
+        } catch (_) {}
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -65,20 +85,23 @@ function App() {
     }
 
     if (currentPath.startsWith('/modules')) {
-      return <UnimplementedPage pageName="모듈 관리" path="/modules" onNavigate={handleNavigate} />;
+      return <ModulesPage onNavigate={handleNavigate} />;
     }
     if (currentPath.startsWith('/workflows')) {
-      return <UnimplementedPage pageName="워크플로우 Engine" path="/workflows" onNavigate={handleNavigate} />;
+      return <WorkflowsPage onNavigate={handleNavigate} />;
     }
     if (currentPath.startsWith('/scheduler')) {
-      return <UnimplementedPage pageName="스케줄러 (Cron)" path="/scheduler" onNavigate={handleNavigate} />;
+      return <SchedulerPage onNavigate={handleNavigate} />;
     }
     if (currentPath.startsWith('/logs')) {
-      return <UnimplementedPage pageName="활동 및 에러 로그" path="/logs" onNavigate={handleNavigate} />;
+      return <LogsPage onNavigate={handleNavigate} />;
     }
 
     if (currentPath.startsWith('/settings')) {
       return <SettingsPage />;
+    }
+    if (currentPath.startsWith('/crawler')) {
+      return <CrawlerPage onNavigate={handleNavigate} />;
     }
 
     return <OverviewPage onNavigate={handleNavigate} />;

@@ -21,11 +21,13 @@ const rateLimit        = require('express-rate-limit');
 const { DB_PATH }      = require('./db/helper');
 const createApiRouter  = require('./routes/api');
 const adminDbRouter    = require('./routes/adminDb');
+const crawlerRouter    = require('./routes/crawler');
 const { basicAuth, setCredentialsCache } = require('./middleware/auth');
 const bcrypt           = require('bcryptjs');
 const { startScheduler } = require('./scheduler/jobRunner');
 const { startMonitor } = require('./monitor/monitorWs');
 const { startLogRotator } = require('./logs/logRotator');
+const { startCrawlerMonitor } = require('./monitor/crawlerMonitor');
 
 // === 환경변수 검증 ===
 // R-013 (security.md): 민감 정보는 환경변수로만 설정
@@ -176,6 +178,7 @@ app.get('/health', (req, res) => {
 // === API 라우터 마운트 ===
 app.use('/api', apiLimiter, createApiRouter(wss));
 app.use('/admin/api', adminApiLimiter, basicAuth(), adminDbRouter);
+app.use('/admin/api/crawler', crawlerRouter);
 app.use('/api/nlp', nlpLimiter, require('./routes/nlp'));
 
 // === 통합 콘솔 SPA 라우터 마운트 (server/routes/adminUi.js) ===
@@ -390,6 +393,28 @@ function initializeDatabase() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`,
+        `CREATE TABLE IF NOT EXISTS crawler_targets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          url TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          interval_seconds INTEGER DEFAULT 0,
+          last_checked_at TIMESTAMP,
+          last_result TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `CREATE TABLE IF NOT EXISTS crawler_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          target_id INTEGER NOT NULL,
+          external_id TEXT,
+          title TEXT,
+          content TEXT,
+          raw TEXT,
+          published_at TIMESTAMP,
+          fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(target_id) REFERENCES crawler_targets(id)
+        )`,
         `CREATE TABLE IF NOT EXISTS workflows (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL UNIQUE,
@@ -572,6 +597,9 @@ initializeDatabase()
       
       // 로그 로테이터 시작 (R-009 logging.md)
       startLogRotator();
+
+      // 크롤러 자동 폴링 시작
+      startCrawlerMonitor(wss);
     });
   })
   .catch((err) => {

@@ -16,24 +16,30 @@
     "pm2:logs": "npx pm2 logs WebCrawlServer",
     "pm2:monitor": "npx pm2 monit",
     "pm2:delete": "npx pm2 delete WebCrawlServer",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "basic-auth": "^2.0.1",
     "bcryptjs": "^3.0.3",
+    "cheerio": "^1.0.0-rc.12",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "fs-extra": "^11.1.1",
     "helmet": "^7.1.0",
     "js-yaml": "^4.1.0",
+    "jsdom": "^29.1.1",
+    "json2csv": "^6.0.0-alpha.2",
     "node-cron": "^3.0.2",
     "sqlite3": "^5.1.6",
     "ws": "^8.13.0"
   },
   "devDependencies": {
+    "jest": "^30.4.2",
     "nodemon": "^3.0.2",
-    "pm2": "^5.3.0"
+    "pm2": "^5.3.0",
+    "supertest": "^7.2.2"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -1,0 +1,18 @@
+name: crawler_default
+description: 기본 크롤링 워크플로우
+steps:
+  - stepId: fetch_target
+    type: custom
+    action: fetch_target
+    params:
+      target_id: 0
+  - stepId: parse_items
+    type: custom
+    action: parse_items
+    params:
+      parser: auto
+  - stepId: save_items
+    type: custom
+    action: save_items
+    params:
+      batch: true

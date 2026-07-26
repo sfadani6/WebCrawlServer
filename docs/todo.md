@@ -17,62 +17,46 @@
 
 ## 완료된 항목
 
-### P1-4: admin-ui/dist 빌드 산출물 확인
-- `server/admin-ui/dist/index.html` 존재 확인
-
-### P2-3: CSS 중복 규칙 정리
-- `App.css`와 `index.css` 중복 없음 확인
-
-### P2-4: SPA 라우팅 뒤로가기 상태 복원
-- `sessionStorage`에 선택된 DB/테이블 저장, `popstate` 시 복원 구현
-
-### P2 아키텍처: monitorWs.js 리소스 로그 과다 기록
-- 5분 간격 샘플링으로 개선 확인
-
-### P2 아키텍처: 에러 처리 미들웨어 통합
-- `server/app.js` 표준 에러 핸들러 적용 확인
-
-### P2 보안: 레이트 리밋 바이패스 가능성
-- `/api`, `/admin/api`, `/api/nlp`에 각각 리미터 적용 확인
-
-### P2 보안: 민감 정보 로그 노출
-- 구조적 필드만 출력 확인
-
-### P3: 단위 테스트 도입
-- Jest 설치, `npm test` 스크립트 추가, `server/scripts/scriptEngine.test.js` 작성
-
-### P3: 통합 테스트 도입
-- supertest 설치, `server/app.test.js` 작성
-
-### P3: docs/rule/ 문서와 코드 불일치 확인
-- R-005, R-006, R-007, R-009 코드와 일치 확인
-
-### P3: API 문서화
-- `docs/api-spec.md` 작성 완료
-
-### P3: 데이터베이스 마이그레이션 스크립트
-- `server/scripts/migrate.js` 작성 완료
-- `server/migrations/001_add_activity_logs_index.sql` 생성 및 적용 완료
-
-### P2 아키텍처: DB 연결 풀 가이드 작성
-- `docs/tips/db-connection-pool-guide.md` 작성 완료
-- SQLite 특성상 싱글톤 유지 권장, 필요 시 선택적 적용 가능
+### 라우트 맵 문서화
+- `docs/tips/route-map.md` 작성 완료
+- Express 라우트 40개, WebSocket 이벤트, 미들웨어 체인, DB 연결 패턴 정리
 
 ---
 
-## 실행 중 / 대기 중
+## 개선 필요 사항 (분석 결과)
 
-### P2-1: 테이블 데이터 페이지네이션, 정렬, 검색 필터 UI
-- `SpreadsheetView.jsx` 상태 변수 추가 완료
-- 실제 UI/로직 추가 필요
+### P1: DB 연결 패턴 통일
+- `server/db/helper.js`의 싱글톤(cachedDb)과 `adminDb.js`/`crawler.js`의 직접 생성 패턴 혼재
+- `adminDb.js`의 `getDb(dbName)`는 매 요청마다 새 연결 생성 후 `db.close()` 호출
+- `crawler.js`의 `getDb()`도 동일한 문제
+- **제안**: `helper.js`에 `getDbForPath(dbPath)` 함수 추가하여 통일
 
-### P2-2: 테이블 CSV/JSON 내보내기/가져오기
-- 내보내기 구현 완료
-- 가져오기는 백엔드 미구현으로 UI 제한
+### P2: adminDb.js 응답 형식 표준화
+- 일부 엔드포인트만 `success`/`fail` 래퍼 사용 (restore, crawler)
+- 대부분의 엔드포인트는 `res.json()` 직접 사용
+- **제안**: 모든 엔드포인트를 `success`/`fail`로 통일
 
-### P2 아키텍처: API 응답 형식 표준화
-- 에러 응답은 표준화됨
-- 성공 응답 형식이 `/api`, `/admin/api`마다 다름
+### P2: NLP 라우터 응답 형식 불일치
+- `{status: 'ok', sql, params}` 형식 사용
+- 다른 API는 `{status: 'success', data}` 또는 `{status: 'error', message}` 형식
+- **제안**: `response.js`의 `success`/`fail` 래퍼로 통일
+
+### P3: adminDb.js 복원 시 DB close 조건 버그
+- 496, 559줄: `if (dbName.toLowerCase() !== 'main.db') db.close();`
+- main.db인 경우 close되지 않아 연결 누수 발생
+- **제안**: 조건 제거하고 항상 `db.close()` 호출
+
+### P3: 에러 처리 미들웨어 require 위치
+- `server/app.js` 354줄: `app.use` 내부에서 `require('./middleware/response')` 호출
+- 모듈 캐싱되지만 가독성을 위해 상단으로 이동 권장
+
+### P3: WebSocket MCP action 더미 응답
+- switch-case (275~302줄)가 실제 구현 없이 문자열만 반환
+- **제안**: 각 action별 실제 핸들러 연결 또는 제거
+
+### P4: SPA 라우팅 catch-all 범위
+- `adminUiRouter`의 `*`가 모든 경로를 잡아 404 핸들러에 도달하지 못함
+- 현재는 문제없으나, 향후 REST API 추가 시 충돌 가능
 
 ---
 

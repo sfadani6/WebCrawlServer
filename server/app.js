@@ -23,6 +23,9 @@ const createApiRouter  = require('./routes/api');
 const adminDbRouter    = require('./routes/adminDb');
 const { basicAuth, setCredentialsCache } = require('./middleware/auth');
 const bcrypt           = require('bcryptjs');
+const { startScheduler } = require('./scheduler/jobRunner');
+const { startMonitor } = require('./monitor/monitorWs');
+const { startLogRotator } = require('./logs/logRotator');
 
 // === Express 앱 설정 ===
 const app    = express();
@@ -568,6 +571,15 @@ initializeDatabase()
       console.log(`  - 헬스 체크: http://localhost:${PORT}/health`);
       console.log(`  - DB 위치: ${path.join(__dirname, '../database/main.db')}`);
       console.log(`========================================`);
+      
+      // 스케줄러 시작 (R-005 scheduler.md)
+      startScheduler(wss);
+      
+      // 모니터링 시작 (R-006 monitoring.md)
+      startMonitor(wss);
+      
+      // 로그 로테이터 시작 (R-009 logging.md)
+      startLogRotator();
     });
   })
   .catch((err) => {

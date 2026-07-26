@@ -30,12 +30,28 @@
 
 ## 2026-07-26 이력
 
+### [완료] 13:00:00 - 미구현 기능 6종 구현
+- **작업 항목**: MCP 스크립트 엔진, 스케줄러 엔진, 모니터링, 로그 로터이터, 재시도 로직, 워크플로우 엔진 구현
+- **변경 내용**:
+  - server/scripts/scriptEngine.js: steps 배열 파싱·실행, setVariable/condition/loop 핸들러
+  - server/scheduler/jobRunner.js: 예약 작업 실행 엔진, overlap_policy(skip/queue/parallel)
+  - server/scheduler/cronParser.js: cron 표현식 파서
+  - server/monitor/monitorWs.js: CPU/메모리 사용량 WebSocket broadcast, activity_logs 연동
+  - server/logs/logRotator.js: 일자별 로그 파일 자동 생성·로테이션
+  - server/middleware/retry.js: 최대 3회 재시도, error_logs 기록, Slack Webhook 옵션
+  - server/workflows/workflowEngine.js: YAML 파싱·실행, validateWorkflow 함수
+  - server/app.js: 3개 모듈 연동 (스케줄러/모니터/로그)
+- **변경 이유**: R-004~R-013 문서에 명시된 미구현 기능을 순차적으로 구현하여 프로젝트 완성도 향상
+- **결과**: ✅ 성공 (7개 파일 신규 생성, 1개 파일 수정)
+- **관련 Rule**: R-004, R-005, R-006, R-009, R-013
+- **담당 AI**: Cline
+
 ### [완료] 11:35:00 - 프로젝트 검수 결과 문서 및 코드 수정
 - **작업 항목**: AGENTS.md와 Rule Registry 문서 불일치 해결
 - **변경 내용**:
   - docs/rule/architecture.md 1.4절: "인증은 다루지 않는다" → "Basic Auth 인증 적용(auth.md R-014 참조)"으로 수정
-  - docs/rule/structure.md: server/controllers/services/utils 디렉토리 항목 제거, 실제 디렉토리 구조반영
-  - server/app.js: scheduled_jobs status DEFAULT 'active' → 'waiting'으로 변경 (scheduler.md 2.1절 일치)
+  - docs/rule/structure.md: server/controllers/services/utils 디렉토리 제거, 실제 구조 반영
+  - server/app.js: scheduled_jobs status DEFAULT 'waiting'으로 변경 (scheduler.md 2.1절 일치)
   - docs/rule/database.md 4.3절: 보호 테이블 목록에 admin_credentials 추가
   - server/routes/adminDb.js: protectedTables 배열에 admin_credentials 추가
   - docs/rule/mcp.md 9장: 워크플로우 엔진 미구현 상태 명시

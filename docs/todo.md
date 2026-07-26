@@ -10,23 +10,96 @@
 | 항목 | 내용 |
 |------|------|
 | 프로젝트 | WebCrawlServer |
-| 현재 주기 | **ask.md 기능 구현 완료** |
+| 현재 주기 | **프로젝트 전면 분석 및 미처리 항목 정리** |
 | **환경 요구사항** | **모든 설치는 로컬만 허용, 글로벌 설치 금지** |
 
 ---
 
-## 우선순위 작업
+## 긴급/버그 수정 (P0)
 
-| 우선순위 | 작업 항목 | 예약 시작일 | 예약 완료일 | 의존성 | 상태 |
-|----------|-----------|-------------|-------------|---------|------|
-| 1 | `main.db` `configattr` 및 `config` 테이블 생성/초기 데이터 구축 | 2026-07-26 | 2026-07-26 | - | ✅ 완료 |
-| 2 | 백엔드 API 보강 (`DELETE /databases`, `POST/DELETE /tables`, `/config`) | 2026-07-26 | 2026-07-26 | - | ✅ 완료 |
-| 3 | 데이터베이스 목록 (`DatabaseOverviewPage.jsx`) DB 삭제 버튼 & `main.db` 예외 처리 | 2026-07-26 | 2026-07-26 | API 보강 | ✅ 완료 |
-| 4 | 테이블 목록 (`TableList.jsx`) 테이블 삭제 & 동적 컬럼 생성 모달 구현 | 2026-07-26 | 2026-07-26 | API 보강 | ✅ 완료 |
-| 5 | 데이터 그리드 (`SpreadsheetView.jsx`) 행 우측 [저장] & [행 삭제] 버튼 구현 | 2026-07-26 | 2026-07-26 | - | ✅ 완료 |
-| 6 | 설정 페이지 (`SettingsPage.jsx`) `configattr` 연동 그리드 및 저장/삭제 구현 | 2026-07-26 | 2026-07-26 | API 보강 | ✅ 완료 |
-| 7 | 프론트엔드 빌드 및 서버 재시작 검증 | 2026-07-26 | 2026-07-26 | - | ✅ 완료 |
-| 8 | `api.js` Basic Auth 헤더 추가 (401 오류 해소) | 2026-07-26 | 2026-07-26 | - | ✅ 완료 |
+| 우선순위 | 작업 항목 | 상태 | 상세 |
+|----------|----------|------|------|
+| P0 | **app.js WebSocket verifyClient에서 allowedOrigins 참조 오류** | 🔴 미해결 | `verifyClient` 콜백(42~72행)에서 `allowedOrigins` 변수가 정의(79~84행)되기 전에 참조됨. JavaScript 호이스팅으로 인해 `undefined` 상태로 평가되어 모든 WebSocket 연결이 차단됨. `allowedOrigins` 선언을 `verifyClient`보다 위로 이동해야 함 |
+| P0 | **server/logs/logRotator.js 파일 누락** | 🔴 미해결 | app.js 28행에서 `require('./logs/logRotator')`로 참조하지만 `server/logs/logRotator.js` 파일이 존재하지 않음. 서버 시작 시 모듈 로드 실패로 크래시 발생 |
+| P0 | **WS_TOKEN 기본값 하드코딩** | 🔴 미해결 | app.js 35행: `const WS_TOKEN = process.env.WS_TOKEN \|\| 'default-ws-token'` — 기본 토큰이 소스코드에 하드코딩되어 보안 위험. 환경변수 미설정 시 경고 로그 출력 필요 |
+
+---
+
+## 미구현 페이지 (P1)
+
+| 우선순위 | 작업 항목 | 상태 | 상세 |
+|----------|----------|------|------|
+| P1 | **관리자 콘솔 `/modules` 페이지 구현** | 🟡 미구현 | 현재 `UnimplementedPage` 컴포넌트로 대체됨. 모듈 CRUD, 상태 조회 UI 필요 |
+| P1 | **관리자 콘솔 `/workflows` 페이지 구현** | 🟡 미구현 | 현재 `UnimplementedPage` 컴포넌트로 대체됨. YAML 편집기, 워크플로우 실행/모니터링 UI 필요 |
+| P1 | **관리자 콘솔 `/scheduler` 페이지 구현** | 🟡 미구현 | 현재 `UnimplementedPage` 컴포넌트로 대체됨. Cron 작업 CRUD, 실행 이력 UI 필요 |
+| P1 | **관리자 콘솔 `/logs` 페이지 구현** | 🟡 미구현 | 현재 `UnimplementedPage` 컴포넌트로 대체됨. 활동 로그/에러 로그 조회, 필터링 UI 필요 |
+
+---
+
+## 백엔드 미구현 기능 (P1)
+
+| 우선순위 | 작업 항목 | 상태 | 상세 |
+|----------|----------|------|------|
+| P1 | **scriptEngine.js 브라우저 자동화 액션 구현** | 🟡 스텁 상태 | `navigate`, `click`, `input`, `extract`, `waitFor` 타입이 모두 `{ status: 'stub', message: '... not implemented yet' }` 반환. 실제 브라우저 자동화(Puppeteer/Playwright) 연동 필요 |
+| P1 | **scheduler overlap_policy 'queue' 구현** | 🟡 미구현 | `jobRunner.js` 40~43행: queue 정책이 "미구현" 로그만 출력하고 return. 실제 큐잉 로직 구현 필요 |
+| P1 | **cronParser.js 실제 cron 로직 구현** | 🟡 단순화됨 | `getNextTime()`이 실제 cron 계산 없이 1분 후만 반환. `node-cron` 라이브러리 도입 또는 정확한 cron 계산 로직 구현 필요 |
+| P1 | **nlp.js SQL 변환 패턴 확장** | 🟡 제한적 | 현재 2개 패턴(회원 삭제, 전체 조회)만 지원. 실제 NLP 엔진 연동 또는 패턴 확장 필요 |
+| P1 | **admin-ui/dist 빌드 산출물 확인** | 🟡 미확인 | `server/routes/adminUi.js`에서 `server/admin-ui/dist`를 정적 파일 경로로 사용. dist 디렉토리 존재 여부 및 최신 빌드 상태 확인 필요 |
+
+---
+
+## 아키텍처/설계 개선 (P2)
+
+| 우선순위 | 작업 항목 | 상태 | 상세 |
+|----------|----------|------|------|
+| P2 | **DB 연결 풀(Connection Pool) 도입** | 🔴 개선 필요 | 모든 모듈(`db/helper.js`, `jobRunner.js`, `workflowEngine.js`, `scriptEngine.js`, `monitorWs.js`, `adminDb.js`)에서 매 요청/함수 호출마다 새 DB 연결 생성 후 즉시 종료. `better-sqlite3` 또는 연결 풀 패턴 도입 필요 |
+| P2 | **DB 연결 중복 코드 제거** | 🔴 개선 필요 | DB 연결 생성/종료 패턴이 6개 이상의 파일에서 중복됨. 공통 DB 헬퍼로 통합 필요 |
+| P2 | **monitorWs.js 리소스 로그 과다 기록** | 🔴 개선 필요 | 10초마다 `activity_logs`에 INSERT. 장기 실행 시 로그 테이블이 급격히 증가. 샘플링 또는 별도 리소스 테이블 분리 고려 |
+| P2 | **에러 처리 미들웨어 통합** | 🔴 개선 필요 | `app.js`에 전역 에러 핸들러가 있지만 일부 라우터에서 `try/catch` 없이 동기 코드 사용. 모든 라우터의 에러 전파 일관성 확보 필요 |
+| P2 | **API 응답 형식 표준화** | 🔴 개선 필요 | `/api`는 `{ modules, workflows, ... }`, `/admin/api`는 `{ error, message }`, WebSocket은 `{ type, status, ... }` 등 응답 형식이 혼재. 표준 응답 래퍼 도입 필요 |
+| P2 | **환경변수 검증 및 기본값 경고** | 🔴 개선 필요 | `WS_TOKEN`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `API_KEY`, `ALLOWED_ORIGINS` 등 환경변수가 누락될 경우 기본값으로 silent fallback. 서버 시작 시 누락된 환경변수 경고 로그 필요 |
+
+---
+
+## 프론트엔드 개선 (P2)
+
+| 우선순위 | 작업 항목 | 상태 | 상세 |
+|----------|----------|------|------|
+| P2 | **테이블 데이터 페이지네이션, 정렬, 검색 필터 UI 추가** | 🟡 미구현 | `SpreadsheetView.jsx`에 페이지네이션/정렬/필터 기능 부재. 대량 데이터 처리 불가 |
+| P2 | **테이블 CSV/JSON 내보내기/가져오기 기능** | 🟡 미구현 | 백엔드 API(`/admin/api/tables/:name/backup`)는 있으나 프론트엔드 UI 미연동 |
+| P2 | **CSS 중복 규칙 정리 및 디자인 토큰 문서 갱신** | 🟡 미구현 | `App.css`와 `index.css` 간 중복 스타일 가능성. CSS 변수 기반 디자인 토큰 체계 정리 필요 |
+| P2 | **SPA 라우팅 뒤로가기 시 상태 복원** | 🟡 개선 필요 | `App.jsx`에서 `popstate` 이벤트는 처리하지만 이전 상태(선택된 DB/테이블)가 복원되지 않음 |
+
+---
+
+## 보안 강화 (P2)
+
+| 우선순위 | 작업 항목 | 상태 | 상세 |
+|----------|----------|------|------|
+| P2 | **adminDb.js SQL Injection 화이트리스트 검증 강화** | 🟡 부분 적용 | 컬럼명은 화이트리스트 검증하나 테이블명은 직접 문자열 연결 사용. 테이블명도 화이트리스트 또는 정규식 검증 필요 |
+| P2 | **레이트 리밋 바이패스 가능성** | 🟡 개선 필요 | `/admin/api`는 `adminApiLimiter` 적용, `/api`는 `apiLimiter` 적용. 그러나 일부 라우터가 다른 미들웨어 체인을 통해 우회될 가능성 확인 필요 |
+| P2 | **민감 정보 로그 노출** | 🟡 개선 필요 | WebSocket 메시지 로그(`console.log('[WebSocket] 수신 메시지:', data)`)에 민감 데이터가 포함될 수 있음. 로그 레벨에 따른 마스킹 필요 |
+
+---
+
+## 테스트 및 문서화 (P3)
+
+| 우선순위 | 작업 항목 | 상태 | 상세 |
+|----------|----------|------|------|
+| P3 | **단위 테스트 도입** | 🔴 부재 | `server/` 전체에 테스트 파일이 하나도 없음. Jest 도입 및 핵심 모듈(`cronParser`, `scriptEngine`, `workflowEngine`) 테스트 코드 작성 필요 |
+| P3 | **통합 테스트 도입** | 🔴 부재 | API 엔드포인트(`/api/stats`, `/admin/api/tables` 등) 통합 테스트 부재. Supertest 등을 활용한 API 테스트 필요 |
+| P3 | **docs/rule/ 문서와 실제 구현 간 불일치 확인** | 🟡 미확인 | `AGENTS.md` 0.2절 Rule Registry의 각 문서(R-001~R-014)가 실제 코드 구현과 일치하는지 전면 검토 필요 |
+| P3 | **API 문서화 (Swagger/OpenAPI)** | 🔴 부재 | REST API 엔드포인트에 대한 문서 부재. Swagger 또는 OpenAPI 스펙 작성 필요 |
+
+---
+
+## 인프라/운영 (P3)
+
+| 우선순위 | 작업 항목 | 상태 | 상세 |
+|----------|----------|------|------|
+| P3 | **Docker Compose 환경 구성** | 🟡 미구현 | `ecosystem.config.js`(PM2)는 있으나 Docker 환경 미구성. 로컬 개발/배포를 위한 Dockerfile 및 docker-compose.yml 작성 필요 |
+| P3 | **데이터베이스 마이그레이션 스크립트** | 🟡 미구현 | `schema_migrations` 테이블은 있으나 실제 마이그레이션 스크립트 및 도구 부재. 마이그레이션 프레임워크 도입 필요 |
+| P3 | **로그 로테이터 구현** | 🔴 미구현 | `app.js`에서 `startLogRotator()` 호출하지만 `server/logs/logRotator.js` 파일 자체가 없음. 로그 파일 로테이션 로직 구현 필요 |
 
 ---
 
@@ -35,16 +108,7 @@
 - **글로벌 설치 금지**: 모든 패키지는 로컬 프로젝트 내에서만 설치해야 함
 - **독립적인 환경**: 프로젝트는 자체 포함된 의존성만 사용해야 함
 - **서버 구성**: 모든 서버 구성은 로컬 환경에서 동작해야 함
-
----
-
-## 다음 단계 (백로그)
-
-1. 관리자 콘솔 `/logs` - 활동/에러 로그 실제 조회 연동
-2. 관리자 콘솔 `/modules`, `/workflows`, `/scheduler` 페이지 구현
-3. 테이블 데이터 페이지네이션, 정렬, 검색 필터 UI 추가
-4. 테이블 CSV/JSON 내보내기/가져오기 기능
-5. CSS 중복 규칙 정리 및 디자인 토큰 문서 갱신
+- **P0 버그 우선 처리**: `allowedOrigins` 참조 오류 및 `logRotator.js` 누락으로 인해 현재 서버가 정상 기동되지 않을 가능성 높음
 
 ---
 

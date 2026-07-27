@@ -17,6 +17,7 @@ function Layout({ currentPath, onNavigate, children }) {
     { id: 'database', path: '/database', label: '데이터베이스', icon: '🗄️' },
     { id: 'visual-workflow', path: '/visual-workflow', label: '시각적 워크플로우', icon: '⚡' },
     { id: 'remote-terminal', path: '/remote-terminal', label: '원격 터미널', icon: '🖥️' },
+    { id: 'plugins', path: '/plugins', label: '플러그인 관리', icon: '🔌' },
     { id: 'modules', path: '/modules', label: '모듈 관리', icon: '🧩', badge: '미구현' },
     { id: 'workflows', path: '/workflows', label: '워크플로우', icon: '⚙️', badge: '미구현' },
     { id: 'scheduler', path: '/scheduler', label: '스케줄러', icon: '⏱️', badge: '미구현' },

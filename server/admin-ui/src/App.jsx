@@ -11,6 +11,7 @@ import LogsPage from './components/LogsPage';
 import CrawlerPage from './components/CrawlerPage';
 import VisualWorkflowEditor from './components/VisualWorkflowEditor';
 import PluginRemoteTerminal from './components/PluginRemoteTerminal';
+import PluginsPage from './components/PluginsPage';
 import './App.css';
 
 function App() {
@@ -91,6 +92,9 @@ function App() {
     }
     if (currentPath.startsWith('/remote-terminal')) {
       return <PluginRemoteTerminal />;
+    }
+    if (currentPath.startsWith('/plugins')) {
+      return <PluginsPage onNavigate={handleNavigate} />;
     }
 
     if (currentPath.startsWith('/modules')) {

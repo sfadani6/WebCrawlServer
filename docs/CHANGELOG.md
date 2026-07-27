@@ -10,6 +10,7 @@
 
 | 버전 | 날짜 | 제목 | 작성자 |
 |------|------|------|--------|
+| 0.1.6 | 2026-07-27 | 플러그인 관리 연결 흐름 수정 | Codex |
 | 0.1.5 | 2026-07-27 | 접속관리 시스템 및 플러그인 호환성 개선 | Mistral Vibe |
 | 0.1.4 | 2026-07-26 | P0-P3 일괄 처리 (8/27건) | Cline |
 | 0.1.3 | 2026-07-26 | 워크플로우 엔진 및 미구현 기능 6종 구현 | Cline |
@@ -18,6 +19,22 @@
 ---
 
 ## 버전 이력
+
+
+### [0.1.6] - 2026-07-27
+
+#### 변경 (Changed)
+- `server/admin-ui/src/components/PluginsPage.jsx`: 플러그인 관리 화면의 미연결 채팅 UI 및 잔여 `</write_to_file>` 문자열 제거
+- `plugin/background.js`: 저장된 승인 토큰 기반 직접 WebSocket 연결 및 승인 토큰 자동 저장 처리 추가
+- `plugin/options/options.js`: 기본 토큰 입력값을 빈 값으로 변경
+- `server/monitor/connectionManager.js`: 플러그인 요청 ID 기준 WebSocket 연결 종료 함수 추가
+- `server/routes/plugin.js`, `server/routes/admin.js`: 연결 종료 API가 실제 WebSocket 세션 종료 개수를 반환하도록 수정
+- `docs/CHANGELOG/플러그인-관리-연결흐름-20260727185813.md`: 상세 변경 로그 추가
+
+#### 수정 (Fixed)
+- `/plugins` 화면 하단에 채팅창처럼 보이는 미사용 UI가 표시되던 문제
+- 승인 토큰을 입력해도 플러그인이 저장 토큰으로 바로 연결하지 않고 새 승인 요청 흐름으로 진입하던 문제
+- 플러그인 연결 종료 API가 DB 상태만 바꾸고 활성 WebSocket 세션을 종료하지 않던 문제
 
 ### [0.1.5] - 2026-07-27
 

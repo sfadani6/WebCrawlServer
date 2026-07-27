@@ -73,7 +73,7 @@ async function loadSettings() {
       if (response && response.config) {
         const cfg = response.config;
         serverUrl.value = cfg.serverUrl || 'ws://localhost:9600';
-        wsToken.value = cfg.wsToken || 'default-ws-token';
+        wsToken.value = cfg.wsToken || '';
         autoReconnect.checked = cfg.autoReconnect !== false;
         reconnectInterval.value = (cfg.reconnectInterval || 5000) / 1000;
         heartbeatInterval.value = (cfg.heartbeatInterval || 30000) / 1000;

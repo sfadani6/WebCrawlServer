@@ -37,7 +37,7 @@ const STATE = {
 // ============================================================
 const DEFAULT_CONFIG = {
   serverUrl: 'ws://localhost:9600',
-  wsToken: 'default-ws-token',
+  wsToken: '',
   autoReconnect: true,
   reconnectInterval: 5000,
   heartbeatInterval: 30000,
@@ -88,6 +88,15 @@ async function connect() {
   }
 
   try {
+    const savedToken = (config.wsToken || '').trim();
+    const hasManualToken = savedToken && savedToken !== 'default-ws-token';
+
+    if (hasManualToken) {
+      console.log('[WCS] 저장된 승인 토큰으로 WebSocket 연결을 시도합니다.');
+      initiateWebSocket(savedToken);
+      return;
+    }
+
     // 1단계: 접속 요청 (HTTP POST)
     STATE.connectionPhase = 'requesting';
     console.log('[WCS] 서버 접속 요청 전송 중...');
@@ -171,6 +180,11 @@ function startApprovalPolling() {
       if (data.status === 'approved') {
         console.log('[WCS] 접속 승인됨! WebSocket 연결을 시도합니다.');
         STATE.approvedToken = data.token || null;
+        if (data.token) {
+          saveConfig({ wsToken: data.token }).catch(err => {
+            console.warn('[WCS] 승인 토큰 저장 실패:', err.message || err);
+          });
+        }
         stopApprovalPolling();
         initiateWebSocket(data.token);
       } else if (data.status === 'rejected') {
@@ -251,7 +265,9 @@ function disconnect() {
     STATE.ws = null;
   }
   STATE.connected = false;
+  STATE.connectionPhase = 'disconnected';
   STATE.approvedToken = null;
+  stopApprovalPolling();
   stopHeartbeat();
   notifyConnectionState(false);
 }
@@ -1178,7 +1194,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({
         connected: STATE.connected,
         serverUrl: config.serverUrl,
-        activeScripts: STATE.activeScripts.size
+        activeScripts: STATE.activeScripts.size,
+        connectionPhase: STATE.connectionPhase,
+        approvedToken: STATE.approvedToken || config.wsToken || null
       });
       break;
 

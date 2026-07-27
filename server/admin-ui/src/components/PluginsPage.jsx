@@ -61,9 +61,6 @@ function PluginsPage() {
   const [error, setError] = useState(null);
   const [newTokens, setNewTokens] = useState({}); // { [id]: token } — 승인 직후 인라인 표시용
   const [actionLoading, setActionLoading] = useState({}); // { [id]: true }
-  const [messages, setMessages] = useState([]);
-  const [inputValue, setInputValue] = useState('');
-  const [pendingRequestId, setPendingRequestId] = useState(null);
 
   // WebSocket 서버 URL (현재 호스트 기반)
   const serverPort = window.location.port || '9600';
@@ -102,26 +99,6 @@ function PluginsPage() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
-
-  // 폴링: 대기 중인 플러그인 요청 확인
-  useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await fetch('/api/plugin/pending');
-        const data = await res.json();
-        const pending = Array.isArray(data) ? data : [];
-        if (pending.length > 0) {
-          setPendingRequestId(pending[0].id);
-        } else {
-          setPendingRequestId(null);
-        }
-      } catch (err) {
-        console.error('[PluginsPage] 폴링 오류:', err);
-      }
-    };
-    const interval = setInterval(poll, 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleApprove = async (id) => {
     setActionLoading(prev => ({ ...prev, [id]: true }));
@@ -186,32 +163,6 @@ function PluginsPage() {
       }
     } catch (err) {
       alert(`테스트 요청 생성 실패: ${err.message}`);
-    }
-  };
-
-  const handleLoginRequest = async () => {
-    if (!pendingRequestId) return;
-    if (!window.confirm('플러그인 연결을 승인하시겠습니까?')) return;
-    try {
-      const res = await fetch(`/api/plugin/${pendingRequestId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessages(prev => [
-          ...prev,
-          { id: Date.now(), text: '✅ 플러그인 요청이 승인되었습니다.', from: 'system' }
-        ]);
-        setPendingRequestId(null);
-      } else {
-        throw new Error(data.error || '승인 실패');
-      }
-    } catch (err) {
-      setMessages(prev => [
-        ...prev,
-        { id: Date.now(), text: '❌ 승인 오류: ' + err.message, from: 'system' }
-      ]);
     }
   };
 
@@ -294,7 +245,7 @@ function PluginsPage() {
         </div>
         <div style={{ marginTop: '10px', fontSize: '11.5px', color: 'var(--gcp-text-secondary)', lineHeight: '1.6' }}>
           플러그인 옵션 페이지에서 <strong style={{ color: 'var(--gcp-text-primary)' }}>Server URL</strong>을 위 WebSocket 주소로 설정하고,
-          관리자가 승인 후 발급된 토큰을 <strong style={{ color: 'var(--gcp-text-primary)' }}>WS_TOKEN</strong> 필드에 입력하세요.
+          관리자가 승인하면 플러그인이 자동으로 승인 상태를 확인하고 WebSocket 연결을 시도합니다. 수동 설정이 필요한 경우 승인 직후 표시되는 토큰을 <strong style={{ color: 'var(--gcp-text-primary)' }}>WebSocket 토큰</strong> 필드에 입력하세요.
         </div>
       </div>
 
@@ -485,69 +436,9 @@ function PluginsPage() {
           )
         )}
 
-        {/* ==== Chat UI Starts ==== */}
-        <div style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '200px',
-          backgroundColor: '#fff',
-          borderTop: '1px solid #eee',
-          padding: '10px',
-          overflowY: 'auto'
-        }}>
-          <div style={{ height: '120px', overflowY: 'auto', marginBottom: '10px' }}>
-            {messages.map((m,i)=> (
-              <div key={i} style={{ marginBottom: '6px' }}>
-                <strong>{m.from}:</strong> {m.text}
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', marginBottom: '10px' }}>
-            <input
-              type="text"
-              value={inputValue}
-              onChange={e => setInputValue(e.target.value)}
-              style={{ flex: 1, padding: '8px', marginRight: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-              placeholder="메시지를 입력하세요..."
-            />
-            <button
-              onClick={e => {
-                if (inputValue.trim()) {
-                  const msg = { id: Date.now(), text: inputValue, from: 'me' };
-                  setMessages(prev => [...prev, msg]);
-                  setInputValue('');
-                }
-              }}
-              style={{ padding: '8px 12px', marginLeft: '8px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              전송
-            </button>
-          </div>
-          {pendingRequestId && (
-            <button
-              onClick={handleLoginRequest}
-              style={{
-                padding: '6px 12px',
-                marginLeft: '8px',
-                background: '#28a745',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              로그인요청
-            </button>
-          )}
-        </div>
-        {/* ==== Chat UI Ends ==== */}
       </div>
     </div>
   );
 }
 
 export default PluginsPage;
-
-</write_to_file>

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { basicAuth } = require('../middleware/auth');
 const dbHelper = require('../db/helper');
+const { terminatePluginConnections } = require('../monitor/connectionManager');
 
 // 플러그인 접속 요청 (브라우저 -> 서버)
 router.post('/request', async (req, res) => {
@@ -104,7 +105,8 @@ router.post('/:id/disconnect', basicAuth, async (req, res) => {
   try {
     const { id } = req.params;
     await dbHelper.updatePluginRequestStatus(id, 'disconnected');
-    res.json({ message: '연결 종료' });
+    const terminatedCount = terminatePluginConnections(id);
+    res.json({ message: '연결 종료', terminatedCount });
   } catch (err) {
     console.error('[plugin.disconnect] 오류:', err);
     res.status(500).json({ error: err.message });

@@ -202,8 +202,10 @@ router.post('/plugins/:id/disconnect', basicAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
     const dbHelper = require('../db/helper');
+    const { terminatePluginConnections } = require('../monitor/connectionManager');
     await dbHelper.updatePluginRequestStatus(id, 'disconnected');
-    return success(res, '플러그인 연결 종료 성공');
+    const terminatedCount = terminatePluginConnections(id);
+    return success(res, '플러그인 연결 종료 성공', { terminatedCount });
   } catch (err) {
     console.error('[admin.plugins.disconnect] 오류:', err);
     return fail(res, '플러그인 연결 종료 실패', 500, { error: err.message });

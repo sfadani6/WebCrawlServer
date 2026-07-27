@@ -149,6 +149,27 @@ function terminateConnection(connectionId) {
   return false;
 }
 
+
+/**
+ * 플러그인 요청 ID와 연결된 모든 WebSocket 연결을 강제 종료
+ * @param {number|string} pluginRequestId - 플러그인 요청 ID
+ * @returns {number} 종료한 연결 수
+ */
+function terminatePluginConnections(pluginRequestId) {
+  let terminatedCount = 0;
+  const normalizedId = String(pluginRequestId);
+
+  for (const [connectionId, conn] of activeConnections.entries()) {
+    if (String(conn.pluginRequestId) === normalizedId && conn.status === 'connected') {
+      if (terminateConnection(connectionId)) {
+        terminatedCount += 1;
+      }
+    }
+  }
+
+  return terminatedCount;
+}
+
 /**
  * 모든 연결 강제 종료
  */
@@ -251,6 +272,7 @@ module.exports = {
   getConnection,
   updateActivity,
   terminateConnection,
+  terminatePluginConnections,
   terminateAllConnections,
   getConnectionStats,
   setupConnectionTracking,

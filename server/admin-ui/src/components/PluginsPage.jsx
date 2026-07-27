@@ -53,6 +53,64 @@ function InlineToken({ token, onDismiss }) {
   );
 }
 
+
+// 플러그인 연결 절차를 화면에 항상 노출하는 안내 컴포넌트
+function ConnectionGuide({ wsUrl, pendingCount, approvedCount }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(wsUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const steps = [
+    '브라우저 확장 프로그램의 옵션 페이지를 엽니다.',
+    '서버 주소에 아래 WebSocket URL을 입력하고 저장합니다.',
+    '확장 프로그램에서 연결 버튼을 누르면 이 화면의 승인 대기 탭에 요청이 표시됩니다.',
+    '승인 버튼을 누르면 플러그인이 승인 토큰을 받아 WebSocket에 연결합니다.'
+  ];
+
+  return (
+    <div style={{
+      backgroundColor: 'rgba(26, 115, 232, 0.08)',
+      border: '1px solid rgba(26, 115, 232, 0.35)',
+      borderRadius: '4px',
+      padding: '14px 16px',
+      marginBottom: '16px'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--gcp-text-primary)', marginBottom: '8px' }}>
+            💬 연결 도우미
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--gcp-text-secondary)', lineHeight: '1.7', marginBottom: '10px' }}>
+            채팅창처럼 별도 메시지를 입력하는 방식이 아니라, 브라우저 플러그인이 먼저 연결 요청을 보내고 관리자가 승인하는 방식입니다.
+            현재 화면에서 바로 확인해야 할 단계는 아래 순서입니다.
+          </div>
+          <ol style={{ margin: '0 0 0 18px', padding: 0, fontSize: '12px', color: 'var(--gcp-text-primary)', lineHeight: '1.8' }}>
+            {steps.map(step => <li key={step}>{step}</li>)}
+          </ol>
+        </div>
+        <div style={{ minWidth: '280px', backgroundColor: 'var(--gcp-bg-main)', border: '1px solid var(--gcp-border)', borderRadius: '4px', padding: '10px 12px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', marginBottom: '6px' }}>복사할 서버 주소</div>
+          <code style={{ display: 'block', fontFamily: 'monospace', fontSize: '12.5px', color: 'var(--gcp-accent)', marginBottom: '10px', wordBreak: 'break-all' }}>
+            {wsUrl}
+          </code>
+          <button className="gcp-btn" onClick={handleCopy} style={{ width: '100%', justifyContent: 'center' }}>
+            {copied ? '✅ 복사됨' : '📋 WebSocket URL 복사'}
+          </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px', fontSize: '11px', color: 'var(--gcp-text-secondary)' }}>
+            <div>승인 대기: <strong style={{ color: 'var(--gcp-text-primary)' }}>{pendingCount}</strong></div>
+            <div>승인됨: <strong style={{ color: 'var(--gcp-text-primary)' }}>{approvedCount}</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PluginsPage() {
   const [activeTab, setActiveTab] = useState('pending');
   const [pendingList, setPendingList] = useState([]);
@@ -61,9 +119,6 @@ function PluginsPage() {
   const [error, setError] = useState(null);
   const [newTokens, setNewTokens] = useState({}); // { [id]: token } — 승인 직후 인라인 표시용
   const [actionLoading, setActionLoading] = useState({}); // { [id]: true }
-  const [messages, setMessages] = useState([]);
-  const [inputValue, setInputValue] = useState('');
-  const [pendingRequestId, setPendingRequestId] = useState(null);
 
   // WebSocket 서버 URL (현재 호스트 기반)
   const serverPort = window.location.port || '9600';
@@ -102,26 +157,6 @@ function PluginsPage() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
-
-  // 폴링: 대기 중인 플러그인 요청 확인
-  useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await fetch('/api/plugin/pending');
-        const data = await res.json();
-        const pending = Array.isArray(data) ? data : [];
-        if (pending.length > 0) {
-          setPendingRequestId(pending[0].id);
-        } else {
-          setPendingRequestId(null);
-        }
-      } catch (err) {
-        console.error('[PluginsPage] 폴링 오류:', err);
-      }
-    };
-    const interval = setInterval(poll, 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleApprove = async (id) => {
     setActionLoading(prev => ({ ...prev, [id]: true }));
@@ -189,32 +224,6 @@ function PluginsPage() {
     }
   };
 
-  const handleLoginRequest = async () => {
-    if (!pendingRequestId) return;
-    if (!window.confirm('플러그인 연결을 승인하시겠습니까?')) return;
-    try {
-      const res = await fetch(`/api/plugin/${pendingRequestId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessages(prev => [
-          ...prev,
-          { id: Date.now(), text: '✅ 플러그인 요청이 승인되었습니다.', from: 'system' }
-        ]);
-        setPendingRequestId(null);
-      } else {
-        throw new Error(data.error || '승인 실패');
-      }
-    } catch (err) {
-      setMessages(prev => [
-        ...prev,
-        { id: Date.now(), text: '❌ 승인 오류: ' + err.message, from: 'system' }
-      ]);
-    }
-  };
-
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     try {
@@ -264,6 +273,8 @@ function PluginsPage() {
         </div>
       </div>
 
+      <ConnectionGuide wsUrl={wsUrl} pendingCount={pendingList.length} approvedCount={approvedList.length} />
+
       {/* 서버 연결 정보 패널 */}
       <div style={{
         backgroundColor: 'var(--gcp-bg-card)', border: '1px solid var(--gcp-border)',
@@ -293,8 +304,8 @@ function PluginsPage() {
           </div>
         </div>
         <div style={{ marginTop: '10px', fontSize: '11.5px', color: 'var(--gcp-text-secondary)', lineHeight: '1.6' }}>
-          플러그인 옵션 페이지에서 <strong style={{ color: 'var(--gcp-text-primary)' }}>Server URL</strong>을 위 WebSocket 주소로 설정하고,
-          관리자가 승인 후 발급된 토큰을 <strong style={{ color: 'var(--gcp-text-primary)' }}>WS_TOKEN</strong> 필드에 입력하세요.
+          플러그인 옵션 페이지에서 <strong style={{ color: 'var(--gcp-text-primary)' }}>서버 주소</strong>를 위 WebSocket 주소로 설정한 뒤 확장 프로그램의 연결 버튼을 누르세요.
+          연결 요청이 들어오면 승인 대기 탭에서 승인할 수 있습니다.
         </div>
       </div>
 
@@ -340,7 +351,7 @@ function PluginsPage() {
         {activeTab === 'pending' && (
           pendingList.length === 0 ? (
             <div style={{ padding: '32px', textAlign: 'center', color: 'var(--gcp-text-secondary)', fontSize: '13px' }}>
-              {loading ? '⏳ 불러오는 중...' : '승인 대기 중인 플러그인 요청이 없습니다.'}
+              {loading ? '⏳ 불러오는 중...' : '승인 대기 중인 플러그인 요청이 없습니다. 위 연결 도우미의 순서대로 확장 프로그램에서 연결 버튼을 눌러 요청을 생성하세요.'}
             </div>
           ) : (
             <table className="gcp-table">
@@ -485,69 +496,9 @@ function PluginsPage() {
           )
         )}
 
-        {/* ==== Chat UI Starts ==== */}
-        <div style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '200px',
-          backgroundColor: '#fff',
-          borderTop: '1px solid #eee',
-          padding: '10px',
-          overflowY: 'auto'
-        }}>
-          <div style={{ height: '120px', overflowY: 'auto', marginBottom: '10px' }}>
-            {messages.map((m,i)=> (
-              <div key={i} style={{ marginBottom: '6px' }}>
-                <strong>{m.from}:</strong> {m.text}
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', marginBottom: '10px' }}>
-            <input
-              type="text"
-              value={inputValue}
-              onChange={e => setInputValue(e.target.value)}
-              style={{ flex: 1, padding: '8px', marginRight: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-              placeholder="메시지를 입력하세요..."
-            />
-            <button
-              onClick={e => {
-                if (inputValue.trim()) {
-                  const msg = { id: Date.now(), text: inputValue, from: 'me' };
-                  setMessages(prev => [...prev, msg]);
-                  setInputValue('');
-                }
-              }}
-              style={{ padding: '8px 12px', marginLeft: '8px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              전송
-            </button>
-          </div>
-          {pendingRequestId && (
-            <button
-              onClick={handleLoginRequest}
-              style={{
-                padding: '6px 12px',
-                marginLeft: '8px',
-                background: '#28a745',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              로그인요청
-            </button>
-          )}
-        </div>
-        {/* ==== Chat UI Ends ==== */}
       </div>
     </div>
   );
 }
 
 export default PluginsPage;
-
-</write_to_file>

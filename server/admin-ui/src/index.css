@@ -22,6 +22,22 @@
   box-sizing: border-box;
 }
 
+[data-theme='light'] {
+  --gcp-bg-main: #f8f9fa;
+  --gcp-bg-header: #ffffff;
+  --gcp-bg-sidebar: #f1f3f4;
+  --gcp-bg-card: #ffffff;
+  --gcp-bg-hover: #e8eaed;
+  --gcp-border: #dadce0;
+  --gcp-text-primary: #202124;
+  --gcp-text-secondary: #5f6368;
+  --gcp-accent: #1a73e8;
+  --gcp-accent-hover: #1557b0;
+  --gcp-status-green: #188038;
+  --gcp-status-yellow: #f29900;
+  --gcp-status-red: #d93025;
+}
+
 *, *::before, *::after {
   box-sizing: inherit;
 }

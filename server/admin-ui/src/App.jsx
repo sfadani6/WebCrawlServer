@@ -9,6 +9,8 @@ import WorkflowsPage from './components/WorkflowsPage';
 import SchedulerPage from './components/SchedulerPage';
 import LogsPage from './components/LogsPage';
 import CrawlerPage from './components/CrawlerPage';
+import VisualWorkflowEditor from './components/VisualWorkflowEditor';
+import PluginRemoteTerminal from './components/PluginRemoteTerminal';
 import './App.css';
 
 function App() {
@@ -82,6 +84,13 @@ function App() {
           onSelectTable={(table) => setSelectedTable(table)}
         />
       );
+    }
+
+    if (currentPath.startsWith('/visual-workflow')) {
+      return <VisualWorkflowEditor onNavigate={handleNavigate} />;
+    }
+    if (currentPath.startsWith('/remote-terminal')) {
+      return <PluginRemoteTerminal />;
     }
 
     if (currentPath.startsWith('/modules')) {

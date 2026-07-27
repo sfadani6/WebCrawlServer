@@ -79,7 +79,7 @@ logs/*.log
 # thorium
 thorium/
 
-docs/askLogs/*.md
-docs/askLogs/*.md
-docs/CHANGELOG/*.md
-docs/tips/*.md
+# docs/askLogs/*.md
+# docs/askLogs/*.md
+# docs/CHANGELOG/*.md
+# docs/tips/*.md

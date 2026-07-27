@@ -493,7 +493,7 @@ router.post('/tables/:name/restore', express.json(), async (req, res, next) => {
       }
     });
     stmt.finalize(err => {
-      if (dbName.toLowerCase() !== 'main.db') db.close();
+      db.close();
       if (err) return next(err);
       return success(res, { inserted: rows.length });
     });
@@ -557,7 +557,7 @@ router.post('/tables/:name/restore/csv', express.text({ type: 'text/csv' }), asy
       }
     });
     stmt.finalize(err => {
-      if (dbName.toLowerCase() !== 'main.db') db.close();
+      db.close();
       if (err) return next(err);
       return success(res, { inserted: rows.length });
     });
@@ -576,14 +576,14 @@ router.delete('/databases/:name', async (req, res, next) => {
 
     // main.db 삭제 금지
     if (dbFileName.toLowerCase() === 'main.db') {
-      return res.status(400).json({ error: 'main.db는 시스템 기초 베이스이므로 삭제할 수 없습니다.' });
+      return fail(res, 'main.db는 시스템 기초 베이스이므로 삭제할 수 없습니다.', 400);
     }
 
     const dbDir = path.join(__dirname, '../../database');
     const filePath = path.join(dbDir, dbFileName);
 
     if (!await fs.pathExists(filePath)) {
-      return res.status(404).json({ error: '존재하지 않는 데이터베이스 파일입니다.' });
+      return fail(res, '존재하지 않는 데이터베이스 파일입니다.', 404);
     }
 
     // SQLite 파일 및 저널 파일 삭제

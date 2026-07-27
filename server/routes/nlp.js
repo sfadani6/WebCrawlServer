@@ -8,6 +8,7 @@
  */
 
 const express = require('express');
+const { success, fail } = require('../middleware/response');
 const router = express.Router();
 
 /**
@@ -45,7 +46,7 @@ function getColumnsForTable(table) {
 router.post('/sql', (req, res) => {
   const { prompt } = req.body;
   if (!prompt) {
-    return res.status(400).json({ status: 'error', message: 'prompt is required' });
+    return fail(res, 'prompt가 필요합니다.', 400);
   }
 
   const lowered = prompt.toLowerCase();
@@ -57,7 +58,7 @@ router.post('/sql', (req, res) => {
     const match = lowered.match(/([\w가-힣]+)\s*회원/);
     const name = match ? match[1] : '';
     if (!isAllowedTable('users')) {
-      return res.status(400).json({ status: 'error', message: '허용되지 않은 테이블입니다.' });
+      return fail(res, '허용되지 않은 테이블입니다.', 400);
     }
     sql = 'DELETE FROM users WHERE name LIKE ?';
     params = [`${name}%`];
@@ -65,7 +66,7 @@ router.post('/sql', (req, res) => {
   // 2) 전체 조회 (기존)
   else if (lowered.includes('전체') && lowered.includes('조회')) {
     if (!isAllowedTable('users')) {
-      return res.status(400).json({ status: 'error', message: '허용되지 않은 테이블입니다.' });
+      return fail(res, '허용되지 않은 테이블입니다.', 400);
     }
     sql = 'SELECT * FROM users;';
     params = [];
@@ -75,7 +76,7 @@ router.post('/sql', (req, res) => {
     const match = lowered.match(/([\w가-힣]+)\s*회원/);
     const keyword = match ? match[1] : '';
     if (!isAllowedTable('users')) {
-      return res.status(400).json({ status: 'error', message: '허용되지 않은 테이블입니다.' });
+      return fail(res, '허용되지 않은 테이블입니다.', 400);
     }
     sql = 'SELECT id, name, email, created_at FROM users WHERE name LIKE ? OR email LIKE ?';
     params = [`%${keyword}%`, `%${keyword}%`];
@@ -83,7 +84,7 @@ router.post('/sql', (req, res) => {
   // 4) 특정 컬럼 조회 (신규)
   else if (lowered.includes('조회') && lowered.includes('이메일')) {
     if (!isAllowedTable('users')) {
-      return res.status(400).json({ status: 'error', message: '허용되지 않은 테이블입니다.' });
+      return fail(res, '허용되지 않은 테이블입니다.', 400);
     }
     const allowedCols = getColumnsForTable('users');
     const wanted = ['name', 'email'];
@@ -96,8 +97,7 @@ router.post('/sql', (req, res) => {
     params = [];
   }
 
-  res.json({
-    status: 'ok',
+  return success(res, {
     sql,
     params,
     warning: '이 SQL은 미리보기입니다. 실제 실행을 원할 경우 확인 후 separate execute 엔드포인트를 사용하세요.',

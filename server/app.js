@@ -22,7 +22,9 @@ const { DB_PATH }      = require('./db/helper');
 const createApiRouter  = require('./routes/api');
 const adminDbRouter    = require('./routes/adminDb');
 const crawlerRouter    = require('./routes/crawler');
+const nlpRouter        = require('./routes/nlp');
 const { basicAuth, setCredentialsCache } = require('./middleware/auth');
+const { fail }         = require('./middleware/response');
 const bcrypt           = require('bcryptjs');
 const { startScheduler } = require('./scheduler/jobRunner');
 const { startMonitor } = require('./monitor/monitorWs');
@@ -346,7 +348,6 @@ app.use((err, req, res, next) => {
   const isDev = process.env.NODE_ENV === 'development';
   const details = isDev ? { error: err.message, stack: err.stack } : undefined;
   // 표준 응답 래퍼 사용
-  const { fail } = require('./middleware/response');
   return fail(res, '내부 서버 오류', 500, details);
 });
 

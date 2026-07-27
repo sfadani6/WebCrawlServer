@@ -14,32 +14,55 @@ const sqlite3 = require('sqlite3').verbose();
 // R-007 1장: DB 파일 위치 고정
 const DB_PATH = path.join(__dirname, '../../database/main.db');
 
-// 공유 DB 연결 객체 (싱글톤)
-let cachedDb = null;
+// 경로별 캐시된 DB 커넥션 맵
+const connectionPool = new Map();
 
 /**
- * DB 연결 가져오기 (싱글톤 패턴)
+ * DB 연결 가져오기 (경로별 싱글톤/커넥션 풀 패턴)
+ * @param {string} [targetPath=DB_PATH] - DB 파일 전체 경로
  * @returns {sqlite3.Database}
  */
-function getDbConnection() {
-  if (!cachedDb) {
-    cachedDb = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) console.error('[DB] 공유 연결 생성 오류:', err);
+function getDbForPath(targetPath = DB_PATH) {
+  const resolvedPath = path.resolve(targetPath);
+  if (!connectionPool.has(resolvedPath)) {
+    const db = new sqlite3.Database(resolvedPath, (err) => {
+      if (err) console.error(`[DB] 연결 생성 오류 (${resolvedPath}):`, err);
     });
-    // 성능 최적화 설정
-    cachedDb.run('PRAGMA journal_mode = WAL');
-    cachedDb.run('PRAGMA synchronous = NORMAL');
+    db.run('PRAGMA journal_mode = WAL');
+    db.run('PRAGMA synchronous = NORMAL');
+    connectionPool.set(resolvedPath, db);
   }
-  return cachedDb;
+  return connectionPool.get(resolvedPath);
 }
 
 /**
- * DB 연결 종료 (서버 종료 시 호출)
+ * DB 연결 가져오기 (기본 main.db)
+ * @returns {sqlite3.Database}
  */
-function closeDbConnection() {
-  if (cachedDb) {
-    cachedDb.close();
+function getDbConnection() {
+  return getDbForPath(DB_PATH);
+}
+
+/**
+ * 특정 DB 또는 전체 DB 연결 종료
+ * @param {sqlite3.Database|string} [target] - 종료할 DB 객체 또는 경로 (생략 시 전체 해제)
+ */
+function closeDbConnection(target) {
+  if (!target) {
+    connectionPool.forEach((db) => db.close());
+    connectionPool.clear();
     cachedDb = null;
+    return;
+  }
+  if (typeof target === 'string') {
+    const resolvedPath = path.resolve(target);
+    const db = connectionPool.get(resolvedPath);
+    if (db) {
+      db.close();
+      connectionPool.delete(resolvedPath);
+    }
+  } else if (target && typeof target.close === 'function') {
+    target.close();
   }
 }
 
@@ -177,6 +200,8 @@ module.exports = {
   openReadonly,
   openReadwrite,
   getDbPath,
+  getDbForPath,
+  getDbConnection,
   DB_PATH,
   closeDbConnection
 };

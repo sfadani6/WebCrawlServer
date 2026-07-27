@@ -19,6 +19,16 @@ function SettingsPage() {
   const [authSaving, setAuthSaving] = useState(false);
   const [authMsg, setAuthMsg] = useState({ type: '', text: '' }); // type: 'success' | 'error'
 
+  // Toast 알림 상태
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success', duration = 3500) => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, duration);
+  };
+
   const loadData = () => {
     setLoading(true);
     Promise.all([
@@ -31,6 +41,7 @@ function SettingsPage() {
       setLoading(false);
     }).catch(err => {
       console.error('Failed to load settings data', err);
+      showToast('설정 데이터 로드 실패', 'error');
       setLoading(false);
     });
   };
@@ -65,7 +76,7 @@ function SettingsPage() {
     const rowIdx = rowObj.idx;
 
     if (!rowObj.attr_id) {
-      alert('속성을 선택해야 합니다.');
+      showToast('속성을 선택해야 합니다.', 'error');
       return;
     }
 
@@ -78,16 +89,18 @@ function SettingsPage() {
           method: 'PUT',
           body: JSON.stringify(rowObj)
         });
+        showToast('설정 항목이 성공적으로 수정되었습니다.', 'success');
       } else {
         // 신규 행 추가
         await fetchJSON('/admin/api/config', {
           method: 'POST',
           body: JSON.stringify(rowObj)
         });
+        showToast('새 설정 항목이 성공적으로 추가되었습니다.', 'success');
       }
       loadData();
     } catch (err) {
-      alert(`저장 실패: ${err.message}`);
+      showToast(`저장 실패: ${err.message}`, 'error');
       setSavingRows(prev => {
         const next = { ...prev };
         delete next[rowIdx];
@@ -106,9 +119,10 @@ function SettingsPage() {
       if (rowIdx) {
         await fetchJSON(`/admin/api/config/${rowIdx}`, { method: 'DELETE' });
       }
+      showToast('설정 항목이 삭제되었습니다.', 'success');
       loadData();
     } catch (err) {
-      alert(`삭제 실패: ${err.message}`);
+      showToast(`삭제 실패: ${err.message}`, 'error');
     }
   };
 
@@ -130,9 +144,10 @@ function SettingsPage() {
     if (!window.confirm('경고: config 테이블의 모든 설정 데이터를 초기화하시겠습니까?')) return;
     try {
       await fetchJSON('/admin/api/config_clear', { method: 'DELETE' });
+      showToast('모든 설정 데이터가 초기화되었습니다.', 'success');
       loadData();
     } catch (err) {
-      alert(`초기화 실패: ${err.message}`);
+      showToast(`초기화 실패: ${err.message}`, 'error');
     }
   };
 
@@ -146,9 +161,10 @@ function SettingsPage() {
       });
       setNewAttrName('');
       setNewAttrDesc('');
+      showToast('속성이 추가되었습니다.', 'success');
       loadData();
     } catch (err) {
-      alert(`속성 추가 실패: ${err.message}`);
+      showToast(`속성 추가 실패: ${err.message}`, 'error');
     }
   };
 
@@ -156,9 +172,10 @@ function SettingsPage() {
     if (!window.confirm('이 속성을 삭제하시겠습니까? 연결된 설정 항목들도 영향을 받을 수 있습니다.')) return;
     try {
       await fetchJSON(`/admin/api/configattr/${attrIdx}`, { method: 'DELETE' });
+      showToast('속성이 삭제되었습니다.', 'success');
       loadData();
     } catch (err) {
-      alert(`속성 삭제 실패: ${err.message}`);
+      showToast(`속성 삭제 실패: ${err.message}`, 'error');
     }
   };
 
@@ -173,18 +190,23 @@ function SettingsPage() {
     setAuthMsg({ type: '', text: '' });
 
     if (!authForm.currentPassword) {
+      showToast('현재 비번을 입력하세요.', 'error');
       return setAuthMsg({ type: 'error', text: '현재 비번을 입력하세요.' });
     }
     if (!authForm.newUsername.trim()) {
+      showToast('새 아이디를 입력하세요.', 'error');
       return setAuthMsg({ type: 'error', text: '새 아이디를 입력하세요.' });
     }
     if (!authForm.newPassword) {
+      showToast('새 비번을 입력하세요.', 'error');
       return setAuthMsg({ type: 'error', text: '새 비번을 입력하세요.' });
     }
     if (authForm.newPassword.length < 6) {
+      showToast('새 비번은 6자 이상이어야 합니다.', 'error');
       return setAuthMsg({ type: 'error', text: '새 비번은 6자 이상이어야 합니다.' });
     }
     if (authForm.newPassword !== authForm.confirmPassword) {
+      showToast('새 비번과 비번 확인이 일치하지 않습니다.', 'error');
       return setAuthMsg({ type: 'error', text: '새 비번과 비번 확인이 일치하지 않습니다.' });
     }
 
@@ -204,16 +226,49 @@ function SettingsPage() {
 
       setAdminInfo(prev => ({ ...prev, username: result.username }));
       setAuthForm(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
-      setAuthMsg({ type: 'success', text: `관리자 계정이 '${result.username}'으로 변경되었습니다. 다음 로그인 시 새 아이디/비번을 사용하세요.` });
+      const successText = `관리자 계정이 '${result.username}'으로 변경되었습니다.`;
+      setAuthMsg({ type: 'success', text: successText });
+      showToast(successText, 'success');
     } catch (err) {
-      setAuthMsg({ type: 'error', text: err.message || '계정 변경 실패' });
+      const errorText = err.message || '계정 변경 실패';
+      setAuthMsg({ type: 'error', text: errorText });
+      showToast(errorText, 'error');
     } finally {
       setAuthSaving(false);
     }
   };
 
   return (
-    <div style={{ padding: '20px 24px' }}>
+    <div style={{ padding: '20px 24px', position: 'relative' }}>
+      {/* ======================================================== */}
+      {/* Toast 알림 컴포넌트 */}
+      {/* ======================================================== */}
+      {toast.show && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 18px',
+          borderRadius: '6px',
+          fontSize: '13px',
+          fontWeight: 500,
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+          backgroundColor: toast.type === 'success' ? 'var(--gcp-bg-card, #202124)' : 'var(--gcp-bg-card, #202124)',
+          color: toast.type === 'success' ? '#81c995' : '#f28b82',
+          borderLeft: `4px solid ${toast.type === 'success' ? '#81c995' : '#f28b82'}`,
+          borderTop: '1px solid var(--gcp-border)',
+          borderRight: '1px solid var(--gcp-border)',
+          borderBottom: '1px solid var(--gcp-border)',
+          transition: 'all 0.3s ease'
+        }}>
+          <span>{toast.type === 'success' ? '✅' : '⚠️'}</span>
+          <span>{toast.message}</span>
+        </div>
+      )}
 
       {/* ======================================================== */}
       {/* 관리자 계정 변경 카드 */}

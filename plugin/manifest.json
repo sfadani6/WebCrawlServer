@@ -10,7 +10,8 @@
     "webNavigation",
     "downloads",
     "tabs",
-    "alarms"
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "http://*/*",

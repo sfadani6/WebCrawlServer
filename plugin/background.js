@@ -93,6 +93,7 @@ async function connect() {
       STATE.reconnectAttempts = 0;
       startHeartbeat();
       notifyConnectionState(true);
+      resetNotificationBadge();
     };
 
     STATE.ws.onmessage = (event) => {
@@ -104,14 +105,19 @@ async function connect() {
       STATE.connected = false;
       stopHeartbeat();
       notifyConnectionState(false);
+      if (event.code !== 1000) {
+        showErrorNotification('network', '연결 종료', `WebSocket 연결이 끊어졌습니다 (코드: ${event.code})`);
+      }
       scheduleReconnect();
     };
 
     STATE.ws.onerror = (error) => {
       console.error('[WCS] WebSocket 오류:', error);
+      showErrorNotification('network', '네트워크 오류', 'WebSocket 연결 오류가 발생하였습니다.');
     };
   } catch (err) {
     console.error('[WCS] WebSocket 생성 오류:', err);
+    showErrorNotification('network', '연결 시도 실패', err.message);
     scheduleReconnect();
   }
 }
@@ -175,6 +181,65 @@ function notifyConnectionState(connected) {
     connected,
     serverUrl: config.serverUrl
   }).catch(() => {}); // 팝업이 열려있지 않으면 무시
+}
+
+// ============================================================
+// 에러 알림 및 아이콘/배지 보강 관리
+// ============================================================
+
+/**
+ * 에러 상황별 시스템 알림(chrome.notifications) 및 뱃지/아이콘 보강
+ * @param {'network'|'script'|'timeout'|'unknown'} errorType - 에러 종류
+ * @param {string} title - 알림 제목
+ * @param {string} message - 알림 내용
+ */
+function showErrorNotification(errorType, title, message) {
+  let badgeText = '!';
+  let badgeColor = '#D93025'; // 기본 빨강
+
+  switch (errorType) {
+    case 'network':
+      badgeText = 'OFF';
+      badgeColor = '#D93025'; // 빨강
+      break;
+    case 'script':
+      badgeText = 'FAIL';
+      badgeColor = '#F2994A'; // 주황
+      break;
+    case 'timeout':
+      badgeText = 'TIME';
+      badgeColor = '#E2A900'; // 노랑
+      break;
+    default:
+      badgeText = 'ERR';
+      badgeColor = '#D93025';
+  }
+
+  // 확장 프로그램 뱃지 및 색상 업데이트
+  if (chrome.action && chrome.action.setBadgeText) {
+    chrome.action.setBadgeText({ text: badgeText });
+    chrome.action.setBadgeBackgroundColor({ color: badgeColor });
+  }
+
+  // chrome.notifications 알림 전송
+  if (chrome.notifications) {
+    const notificationId = `wcs_err_${Date.now()}`;
+    chrome.notifications.create(notificationId, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon48.png'),
+      title: `[WebCrawlServer] ${title}`,
+      message: message || '오류가 발생했습니다.',
+      priority: 2
+    }, () => {});
+  }
+}
+
+/** 성공 / 정상 상태 배지 초기화 */
+function resetNotificationBadge() {
+  if (chrome.action && chrome.action.setBadgeText) {
+    chrome.action.setBadgeText({ text: 'ON' });
+    chrome.action.setBadgeBackgroundColor({ color: '#188038' }); // 초록
+  }
 }
 
 // ============================================================
@@ -388,6 +453,8 @@ async function handleScript(data) {
   } catch (err) {
     console.error(`[WCS] 스크립트 실행 실패: ${scriptId}`, err);
 
+    showErrorNotification('script', '스크립트 실행 실패', `ID: ${scriptId} - ${err.message}`);
+
     STATE.activeScripts.set(scriptId, {
       ...STATE.activeScripts.get(scriptId),
       status: 'failed',
@@ -480,7 +547,11 @@ async function executeStep(step, scriptState, moduleName) {
 
   // 타임아웃 처리
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error(`단계 타임아웃: ${type} (${stepTimeout}ms)`)), stepTimeout);
+    setTimeout(() => {
+      const errMsg = `단계 타임아웃: ${type} (${stepTimeout}ms)`;
+      showErrorNotification('timeout', '단계 타임아웃', errMsg);
+      reject(new Error(errMsg));
+    }, stepTimeout);
   });
 
   let executePromise;

@@ -1,15 +1,28 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 function Layout({ currentPath, onNavigate, children }) {
+  const [theme, setTheme] = useState(() => localStorage.getItem('wcs_theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('wcs_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
   const menuItems = [
     { id: 'home', path: '/', label: '서비스 목록 (대시보드)', icon: '🏠' },
     { id: 'database', path: '/database', label: '데이터베이스', icon: '🗄️' },
+    { id: 'visual-workflow', path: '/visual-workflow', label: '시각적 워크플로우', icon: '⚡' },
+    { id: 'remote-terminal', path: '/remote-terminal', label: '원격 터미널', icon: '🖥️' },
     { id: 'modules', path: '/modules', label: '모듈 관리', icon: '🧩', badge: '미구현' },
     { id: 'workflows', path: '/workflows', label: '워크플로우', icon: '⚙️', badge: '미구현' },
     { id: 'scheduler', path: '/scheduler', label: '스케줄러', icon: '⏱️', badge: '미구현' },
     { id: 'logs', path: '/logs', label: '로그', icon: '📋', badge: '미구현' },
     { id: 'crawler', path: '/crawler', label: '크롤러', icon: '🕷️' },
-    { id: 'settings', path: '/settings', label: '설정', icon: '🔧', badge: '미구현' },
+    { id: 'settings', path: '/settings', label: '설정', icon: '🔧' },
   ];
 
   return (
@@ -56,6 +69,25 @@ function Layout({ currentPath, onNavigate, children }) {
             />
             <span style={{ position: 'absolute', left: '8px', top: '4px', fontSize: '12px', color: 'var(--gcp-text-secondary)' }}>🔍</span>
           </div>
+
+          {/* 테마 스위처 */}
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--gcp-border)',
+              borderRadius: '4px',
+              padding: '3px 8px',
+              color: 'var(--gcp-text-primary)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <span>{theme === 'dark' ? '🌙 다크' : '☀️ 라이트'}</span>
+          </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span className="gcp-badge gcp-badge-active">● 서버 정상 (9600)</span>

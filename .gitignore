@@ -70,9 +70,16 @@ database/*.db
 sql\app_data.db
 data/*.db
 *.db
+database/*.db-shm
+database/*.db-wal
 
 # 개인 설정 및 런타임 파일 [C8]
 logs/*.log
 
 # thorium
 thorium/
+
+docs/askLogs/*.md
+docs/askLogs/*.md
+docs/CHANGELOG/*.md
+docs/tips/*.md

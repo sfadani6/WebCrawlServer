@@ -10,6 +10,7 @@
 
 | 버전 | 날짜 | 제목 | 작성자 |
 |------|------|------|--------|
+| 0.1.5 | 2026-07-27 | 접속관리 시스템 및 플러그인 호환성 개선 | Mistral Vibe |
 | 0.1.4 | 2026-07-26 | P0-P3 일괄 처리 (8/27건) | Cline |
 | 0.1.3 | 2026-07-26 | 워크플로우 엔진 및 미구현 기능 6종 구현 | Cline |
 | 0.1.2 | 2026-07-26 | 페이지 구조 개선 및 드롭다운 메뉴 구현 | Mistral Vibe |
@@ -17,6 +18,36 @@
 ---
 
 ## 버전 이력
+
+### [0.1.5] - 2026-07-27
+
+#### 추가 (Added)
+- `server/monitor/connectionManager.js`: WebSocket 연결 추적 및 관리 시스템
+- `server/routes/admin.js`: 접속 관리 API 라우터
+- `server/admin-ui/src/components/ConnectionPage.jsx`: 실시간 접속 관리 페이지
+- `docs/CHANGELOG/접속관리-시스템-20260727140000.md`: 상세 변경 로그
+
+#### 변경 (Changed)
+- `plugin/manifest.json`: web_accessible_resources 추가 (Opera 브라우저 호환성)
+- `server/app.js`: verifyClient 개선 (Firefox 지원, async 처리 개선), connectionManager 통합
+- `server/admin-ui/src/components/Layout.jsx`: 접속관리 메뉴 추가
+- `server/admin-ui/src/App.jsx`: 접속관리 라우팅 추가
+- `docs/ask.md`: 현재 요청 정보로 업데이트
+- `docs/todo.md`: 작업 상태 반영
+- `docs/todo.history.md`: 작업 이력 추가
+
+#### 수정 (Fixed)
+- Opera 브라우저에서 플러그인 아이콘 로딩 오류 (`Could not load icon`)
+- WebSocket 인증 실패 (`HTTP Authentication failed`) - async callback 중복 호출 방지
+- WebSocket origin 검증에서 Firefox 확장 프로그램 미지원 문제
+
+#### 기능 (Features)
+- 실시간 접속 관리 페이지: 현재 연결된 모든 장비 및 플러그인 모니터링
+- 브라우저별 아이콘 표시 (Chrome, Opera, Firefox, Safari, Edge)
+- 연결 상태, IP 주소, 브라우저 정보, 로그인 상태 등 상세 정보 제공
+- 자동 새로고침 기능 (3~30초 간격 설정 가능)
+- 개별 연결 강제 종료 기능
+- 연결 통계 정보 제공
 
 ### [0.1.4] - 2026-07-26
 

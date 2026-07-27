@@ -77,6 +77,40 @@
 
 ---
 
+## 2026-07-27 접속관리 및 플러그인 연결 시스템 구현
+
+### 처리 요약
+Opera 브라우저 플러그인 아이콘 로딩 오류 및 WebSocket 인증 오류를 수정하고, 관리자 페이지에 접속관리 메뉴를 구현했습니다.
+
+### 완료 항목
+- Opera 브라우저 플러그인 아이콘 로딩 오류 수정 (manifest.json에 web_accessible_resources 추가)
+- WebSocket 인증 오류 수정 (app.js verifyClient에서 Firefox extension 지원 추가 및 async 처리 개선)
+- 접속관리 메뉴 구현 (ConnectionPage.jsx 신규 생성)
+- WebSocket 연결 추적 시스템 구현 (connectionManager.js 신규 생성)
+- 관리자 API 라우터 구현 (server/routes/admin.js 신규 생성)
+- Layout.jsx에 접속관리 메뉴 항목 추가
+- App.jsx에 접속관리 라우팅 추가
+
+### 변경 파일
+- `plugin/manifest.json`: web_accessible_resources 추가
+- `server/app.js`: verifyClient 개선, connectionManager 통합
+- `server/monitor/connectionManager.js`: 신규 생성
+- `server/routes/admin.js`: 신규 생성
+- `server/admin-ui/src/components/ConnectionPage.jsx`: 신규 생성
+- `server/admin-ui/src/components/Layout.jsx`: 접속관리 메뉴 추가
+- `server/admin-ui/src/App.jsx`: 접속관리 라우팅 추가
+- `docs/ask.md`: 요청 정보 업데이트
+- `docs/todo.md`: 상태 반영
+- `docs/askLogs/ask-20260727140000.md`: 작업 로그 기록
+
+### 비고
+- 플러그인은 이제 Opera 브라우저에서도 정상적으로 아이콘을 로드할 수 있음
+- WebSocket 인증이 Chrome, Opera, Firefox 모든 브라우저 확장 프로그램에서 동작함
+- 관리자 페이지에서 실시간으로 현재 연결된 모든 장비와 플러그인을 모니터링할 수 있음
+- 접속관리 페이지에서 연결 종료, 자동 새로고침 등 기능 제공
+
+---
+
 ## 2026-07-26 ask.md 처리
 
 ### 처리 요약

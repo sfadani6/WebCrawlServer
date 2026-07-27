@@ -12,6 +12,7 @@ import CrawlerPage from './components/CrawlerPage';
 import VisualWorkflowEditor from './components/VisualWorkflowEditor';
 import PluginRemoteTerminal from './components/PluginRemoteTerminal';
 import PluginsPage from './components/PluginsPage';
+import ConnectionPage from './components/ConnectionPage';
 import './App.css';
 
 function App() {
@@ -87,6 +88,9 @@ function App() {
       );
     }
 
+    if (currentPath.startsWith('/connections')) {
+      return <ConnectionPage onNavigate={handleNavigate} />;
+    }
     if (currentPath.startsWith('/visual-workflow')) {
       return <VisualWorkflowEditor onNavigate={handleNavigate} />;
     }

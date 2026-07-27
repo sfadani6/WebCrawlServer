@@ -21,8 +21,10 @@ const rateLimit        = require('express-rate-limit');
 const { DB_PATH }      = require('./db/helper');
 const createApiRouter  = require('./routes/api');
 const adminDbRouter    = require('./routes/adminDb');
+const adminRouter      = require('./routes/admin');
 const crawlerRouter    = require('./routes/crawler');
 const nlpRouter        = require('./routes/nlp');
+const pluginRouter     = require('./routes/plugin');
 const { basicAuth, setCredentialsCache } = require('./middleware/auth');
 const { fail }         = require('./middleware/response');
 const bcrypt           = require('bcryptjs');
@@ -30,6 +32,7 @@ const { startScheduler } = require('./scheduler/jobRunner');
 const { startMonitor } = require('./monitor/monitorWs');
 const { startLogRotator } = require('./logs/logRotator');
 const { startCrawlerMonitor } = require('./monitor/crawlerMonitor');
+const { setupConnectionTracking, registerConnection, unregisterConnection } = require('./monitor/connectionManager');
 
 // === 환경변수 검증 ===
 // R-013 (security.md): 민감 정보는 환경변수로만 설정
@@ -77,8 +80,8 @@ const wss = new WebSocketServer({
     const origin = info.origin;
     const reqUrl = info.req.url || '';
     
-    // Chrome Extension 프로토콜(chrome-extension://...) 및 기본 허용 origin 지원
-    const isExtension = origin && origin.startsWith('chrome-extension://');
+    // Chrome Extension 및 Opera Extension, Firefox Extension 프로토콜 지원
+    const isExtension = origin && (origin.startsWith('chrome-extension://') || origin.startsWith('opera-extension://') || origin.startsWith('moz-extension://'));
     const isOriginAllowed = isExtension || allowedOrigins.includes(origin) || allowedOrigins.includes('*');
     
     if (!isOriginAllowed && origin !== undefined) {
@@ -86,22 +89,45 @@ const wss = new WebSocketServer({
       return callback(false, 403, 'Forbidden');
     }
     
-    // 토큰 검증 - 쿼리 파라미터에서 token 추출
+    // 토큰 검증 - 쿼리 파라미터에서 token 추출 및 DB 검증
     try {
       const url = new URL(reqUrl, `http://${info.req.headers.host || 'localhost'}`);
       const token = url.searchParams.get('token');
       
-      if (!token || token !== WS_TOKEN) {
-        console.log(`[WebSocket] 인증 실패: invalid token`);
+      if (!token) {
+        console.log(`[WebSocket] 인증 실패: 토큰 누락`);
         return callback(false, 401, 'Unauthorized');
       }
+
+      // DB에서 승인된 토큰인지 확인 (async 처리)
+      const dbHelper = require('./db/helper');
+      dbHelper.queryOne(
+        `SELECT id, browser_name, browser_version, extension_id FROM plugin_requests WHERE approved_token = ? AND status = 'approved'`,
+        [token]
+      ).then(row => {
+        if (row) {
+          console.log(`[WebSocket] 인증 성공: 유효한 토큰 (ID: ${row.id})`);
+          // 인증 성공 시 정보 저장 (connection 이벤트에서 사용할 수 있도록)
+          info.pluginRequestId = row.id;
+          info.browserName = row.browser_name;
+          info.browserVersion = row.browser_version;
+          info.extensionId = row.extension_id;
+          callback(true);
+        } else {
+          console.log(`[WebSocket] 인증 실패: 유효하지 않은 토큰`);
+          callback(false, 401, 'Unauthorized');
+        }
+      }).catch(err => {
+        console.error(`[WebSocket] DB 검증 오류:`, err);
+        callback(false, 500, 'Internal Server Error');
+      });
+      
+      // async 작업 중이므로 여기서 바로 return 함
+      return;
     } catch (err) {
       console.log(`[WebSocket] URL 파싱 오류:`, err.message);
       return callback(false, 400, 'Bad Request');
     }
-    
-    // 모든 검증 통과
-    callback(true);
   }
 });
 
@@ -174,9 +200,11 @@ app.get('/health', (req, res) => {
 
 // === API 라우터 마운트 ===
 app.use('/api', apiLimiter, createApiRouter(wss));
+app.use('/admin/api', adminApiLimiter, adminRouter); // 새로운 관리자 API
 app.use('/admin/api', adminApiLimiter, basicAuth(), adminDbRouter);
 app.use('/admin/api/crawler', crawlerRouter);
 app.use('/api/nlp', nlpLimiter, require('./routes/nlp'));
+app.use('/api/plugin', pluginRouter);
 
 // === 통합 콘솔 SPA 라우터 마운트 (server/routes/adminUi.js) ===
 const adminUiRouter = require('./routes/adminUi');
@@ -197,6 +225,18 @@ wss.on('connection', (ws, req) => {
 
   // IP 주소 저장 (하트비트 로그에서 사용)
   ws.clientIp = clientIp;
+  
+  // 연결 정보 추출 (verifyClient에서 저장된 정보)
+  const connectionInfo = {
+    browserName: req.browserName,
+    browserVersion: req.browserVersion,
+    extensionId: req.extensionId,
+    pluginRequestId: req.pluginRequestId
+  };
+  
+  // 연결 등록 (ConnectionManager)
+  const connectionId = registerConnection(ws, req, connectionInfo);
+  ws.connectionId = connectionId;
 
   // 연결 시 초기 메시지 전송
   ws.send(JSON.stringify({
@@ -316,11 +356,21 @@ wss.on('connection', (ws, req) => {
   // 연결 종료 처리
   ws.on('close', () => {
     console.log(`[WebSocket] 클라이언트 연결 종료: ${clientIp}`);
+    unregisterConnection(ws);
   });
 
   // 오류 처리
   ws.on('error', (error) => {
     console.error(`[WebSocket] 클라이언트 오류:`, error);
+    unregisterConnection(ws);
+  });
+
+  // 활동 로그 업데이트 (메시지 수신 시)
+  ws.on('message', () => {
+    if (ws.connectionId) {
+      const { updateActivity } = require('./monitor/connectionManager');
+      updateActivity(ws.connectionId);
+    }
   });
 });
 
@@ -400,17 +450,30 @@ function initializeDatabase() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`,
-        `CREATE TABLE IF NOT EXISTS crawler_items (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          target_id INTEGER NOT NULL,
-          external_id TEXT,
-          title TEXT,
-          content TEXT,
-          raw TEXT,
-          published_at TIMESTAMP,
-          fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY(target_id) REFERENCES crawler_targets(id)
-        )`,
+    `CREATE TABLE IF NOT EXISTS plugin_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      browser_name TEXT,
+      browser_version TEXT,
+      extension_id TEXT,
+      hostname TEXT,
+      status TEXT DEFAULT 'pending',
+      approved_token TEXT,
+      approved_at TIMESTAMP,
+      connected BOOLEAN DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS crawler_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      target_id INTEGER NOT NULL,
+      external_id TEXT,
+      title TEXT,
+      content TEXT,
+      raw TEXT,
+      published_at TIMESTAMP,
+      fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(target_id) REFERENCES crawler_targets(id)
+    )`,
         `CREATE TABLE IF NOT EXISTS workflows (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL UNIQUE,

@@ -19,10 +19,13 @@ const STATE = {
   connected: false,
   serverUrl: '',
   wsToken: '',
+  requestId: null,           // 현재 접속 요청 ID
+  connectionPhase: 'disconnected', // disconnected | requesting | awaiting_approval | connecting
   reconnectAttempts: 0,
   maxReconnectAttempts: 10,
   reconnectDelay: 1000, // 초기 1초, 지수 백오프
   heartbeatInterval: null,
+  approvalPollInterval: null, // 승인 확인 폴링 타이머
   pendingRequests: new Map(), // messageId -> { resolve, reject, timeout }
   activeScripts: new Map(),   // scriptId -> { steps, currentStep, variables, tabId }
   tabStates: new Map(),       // tabId -> { url, status }
@@ -33,7 +36,7 @@ const STATE = {
 // ============================================================
 const DEFAULT_CONFIG = {
   serverUrl: 'ws://localhost:9600',
-  wsToken: '',
+  wsToken: 'default-ws-token',
   autoReconnect: true,
   reconnectInterval: 5000,
   heartbeatInterval: 30000,
@@ -64,7 +67,7 @@ async function saveConfig(newConfig) {
 // WebSocket 연결 관리
 // ============================================================
 
-/** 서버에 WebSocket 연결 */
+/** 서버에 WebSocket 연결 (2단계 인증 프로세스) */
 async function connect() {
   if (STATE.ws && STATE.ws.readyState === WebSocket.OPEN) {
     console.log('[WCS] 이미 연결됨');
@@ -78,11 +81,87 @@ async function connect() {
     return;
   }
 
-  const url = config.wsToken
-    ? `${config.serverUrl}?token=${encodeURIComponent(config.wsToken)}`
-    : config.serverUrl;
+  try {
+    // 1단계: 접속 요청 (HTTP POST)
+    STATE.connectionPhase = 'requesting';
+    console.log('[WCS] 서버 접속 요청 전송 중...');
+    
+    const httpUrl = config.serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+    const response = await fetch(`${httpUrl}/api/plugin/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        browser_name: navigator.userAgent,
+        browser_version: navigator.appVersion,
+        extension_id: chrome.runtime.id,
+        hostname: 'browser-extension'
+      })
+    });
 
-  console.log(`[WCS] 서버 연결 시도: ${config.serverUrl}`);
+    if (!response.ok) throw new Error(`접속 요청 실패: ${response.statusText}`);
+    
+    const result = await response.json();
+    STATE.requestId = result.requestId;
+    STATE.connectionPhase = 'awaiting_approval';
+    console.log(`[WCS] 접속 요청 접수됨 (ID: ${STATE.requestId}). 승인 대기 중...`);
+    
+    // 2단계: 승인 상태 폴링 시작
+    startApprovalPolling();
+    notifyConnectionState(false, 'awaiting_approval');
+
+  } catch (err) {
+    console.error('[WCS] 접속 요청 오류:', err);
+    STATE.connectionPhase = 'disconnected';
+    showErrorNotification('network', '접속 요청 실패', err.message);
+  }
+}
+
+/** 승인 상태 폴링 */
+function startApprovalPolling() {
+  stopApprovalPolling();
+  
+  STATE.approvalPollInterval = setInterval(async () => {
+    if (!STATE.requestId) return;
+    
+    try {
+      const httpUrl = config.serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+      const response = await fetch(`${httpUrl}/api/plugin/status/${STATE.requestId}`);
+      
+      if (!response.ok) throw new Error('상태 확인 실패');
+      
+      const data = await response.json();
+      console.log(`[WCS] 승인 상태 확인: ${data.status}`);
+
+      if (data.status === 'approved') {
+        console.log('[WCS] 접속 승인됨! WebSocket 연결을 시도합니다.');
+        stopApprovalPolling();
+        initiateWebSocket(data.token);
+      } else if (data.status === 'rejected') {
+        console.warn('[WCS] 서버에서 접속 요청이 거절되었습니다.');
+        stopApprovalPolling();
+        STATE.connectionPhase = 'disconnected';
+        showErrorNotification('network', '접속 거절', '관리자가 접속 요청을 거절하였습니다.');
+        notifyConnectionState(false, 'rejected');
+      }
+    } catch (err) {
+      console.error('[WCS] 폴링 오류:', err);
+    }
+  }, 3000);
+}
+
+function stopApprovalPolling() {
+  if (STATE.approvalPollInterval) {
+    clearInterval(STATE.approvalPollInterval);
+    STATE.approvalPollInterval = null;
+  }
+}
+
+/** 실제 WebSocket 연결 수행 */
+function initiateWebSocket(token) {
+  STATE.connectionPhase = 'connecting';
+  const url = `${config.serverUrl}?token=${encodeURIComponent(token)}`;
+  
+  console.log(`[WCS] 서버 연결 시도: ${url}`);
 
   try {
     STATE.ws = new WebSocket(url);
@@ -90,6 +169,7 @@ async function connect() {
     STATE.ws.onopen = () => {
       console.log('[WCS] WebSocket 연결 성공');
       STATE.connected = true;
+      STATE.connectionPhase = 'connected';
       STATE.reconnectAttempts = 0;
       startHeartbeat();
       notifyConnectionState(true);
@@ -103,6 +183,7 @@ async function connect() {
     STATE.ws.onclose = (event) => {
       console.log(`[WCS] WebSocket 연결 종료 (code: ${event.code})`);
       STATE.connected = false;
+      STATE.connectionPhase = 'disconnected';
       stopHeartbeat();
       notifyConnectionState(false);
       if (event.code !== 1000) {
@@ -113,10 +194,12 @@ async function connect() {
 
     STATE.ws.onerror = (error) => {
       console.error('[WCS] WebSocket 오류:', error);
+      STATE.connectionPhase = 'disconnected';
       showErrorNotification('network', '네트워크 오류', 'WebSocket 연결 오류가 발생하였습니다.');
     };
   } catch (err) {
     console.error('[WCS] WebSocket 생성 오류:', err);
+    STATE.connectionPhase = 'disconnected';
     showErrorNotification('network', '연결 시도 실패', err.message);
     scheduleReconnect();
   }

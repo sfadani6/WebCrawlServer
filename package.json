@@ -33,7 +33,7 @@
     "jsdom": "^29.1.1",
     "json2csv": "^6.0.0-alpha.2",
     "node-cron": "^3.0.2",
-    "sqlite3": "^5.1.6",
+    "sqlite3": "^5.0.2",
     "ws": "^8.13.0"
   },
   "devDependencies": {

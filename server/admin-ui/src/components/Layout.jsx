@@ -14,6 +14,7 @@ function Layout({ currentPath, onNavigate, children }) {
 
   const menuItems = [
     { id: 'home', path: '/', label: '서비스 목록 (대시보드)', icon: '🏠' },
+    { id: 'connections', path: '/connections', label: '접속 관리', icon: '📡' },
     { id: 'database', path: '/database', label: '데이터베이스', icon: '🗄️' },
     { id: 'visual-workflow', path: '/visual-workflow', label: '시각적 워크플로우', icon: '⚡' },
     { id: 'remote-terminal', path: '/remote-terminal', label: '원격 터미널', icon: '🖥️' },

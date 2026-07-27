@@ -56,10 +56,10 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS ?
     'http://127.0.0.1:9600'
   ];
 
-// WebSocket 인증 토큰 (환경변수)
-const WS_TOKEN = process.env.WS_TOKEN;
-if (!WS_TOKEN) {
-  console.warn('[보안 경고] WS_TOKEN 환경변수가 설정되지 않았습니다. WebSocket 연결이 차단됩니다.');
+// WebSocket 인증 토큰 (환경변수 또는 기본값)
+const WS_TOKEN = process.env.WS_TOKEN || 'default-ws-token';
+if (!process.env.WS_TOKEN) {
+  console.log('[WebSocket] WS_TOKEN 환경변수가 설정되지 않아 기본 토큰(default-ws-token)으로 동작합니다.');
 }
 
 // === Express 앱 설정 ===
@@ -75,18 +75,13 @@ const wss = new WebSocketServer({
     const origin = info.origin;
     const reqUrl = info.req.url || '';
     
-    // Origin 검증 - 허용된 origin만 연결 허용
-    const isOriginAllowed = allowedOrigins.includes(origin) || allowedOrigins.includes('*');
+    // Chrome Extension 프로토콜(chrome-extension://...) 및 기본 허용 origin 지원
+    const isExtension = origin && origin.startsWith('chrome-extension://');
+    const isOriginAllowed = isExtension || allowedOrigins.includes(origin) || allowedOrigins.includes('*');
     
     if (!isOriginAllowed && origin !== undefined) {
       console.log(`[WebSocket] 거부된 Origin: ${origin}`);
       return callback(false, 403, 'Forbidden');
-    }
-    
-    // 토큰 검증 - WS_TOKEN이 설정되지 않았으면 모든 연결 거부
-    if (!WS_TOKEN) {
-      console.log(`[WebSocket] WS_TOKEN 미설정, 연결 거부`);
-      return callback(false, 503, '서버 설정이 완료되지 않았습니다. WS_TOKEN을 설정하세요.');
     }
     
     // 토큰 검증 - 쿼리 파라미터에서 token 추출

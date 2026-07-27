@@ -21,10 +21,13 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
     if (!tableName) return;
     setLoading(true);
     const dbParam = `?db=${encodeURIComponent(dbName)}`;
+    const offset = (currentPage - 1) * pageSize;
+    const sortParam = sortColumn ? `&order_by=${sortColumn}&order_dir=${sortDirection}` : '';
+    const searchParam = searchTerm ? `&query=1` : '';
 
     Promise.all([
       fetchJSON(`/admin/api/tables/${tableName}/schema${dbParam}`),
-      fetchJSON(`/admin/api/tables/${tableName}/rows${dbParam}&limit=1000&offset=0`)
+      fetchJSON(`/admin/api/tables/${tableName}/rows${dbParam}&limit=${pageSize}&offset=${offset}${sortParam}${searchParam}`)
     ])
     .then(([schemaData, rowsData]) => {
       setSchema(schemaData || []);
@@ -43,7 +46,7 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
       console.error('Failed to load table data', err);
       setLoading(false);
     });
-  }, [dbName, tableName]);
+  }, [dbName, tableName, currentPage, pageSize, sortColumn, sortDirection, searchTerm]);
 
   useEffect(() => {
     loadData();
@@ -122,7 +125,36 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
   };
 
   const handleImport = () => {
-    alert('가져오기 기능은 현재 백엔드 API 미구현으로 사용할 수 없습니다.');
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,.json';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      const dbParam = `?db=${encodeURIComponent(dbName)}`;
+      try {
+        if (file.name.endsWith('.csv')) {
+          await fetch(`/admin/api/tables/${tableName}/restore/csv${dbParam}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/csv' },
+            body: text
+          });
+        } else {
+          const jsonData = JSON.parse(text);
+          await fetch(`/admin/api/tables/${tableName}/restore${dbParam}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(jsonData)
+          });
+        }
+        alert('데이터 가져오기 완료');
+        loadData();
+      } catch (err) {
+        alert(`가져오기 실패: ${err.message}`);
+      }
+    };
+    input.click();
   };
 
   // 파일 내보내기
@@ -161,6 +193,29 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  // 정렬 핸들러
+  const handleSort = (colName) => {
+    if (sortColumn === colName) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(colName);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  // 검색 핸들러
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+
+  // 페이지 이동
+  const goToPage = (page) => {
+    if (page < 1) return;
+    setCurrentPage(page);
   };
 
   // 새 행 추가
@@ -238,6 +293,23 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
           {Object.keys(dirtyRows).length > 0 && (
             <span className="gcp-badge gcp-badge-warn">● {Object.keys(dirtyRows).length}개 행 수정됨</span>
           )}
+          {/* 검색 입력 */}
+          <input
+            type="text"
+            placeholder="🔍 검색..."
+            value={searchTerm}
+            onChange={handleSearch}
+            style={{
+              padding: '4px 8px',
+              fontSize: '12px',
+              backgroundColor: 'var(--gcp-bg-main)',
+              border: '1px solid var(--gcp-border)',
+              borderRadius: '4px',
+              color: 'var(--gcp-text-primary)',
+              width: '150px',
+              outline: 'none'
+            }}
+          />
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <div style={{ display: 'flex', border: '1px solid var(--gcp-border)', borderRadius: '4px', overflow: 'hidden' }}>
@@ -290,8 +362,13 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
               <tr>
                 <th style={{ width: '45px', textAlign: 'center' }}>#</th>
                 {schema.map(col => (
-                  <th key={col.name}>
+                  <th key={col.name} onClick={() => handleSort(col.name)} style={{ cursor: 'pointer', userSelect: 'none' }}>
                     {col.name} <span style={{ fontSize: '10px', opacity: 0.6 }}>({col.type})</span>
+                    {sortColumn === col.name && (
+                      <span style={{ marginLeft: '4px', fontSize: '10px' }}>
+                        {sortDirection === 'asc' ? '▲' : '▼'}
+                      </span>
+                    )}
                   </th>
                 ))}
                 <th style={{ width: '130px', textAlign: 'right', position: 'sticky', right: 0, backgroundColor: 'var(--gcp-bg-header)' }}>
@@ -371,8 +448,62 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
             </tbody>
           </table>
         </div>
-      ) : (
-        /* Canvas 대용량 그리드 뷰 */
+      ) : null}
+
+      {/* 페이지네이션 컨트롤 */}
+      <div style={{
+        padding: '6px 16px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: 'var(--gcp-bg-header)',
+        borderTop: '1px solid var(--gcp-border)',
+        flexShrink: 0,
+        fontSize: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>페이지 크기:</span>
+          <select
+            value={pageSize}
+            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+            style={{
+              padding: '2px 4px',
+              fontSize: '12px',
+              backgroundColor: 'var(--gcp-bg-main)',
+              border: '1px solid var(--gcp-border)',
+              borderRadius: '3px',
+              color: 'var(--gcp-text-primary)'
+            }}
+          >
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            className="gcp-btn gcp-btn-secondary"
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage <= 1}
+            style={{ padding: '2px 8px', fontSize: '11px' }}
+          >
+            ◀ 이전
+          </button>
+          <span>페이지 {currentPage}</span>
+          <button
+            className="gcp-btn gcp-btn-secondary"
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={rows.length < pageSize}
+            style={{ padding: '2px 8px', fontSize: '11px' }}
+          >
+            다음 ▶
+          </button>
+        </div>
+      </div>
+      
+      {/* Canvas 대용량 그리드 뷰 */}
+      {!loading && viewMode === 'canvas' && (
         <div style={{ flexGrow: 1, position: 'relative' }}>
           {columns.length > 0 && (
             <DataEditor

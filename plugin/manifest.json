@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "WebCrawlServer Plugin",
+  "version": "0.1.0",
+  "description": "WebCrawlServer MCP 프로토콜 기반 브라우저 자동화 플러그인",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "webNavigation",
+    "downloads",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*",
+    "ws://*/*",
+    "wss://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["contentScript.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "WebCrawlServer"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

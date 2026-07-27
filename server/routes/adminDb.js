@@ -458,32 +458,29 @@ router.post('/tables/:name/backup', async (req, res, next) => {
   }
 });
 
-// ------------------- 복원 -------------------
+// ------------------- 복원 (JSON) -------------------
 // POST /admin/api/tables/:name/restore (JSON 배열 body)
 router.post('/tables/:name/restore', express.json(), async (req, res, next) => {
   try {
     const { name } = req.params;
-    const rows = req.body; // [{col:val, ...}, ...]
+    const rows = req.body;
     const dbName = req.query.db || 'main.db';
     
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json({ error: '복원 데이터가 필요합니다.' });
+      return fail(res, '복원 데이터가 필요합니다.', 400);
     }
     
-    // 보안: 테이블 존재 여부 확인
     const tableExistsFlag = await tableExists(name, dbName);
     if (!tableExistsFlag) {
-      return res.status(404).json({ error: '테이블을 찾을 수 없습니다.' });
+      return fail(res, '테이블을 찾을 수 없습니다.', 404);
     }
     
-    // 보안: 실제 컬럼 리스트 가져오기
     const validColumns = await getTableColumns(name, dbName);
     const validColumnNames = validColumns.map(normalizeColumnName);
     
-    // 보안: 유효한 컬럼만 필터링
     const cols = Object.keys(rows[0] || {}).filter(col => validColumnNames.includes(normalizeColumnName(col)));
     if (cols.length === 0) {
-      return res.status(400).json({ error: '유효한 컬럼이 없습니다.' });
+      return fail(res, '유효한 컬럼이 없습니다.', 400);
     }
     
     const placeholders = cols.map(() => '?').join(',');
@@ -496,9 +493,73 @@ router.post('/tables/:name/restore', express.json(), async (req, res, next) => {
       }
     });
     stmt.finalize(err => {
-      db.close();
+      if (dbName.toLowerCase() !== 'main.db') db.close();
       if (err) return next(err);
-      res.json({ inserted: rows.length });
+      return success(res, { inserted: rows.length });
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------- 복원 (CSV) -------------------
+// POST /admin/api/tables/:name/restore/csv (text/csv body)
+router.post('/tables/:name/restore/csv', express.text({ type: 'text/csv' }), async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const csvText = req.body;
+    const dbName = req.query.db || 'main.db';
+    
+    if (!csvText || typeof csvText !== 'string' || csvText.trim().length === 0) {
+      return fail(res, 'CSV 데이터가 필요합니다.', 400);
+    }
+    
+    const lines = csvText.trim().split('\n');
+    if (lines.length < 2) {
+      return fail(res, 'CSV는 헤더와 최소 1개 이상의 데이터 행이 필요합니다.', 400);
+    }
+    
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+      if (values.length !== headers.length) continue;
+      const row = {};
+      headers.forEach((h, idx) => { row[h] = values[idx]; });
+      rows.push(row);
+    }
+    
+    if (rows.length === 0) {
+      return fail(res, '파싱 가능한 데이터 행이 없습니다.', 400);
+    }
+    
+    const tableExistsFlag = await tableExists(name, dbName);
+    if (!tableExistsFlag) {
+      return fail(res, '테이블을 찾을 수 없습니다.', 404);
+    }
+    
+    const validColumns = await getTableColumns(name, dbName);
+    const validColumnNames = validColumns.map(normalizeColumnName);
+    
+    const cols = Object.keys(rows[0] || {}).filter(col => validColumnNames.includes(normalizeColumnName(col)));
+    if (cols.length === 0) {
+      return fail(res, '유효한 컬럼이 없습니다.', 400);
+    }
+    
+    const placeholders = cols.map(() => '?').join(',');
+    const quotedCols = cols.map(c => `"${c}"`).join(',');
+    const sql = `INSERT INTO "${name}" (${quotedCols}) VALUES (${placeholders})`;
+    const db = getDb(dbName);
+    const stmt = db.prepare(sql);
+    db.serialize(() => {
+      for (const row of rows) {
+        stmt.run(cols.map(c => row[c]));
+      }
+    });
+    stmt.finalize(err => {
+      if (dbName.toLowerCase() !== 'main.db') db.close();
+      if (err) return next(err);
+      return success(res, { inserted: rows.length });
     });
   } catch (err) {
     next(err);
@@ -558,10 +619,10 @@ router.post('/tables', express.json(), async (req, res, next) => {
       if (!/^[a-zA-Z0-9_]+$/.test(name)) {
         throw new Error(`유효하지 않은 컬럼 이름: ${name}`);
       }
-      return `${name} ${type} ${constraints}`;
+      return `"${name}" ${type} ${constraints}`;
     });
 
-    const sql = `CREATE TABLE ${tableName} (${colDefs.join(', ')})`;
+    const sql = `CREATE TABLE "${tableName}" (${colDefs.join(', ')})`;
     const db = getDb(dbName);
     db.run(sql, err => {
       db.close();
@@ -590,7 +651,7 @@ router.delete('/tables/:name', async (req, res, next) => {
       return res.status(400).json({ error: `'${name}' 테이블은 main.db 시스템 코어 테이블이므로 삭제할 수 없습니다.` });
     }
 
-    const sql = `DROP TABLE ${name}`;
+    const sql = `DROP TABLE "${name}"`;
     const db = getDb(dbName);
     db.run(sql, err => {
       db.close();

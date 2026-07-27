@@ -10,16 +10,29 @@
 | 항목 | 내용 |
 |------|------|
 | 프로젝트 | WebCrawlServer |
-| 현재 주기 | **ask.md 처리 완료** |
+| 현재 주기 | **브라우저 플러그인 개발 완료** |
 | **환경 요구사항** | **모든 설치는 로컬만 허용, 글로벌 설치 금지** |
 
 ---
 
 ## 완료된 항목
 
-### 라우트 맵 문서화
-- `docs/tips/route-map.md` 작성 완료
-- Express 라우트 40개, WebSocket 이벤트, 미들웨어 체인, DB 연결 패턴 정리
+### 브라우저 플러그인 개발 (plugin/)
+- `plugin/manifest.json` 생성 (Manifest V3, Chrome/Firefox/Opera 호환)
+- `plugin/background.js` 생성 (WebSocket 연결, MCP 메시지 처리, 스크립트 실행 엔진)
+- `plugin/contentScript.js` 생성 (DOM 조작, 데이터 수집, 브라우저 자동화)
+- `plugin/popup/` 구현 (연결 상태 표시, 명령어 전송, 로그 표시)
+- `plugin/options/` 구현 (서버 URL, WS_TOKEN, 연결 설정 관리)
+- `plugin/icons/` 생성 (16x16, 48x48, 128x128 SVG 아이콘)
+- `plugin/README.md` 작성 (설치 방법, 설정 방법, MCP 프로토콜 설명)
+
+### 플러그인 주요 기능
+- WebSocket MCP 프로토콜 완전 구현 (요청/응답, 스크립트, heartbeat, 이벤트)
+- 8개 표준 명령어 지원 (open_browser, crawl_page, run_process, stop_process 등)
+- 12개 스크립트 스텝 타입 지원 (navigate, click, input, extract, scroll, loop, condition 등)
+- 지수 백오프 재연결, heartbeat 유지, 타임아웃 처리
+- 다중 브라우저 프로세스 통제 (여러 탭/브라우저 인스턴스)
+- 서버 확장 모듈 스크립트 실행 및 결과 반환
 
 ---
 

@@ -16,10 +16,11 @@
     "pm2:logs": "npx pm2 logs WebCrawlServer",
     "pm2:monitor": "npx pm2 monit",
     "pm2:delete": "npx pm2 delete WebCrawlServer",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
   "dependencies": {
+    "axios": "^1.18.1",
     "basic-auth": "^2.0.1",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.0.0-rc.12",
@@ -36,6 +37,9 @@
     "ws": "^8.13.0"
   },
   "devDependencies": {
+    "@babel/core": "^8.0.1",
+    "@babel/preset-env": "^8.0.2",
+    "babel-jest": "^30.4.1",
     "jest": "^30.4.2",
     "nodemon": "^3.0.2",
     "pm2": "^5.3.0",

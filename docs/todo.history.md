@@ -1,5 +1,44 @@
 # 작업 이력
 
+## 2026-07-27 브라우저 플러그인 개발
+
+### 처리 요약
+- `docs/ask.md` 요청에 따라 WebCrawlServer와 통신하는 브라우저 플러그인 개발 완료
+- Chrome, Firefox, Opera 등 Manifest V3 지원 브라우저 호환
+
+### 완료 항목
+- `plugin/manifest.json`: Manifest V3 매니페스트 (permissions, host_permissions, background, content_scripts)
+- `plugin/background.js`: WebSocket MCP 프로토콜 구현 (연결/재연결, 메시지 처리, 스크립트 실행 엔진, 8개 표준 명령어, 12개 스텝 타입)
+- `plugin/contentScript.js`: DOM 조작 및 데이터 수집 (요소 대기, 추출, 클릭, 입력, 스크롤, 이미지 수집, 페이지 크롤링, 커스텀 액션)
+- `plugin/popup/`: 팝업 UI (연결 상태, 명령어 전송, 활성 스크립트 목록, 응답 로그)
+- `plugin/options/`: 옵션 페이지 (서버 URL, WS_TOKEN, 연결 설정, 연결 테스트)
+- `plugin/icons/`: SVG 아이콘 (16x16, 48x48, 128x128)
+- `plugin/README.md`: 설치/설정/사용법 문서
+
+### 변경 파일
+- `plugin/manifest.json`: 신규 생성
+- `plugin/background.js`: 신규 생성
+- `plugin/contentScript.js`: 신규 생성
+- `plugin/popup/popup.html`: 신규 생성
+- `plugin/popup/popup.js`: 신규 생성
+- `plugin/popup/popup.css`: 신규 생성
+- `plugin/options/options.html`: 신규 생성
+- `plugin/options/options.js`: 신규 생성
+- `plugin/options/options.css`: 신규 생성
+- `plugin/icons/icon16.svg`: 신규 생성
+- `plugin/icons/icon48.svg`: 신규 생성
+- `plugin/icons/icon128.svg`: 신규 생성
+- `plugin/README.md`: 신규 생성
+- `docs/todo.md`: 상태 반영
+
+### 비고
+- 플러그인은 서버의 MCP 프로토콜(WebSocket)을 통해 통신하며, 서버로부터 수신한 스크립트(steps)를 브라우저에서 실행하고 결과를 반환
+- 관리자 페이지에서 생성한 모듈의 스크립트를 플러그인이 수신하여 실행하는 구조
+- 다중 브라우저 프로세스 통제 가능 (여러 탭/브라우저 인스턴스)
+- 서버 app.js의 WebSocket MCP 핸들러와 호환되도록 구현
+
+---
+
 ## 2026-07-27 에러 처리 미들웨어 가이드 작성
 
 ### 처리 요약

@@ -65,15 +65,15 @@ function createApiRouter(wss) {
                         activity_logs.action AS action,
                         activity_logs.status AS status,
                         activity_logs.created_at AS timestamp
-                   FROM activity_logs
-                   LEFT JOIN modules ON modules.id = activity_logs.module_id
-                  ORDER BY activity_logs.created_at DESC
-                  LIMIT ?`,
+                    FROM activity_logs
+                    LEFT JOIN modules ON modules.id = activity_logs.module_id
+                   ORDER BY activity_logs.created_at DESC
+                   LIMIT ?`,
                 [limit]
             );
-            res.json(rows);
+            return success(res, rows);
         } catch (err) {
-            next(err);
+            return fail(res, '최근 활동 로그 조회 실패', 500, { error: err.message });
         }
     });
 
@@ -105,8 +105,8 @@ function createApiRouter(wss) {
         // WebSocket 상태를 실제 연결 수에 따라 동적으로 반영
         const websocketStatus = wss && wss.clients.size > 0 ? 'active' : 'idle';
         const mcpStatus = wss && wss.clients.size > 0 ? 'ready' : 'waiting';
-
-        res.json({
+ 
+        return success(res, {
             server:           'online',
             database:         dbStatus,
             websocket:        websocketStatus,

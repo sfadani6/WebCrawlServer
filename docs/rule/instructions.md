@@ -42,6 +42,7 @@
 | R-012 | docs/rule/communication.md | 커뮤니케이션 가이드, 응답 구조 |
 | R-013 | docs/rule/security.md | 예외 처리 및 일반 보안 정책 |
 | R-014 | docs/rule/auth.md | 페이지 인증, Basic Auth, bcryptjs, 자격증명 변경 API |
+| R-015 | docs/rule/testing.md | 단위/통합 테스트 도구, 환경, 작성 규칙 및 가이드 |
 
 동일한 표가 `AGENTS.md` 0.2에도 있다. 두 표가 어긋나면 `AGENTS.md`가 우선하며(`AGENTS.md` 1.5 우선순위 규칙), 발견 즉시 이 표를 `AGENTS.md`에 맞춰 갱신한다.
 

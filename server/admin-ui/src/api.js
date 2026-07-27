@@ -66,6 +66,16 @@ export async function fetchJSON(url, options = {}) {
     throw new Error(msg);
   }
 
+  // 204 No Content
   if (response.status === 204) return null;
-  return response.json();
+
+  const json = await response.json();
+
+  // 표준 응답 래퍼({ status: 'success', data: ..., timestamp }) 지원
+  // response.js의 success/fail 래퍼와 호환
+  if (json && json.status === 'success' && json.hasOwnProperty('data')) {
+    return json.data;
+  }
+
+  return json;
 }

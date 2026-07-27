@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebCrawlServer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 헤더 -->
+    <div class="header">
+      <h1 class="title">WebCrawlServer</h1>
+      <span class="version">v0.1.0</span>
+    </div>
+
+    <!-- 연결 상태 -->
+    <div class="status-bar">
+      <div class="status-indicator" id="statusIndicator">
+        <span class="status-dot disconnected" id="statusDot"></span>
+        <span class="status-text" id="statusText">연결 끊김</span>
+      </div>
+      <button class="btn btn-sm" id="connectBtn">연결</button>
+    </div>
+
+    <!-- 서버 정보 -->
+    <div class="section">
+      <div class="section-title">서버 정보</div>
+      <div class="info-row">
+        <span class="info-label">서버</span>
+        <span class="info-value" id="serverUrl">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">활성 스크립트</span>
+        <span class="info-value" id="activeScripts">0</span>
+      </div>
+    </div>
+
+    <!-- 명령어 전송 -->
+    <div class="section">
+      <div class="section-title">명령어 전송</div>
+      <div class="command-group">
+        <select class="select" id="commandSelect">
+          <option value="open_browser">브라우저 열기</option>
+          <option value="crawl_page">페이지 크롤링</option>
+          <option value="run_process">프로세스 실행</option>
+          <option value="stop_process">프로세스 중지</option>
+          <option value="monitor_status">모니터링 상태</option>
+        </select>
+        <input type="text" class="input" id="commandInput" placeholder="URL 또는 파라미터 (JSON)">
+        <button class="btn btn-primary" id="sendBtn">전송</button>
+      </div>
+    </div>
+
+    <!-- 활성 스크립트 목록 -->
+    <div class="section" id="scriptsSection">
+      <div class="section-title">활성 스크립트</div>
+      <div class="script-list" id="scriptList">
+        <div class="empty-state">실행 중인 스크립트 없음</div>
+      </div>
+    </div>
+
+    <!-- 응답 로그 -->
+    <div class="section">
+      <div class="section-title">응답 로그</div>
+      <div class="log-container" id="logContainer">
+        <div class="empty-state">로그 없음</div>
+      </div>
+    </div>
+
+    <!-- 하단 버튼 -->
+    <div class="footer">
+      <button class="btn btn-sm" id="optionsBtn">설정</button>
+      <button class="btn btn-sm btn-danger" id="clearLogBtn">로그 지우기</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

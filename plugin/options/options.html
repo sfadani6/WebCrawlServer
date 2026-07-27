@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebCrawlServer 설정</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 class="title">WebCrawlServer 설정</h1>
+      <span class="version">v0.1.0</span>
+    </div>
+
+    <!-- 서버 연결 설정 -->
+    <div class="section">
+      <div class="section-title">서버 연결 설정</div>
+      <div class="form-group">
+        <label class="form-label">서버 URL (WebSocket)</label>
+        <input type="text" class="form-input" id="serverUrl" placeholder="ws://localhost:9600">
+        <div class="form-hint">WebSocket 서버 주소 (예: ws://192.168.0.10:9600)</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">WebSocket 토큰</label>
+        <div class="password-group">
+          <input type="password" class="form-input" id="wsToken" placeholder="WS_TOKEN 입력">
+          <button class="btn btn-sm" id="toggleTokenBtn">표시</button>
+        </div>
+        <div class="form-hint">서버의 WS_TOKEN 환경변수 값과 일치해야 합니다.</div>
+      </div>
+    </div>
+
+    <!-- 연결 설정 -->
+    <div class="section">
+      <div class="section-title">연결 설정</div>
+      <div class="form-group">
+        <label class="form-label">
+          <input type="checkbox" id="autoReconnect" checked>
+          자동 재연결
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="form-label">재연결 간격 (초)</label>
+        <input type="number" class="form-input" id="reconnectInterval" value="5" min="1" max="60">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Heartbeat 간격 (초)</label>
+        <input type="number" class="form-input" id="heartbeatInterval" value="30" min="5" max="300">
+      </div>
+      <div class="form-group">
+        <label class="form-label">요청 타임아웃 (초)</label>
+        <input type="number" class="form-input" id="requestTimeout" value="30" min="5" max="300">
+      </div>
+    </div>
+
+    <!-- 연결 상태 -->
+    <div class="section">
+      <div class="section-title">연결 상태</div>
+      <div class="status-display">
+        <span class="status-dot disconnected" id="statusDot"></span>
+        <span id="statusText">연결 끊김</span>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="connectBtn">연결</button>
+        <button class="btn btn-sm" id="testConnectionBtn">연결 테스트</button>
+      </div>
+    </div>
+
+    <!-- 작업 버튼 -->
+    <div class="section">
+      <div class="section-title">작업</div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="saveBtn">설정 저장</button>
+        <button class="btn" id="resetBtn">기본값으로 초기화</button>
+      </div>
+      <div class="save-message" id="saveMessage"></div>
+    </div>
+
+    <!-- 정보 -->
+    <div class="section">
+      <div class="section-title">정보</div>
+      <div class="info-row">
+        <span class="info-label">확장 프로그램 ID</span>
+        <span class="info-value" id="extensionId">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">브라우저</span>
+        <span class="info-value" id="browserInfo">-</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">플러그인 버전</span>
+        <span class="info-value" id="pluginVersion">-</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

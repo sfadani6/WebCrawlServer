@@ -109,6 +109,12 @@ Admin UI
 
 ---
 
+# 운영/테스트 가이드
+
+- 플러그인 승인 및 WebSocket 연결 검증 체크리스트: [docs/askLogs/plugin-approval-test-checklist-20260728.md](docs/askLogs/plugin-approval-test-checklist-20260728.md)
+
+---
+
 # 시작하기
 
 ## 1. 저장소 복제

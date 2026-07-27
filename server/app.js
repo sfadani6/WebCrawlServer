@@ -54,12 +54,22 @@ for (const ev of ENV_VARS) {
 
 // === 보안 관련 상수 정의 (WebSocket/CORS에서 공유) ===
 // CORS 설정 - 허용된 origin만 접근 가능
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? 
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ? 
   process.env.ALLOWED_ORIGINS.split(',') : [
     'http://localhost:3000',
     'http://localhost:9600',
     'http://127.0.0.1:9600'
-  ];
+  ]).map((value) => value.trim()).filter(Boolean);
+
+function isExtensionOrigin(origin) {
+  return /^(chrome|opera|moz)-extension:\/\/.+$/i.test(origin || '');
+}
+
+function isOriginAllowed(origin) {
+  if (!origin) return true;
+  if (isExtensionOrigin(origin)) return true;
+  return allowedOrigins.includes(origin) || allowedOrigins.includes('*');
+}
 
 // WebSocket 인증 토큰 (환경변수 또는 기본값)
 const WS_TOKEN = process.env.WS_TOKEN || 'default-ws-token';
@@ -136,7 +146,28 @@ const wss = new WebSocketServer({
 app.use(helmet());
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    if (!origin || isOriginAllowed(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    console.warn(`[CORS] 차단된 Origin: ${origin}`);
+    callback(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
+}));
+
+app.options('*', cors({
+  origin: (origin, callback) => {
+    if (!origin || isOriginAllowed(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(null, false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
@@ -149,12 +180,24 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // 레이트 리밋 설정 (특히 /api/nlp 경로에 적용)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15분
-  max: 100, // 15분당 100회 요청 최대
+  max: Number(process.env.API_RATE_LIMIT_MAX || 100), // 15분당 요청 최대
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     status: 'error',
     message: '너무 많은 요청입니다. 잠시 후 다시 시도하세요.'
+  }
+});
+
+// 플러그인 연결 요청은 일반 API 폭주와 분리하여 허용량을 넉넉히 둠
+const pluginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.PLUGIN_RATE_LIMIT_MAX || 300),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 'error',
+    message: '플러그인 요청이 너무 많습니다. 잠시 후 다시 시도하세요.'
   }
 });
 
@@ -199,12 +242,12 @@ app.get('/health', (req, res) => {
 });
 
 // === API 라우터 마운트 ===
+app.use('/api/plugin', pluginLimiter, pluginRouter);
 app.use('/api', apiLimiter, createApiRouter(wss));
 app.use('/admin/api', adminApiLimiter, adminRouter); // 새로운 관리자 API
 app.use('/admin/api', adminApiLimiter, basicAuth(), adminDbRouter);
 app.use('/admin/api/crawler', crawlerRouter);
 app.use('/api/nlp', nlpLimiter, require('./routes/nlp'));
-app.use('/api/plugin', pluginRouter);
 
 // === 통합 콘솔 SPA 라우터 마운트 (server/routes/adminUi.js) ===
 const adminUiRouter = require('./routes/adminUi');

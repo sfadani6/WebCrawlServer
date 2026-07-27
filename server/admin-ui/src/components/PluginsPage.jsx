@@ -68,7 +68,7 @@ function PluginsPage() {
 
   const loadPending = useCallback(async () => {
     try {
-      const data = await fetchJSON('/plugin/pending');
+      const data = await fetchJSON('/api/plugin/pending');
       setPendingList(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('[PluginsPage] 승인 대기 목록 조회 실패:', err);
@@ -77,7 +77,7 @@ function PluginsPage() {
 
   const loadApproved = useCallback(async () => {
     try {
-      const data = await fetchJSON('/plugin/approved');
+      const data = await fetchJSON('/api/plugin/approved');
       setApprovedList(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('[PluginsPage] 승인된 목록 조회 실패:', err);
@@ -103,7 +103,7 @@ function PluginsPage() {
   const handleApprove = async (id) => {
     setActionLoading(prev => ({ ...prev, [id]: true }));
     try {
-      const result = await fetchJSON(`/plugin/${id}/approve`, { method: 'POST' });
+      const result = await fetchJSON(`/api/plugin/${id}/approve`, { method: 'POST' });
       // 토큰을 인라인으로 표시하기 위해 newTokens에 저장
       setNewTokens(prev => ({ ...prev, [id]: result.token }));
       await loadPending();
@@ -121,7 +121,7 @@ function PluginsPage() {
     if (!window.confirm('이 플러그인 요청을 거부하시겠습니까?')) return;
     setActionLoading(prev => ({ ...prev, [id]: true }));
     try {
-      await fetchJSON(`/plugin/${id}/reject`, { method: 'POST' });
+      await fetchJSON(`/api/plugin/${id}/reject`, { method: 'POST' });
       await loadPending();
     } catch (err) {
       alert(`거부 실패: ${err.message}`);
@@ -134,12 +134,35 @@ function PluginsPage() {
     if (!window.confirm('이 플러그인 연결을 종료하시겠습니까?')) return;
     setActionLoading(prev => ({ ...prev, [id]: true }));
     try {
-      await fetchJSON(`/plugin/${id}/disconnect`, { method: 'POST' });
+      await fetchJSON(`/api/plugin/${id}/disconnect`, { method: 'POST' });
       await loadApproved();
     } catch (err) {
       alert(`연결 종료 실패: ${err.message}`);
     } finally {
       setActionLoading(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const handleCreateTestRequest = async () => {
+    try {
+      const result = await fetchJSON('/api/plugin/request', {
+        method: 'POST',
+        body: JSON.stringify({
+          browser_name: 'Admin Test Browser',
+          browser_version: 'test',
+          extension_id: 'admin-test-extension',
+          hostname: 'admin-ui-test'
+        })
+      });
+
+      if (result?.requestId) {
+        await loadPending();
+        alert(`테스트 요청이 생성되었습니다. ID: ${result.requestId}`);
+      } else {
+        throw new Error('요청 ID를 받지 못했습니다.');
+      }
+    } catch (err) {
+      alert(`테스트 요청 생성 실패: ${err.message}`);
     }
   };
 
@@ -173,14 +196,23 @@ function PluginsPage() {
             브라우저 플러그인의 연결 요청을 승인하고 현재 연결 상태를 관리합니다.
           </p>
         </div>
-        <button
-          className="gcp-btn gcp-btn-secondary"
-          onClick={loadAll}
-          disabled={loading}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
-          {loading ? '⏳' : '🔄'} 새로고침
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="gcp-btn"
+            onClick={handleCreateTestRequest}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            🧪 테스트 요청 생성
+          </button>
+          <button
+            className="gcp-btn gcp-btn-secondary"
+            onClick={loadAll}
+            disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            {loading ? '⏳' : '🔄'} 새로고침
+          </button>
+        </div>
       </div>
 
       {/* 서버 연결 정보 패널 */}

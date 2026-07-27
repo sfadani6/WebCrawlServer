@@ -72,7 +72,17 @@ data/*.db
 *.db
 database/*.db-shm
 database/*.db-wal
-
+database\*.db-shm
+database\*.db-wal
+database\main.db
+database/main.db-shm
+database/main.db-wal
+database\sdsd.db
+database/sdsd.db-shm
+database/sdsd.db-wal
+database\test_app.db
+database/test_app.db-shm
+database/test_app.db-wal
 # 개인 설정 및 런타임 파일 [C8]
 logs/*.log
 
@@ -83,3 +93,6 @@ thorium/
 # docs/askLogs/*.md
 # docs/CHANGELOG/*.md
 # docs/tips/*.md
+
+# docs\TaskCompleted
+docs/TaskCompleted

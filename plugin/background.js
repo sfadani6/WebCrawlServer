@@ -20,6 +20,7 @@ const STATE = {
   serverUrl: '',
   wsToken: '',
   requestId: null,           // 현재 접속 요청 ID
+  approvedToken: null,       // 승인된 토큰
   connectionPhase: 'disconnected', // disconnected | requesting | awaiting_approval | connecting
   reconnectAttempts: 0,
   maxReconnectAttempts: 10,
@@ -74,6 +75,11 @@ async function connect() {
     return;
   }
 
+  if (STATE.connectionPhase === 'requesting' || STATE.connectionPhase === 'awaiting_approval') {
+    console.log('[WCS] 이미 접속 요청 중이므로 새 요청을 생략합니다.');
+    return;
+  }
+
   await loadConfig();
 
   if (!config.serverUrl) {
@@ -85,7 +91,7 @@ async function connect() {
     // 1단계: 접속 요청 (HTTP POST)
     STATE.connectionPhase = 'requesting';
     console.log('[WCS] 서버 접속 요청 전송 중...');
-    
+
     const httpUrl = config.serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
     const response = await fetch(`${httpUrl}/api/plugin/request`, {
       method: 'POST',
@@ -98,21 +104,47 @@ async function connect() {
       })
     });
 
-    if (!response.ok) throw new Error(`접속 요청 실패: ${response.statusText}`);
-    
-    const result = await response.json();
-    STATE.requestId = result.requestId;
+    let result = null;
+    try {
+      result = await response.json();
+    } catch (_) {
+      result = null;
+    }
+
+    const requestId = result?.requestId || null;
+
+    if (!response.ok) {
+      if (requestId) {
+        STATE.requestId = requestId;
+      }
+      console.warn(`[WCS] 접속 요청이 즉시 완료되지 않았습니다. 승인 대기 상태로 유지합니다. (${response.status} ${response.statusText})`);
+      STATE.connectionPhase = 'awaiting_approval';
+      if (STATE.requestId) {
+        startApprovalPolling();
+      }
+      notifyConnectionState(false, 'awaiting_approval');
+      return;
+    }
+
+    if (!requestId) {
+      console.warn('[WCS] 서버가 요청 ID를 반환하지 않아 승인 대기 상태로 유지합니다.');
+      STATE.connectionPhase = 'awaiting_approval';
+      notifyConnectionState(false, 'awaiting_approval');
+      return;
+    }
+
+    STATE.requestId = requestId;
     STATE.connectionPhase = 'awaiting_approval';
     console.log(`[WCS] 접속 요청 접수됨 (ID: ${STATE.requestId}). 승인 대기 중...`);
-    
+
     // 2단계: 승인 상태 폴링 시작
     startApprovalPolling();
     notifyConnectionState(false, 'awaiting_approval');
 
   } catch (err) {
-    console.error('[WCS] 접속 요청 오류:', err);
-    STATE.connectionPhase = 'disconnected';
-    showErrorNotification('network', '접속 요청 실패', err.message);
+    console.warn('[WCS] 접속 요청이 지연되어 승인 대기 상태로 유지합니다:', err.message || err);
+    STATE.connectionPhase = 'awaiting_approval';
+    notifyConnectionState(false, 'awaiting_approval');
   }
 }
 
@@ -126,14 +158,19 @@ function startApprovalPolling() {
     try {
       const httpUrl = config.serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
       const response = await fetch(`${httpUrl}/api/plugin/status/${STATE.requestId}`);
-      
-      if (!response.ok) throw new Error('상태 확인 실패');
-      
+
+      if (!response.ok) {
+        const bodyText = await response.text().catch(() => '');
+        console.warn(`[WCS] 상태 확인 응답 오류 (${response.status} ${response.statusText}): ${bodyText || '(본문 없음)'}`);
+        return;
+      }
+
       const data = await response.json();
       console.log(`[WCS] 승인 상태 확인: ${data.status}`);
 
       if (data.status === 'approved') {
         console.log('[WCS] 접속 승인됨! WebSocket 연결을 시도합니다.');
+        STATE.approvedToken = data.token || null;
         stopApprovalPolling();
         initiateWebSocket(data.token);
       } else if (data.status === 'rejected') {
@@ -144,7 +181,7 @@ function startApprovalPolling() {
         notifyConnectionState(false, 'rejected');
       }
     } catch (err) {
-      console.error('[WCS] 폴링 오류:', err);
+      console.warn('[WCS] 폴링 오류:', err.message || err);
     }
   }, 3000);
 }
@@ -159,7 +196,9 @@ function stopApprovalPolling() {
 /** 실제 WebSocket 연결 수행 */
 function initiateWebSocket(token) {
   STATE.connectionPhase = 'connecting';
-  const url = `${config.serverUrl}?token=${encodeURIComponent(token)}`;
+  STATE.approvedToken = token || STATE.approvedToken || null;
+  const effectiveToken = STATE.approvedToken || token;
+  const url = `${config.serverUrl}?token=${encodeURIComponent(effectiveToken)}`;
   
   console.log(`[WCS] 서버 연결 시도: ${url}`);
 
@@ -212,6 +251,7 @@ function disconnect() {
     STATE.ws = null;
   }
   STATE.connected = false;
+  STATE.approvedToken = null;
   stopHeartbeat();
   notifyConnectionState(false);
 }
@@ -262,7 +302,8 @@ function notifyConnectionState(connected) {
   chrome.runtime.sendMessage({
     type: 'connection_state',
     connected,
-    serverUrl: config.serverUrl
+    serverUrl: config.serverUrl,
+    approvedToken: STATE.approvedToken
   }).catch(() => {}); // 팝업이 열려있지 않으면 무시
 }
 

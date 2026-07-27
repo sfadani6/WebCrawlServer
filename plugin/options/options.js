@@ -28,6 +28,8 @@ const saveMessage = $('saveMessage');
 const extensionId = $('extensionId');
 const browserInfo = $('browserInfo');
 const pluginVersion = $('pluginVersion');
+const tokenStatus = $('tokenStatus');
+const currentToken = $('currentToken');
 
 // ============================================================
 // 초기화
@@ -55,6 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'connection_state') {
       updateStatusDisplay(message.connected);
+      updateTokenDisplay(message.approvedToken);
     }
   });
 });
@@ -169,6 +172,18 @@ function updateStatusDisplay(connected) {
     statusText.textContent = '연결 끊김';
     connectBtn.textContent = '연결';
     connectBtn.className = 'btn';
+  }
+}
+
+function updateTokenDisplay(token) {
+  if (token) {
+    tokenStatus.textContent = '승인된 토큰 사용 중';
+    currentToken.textContent = token;
+    currentToken.parentElement.style.display = 'block';
+  } else {
+    tokenStatus.textContent = '토큰 없음';
+    currentToken.textContent = '관리자 승인 후 발급된 토큰이 여기에 표시됩니다.';
+    currentToken.parentElement.style.display = 'block';
   }
 }
 

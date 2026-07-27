@@ -6,6 +6,7 @@
 
 const request = require('supertest');
 const { app } = require('./app');
+const dbHelper = require('./db/helper');
 
 describe('API 통합 테스트', () => {
   // 헬스 체크
@@ -28,6 +29,43 @@ describe('API 통합 테스트', () => {
       .send({ prompt: '회원 검색' });
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
+  });
+
+  test('OPTIONS /api/plugin/request - 확장 프로그램 CORS preflight 허용', async () => {
+    const res = await request(app)
+      .options('/api/plugin/request')
+      .set('Origin', 'chrome-extension://abc123')
+      .set('Access-Control-Request-Method', 'POST')
+      .set('Access-Control-Request-Headers', 'content-type');
+
+    expect(res.status).toBe(204);
+    expect(res.headers['access-control-allow-origin']).toBe('chrome-extension://abc123');
+    expect(res.headers['access-control-allow-methods']).toContain('POST');
+  });
+
+  test('플러그인 승인 시 토큰이 발급되고 상태가 approved로 갱신된다', async () => {
+    const requestId = await dbHelper.insertPluginRequest({
+      browser_name: 'Test Browser',
+      browser_version: '1.0',
+      extension_id: 'test-ext',
+      hostname: 'browser-extension'
+    });
+
+    const token = await dbHelper.approvePluginRequest(requestId);
+    const row = await dbHelper.queryOne('SELECT status, approved_token, connected FROM plugin_requests WHERE id = ?', [requestId]);
+
+    expect(token).toBeTruthy();
+    expect(row.status).toBe('approved');
+    expect(row.approved_token).toBe(token);
+    expect(row.connected).toBe(0);
+  });
+
+  test('플러그인 상태 조회가 없는 요청에도 200과 pending를 반환한다', async () => {
+    const res = await request(app).get('/api/plugin/status/9999999');
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('pending');
+    expect(res.body.token).toBeNull();
   });
 
   // 404 처리

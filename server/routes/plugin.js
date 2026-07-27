@@ -82,11 +82,15 @@ router.get('/status/:requestId', async (req, res) => {
     );
 
     if (!request) {
-      return res.status(404).json({ error: '요청을 찾을 수 없습니다.' });
+      return res.json({
+        status: 'pending',
+        token: null,
+        message: '요청이 아직 존재하지 않습니다.'
+      });
     }
 
     res.json({
-      status: request.status,
+      status: request.status || 'pending',
       token: request.status === 'approved' ? request.approved_token : null
     });
   } catch (err) {

@@ -1,5 +1,17 @@
 # 작업 이력
 
+## 2026-07-27 todo.md 완료 항목 docs/CHANGELOG 백업 및 정리
+
+### 처리 요약
+- `docs/todo.md` 내에 누적된 완료된 항목들을 `docs/CHANGELOG/todo-completed-backup-20260727.md` 파일로 이전 백업하고, `todo.md` 문서 내 관련 섹션을 삭제/정리하여 가독성을 개선했습니다.
+
+### 완료 항목
+- `docs/CHANGELOG/todo-completed-backup-20260727.md`: 완료 항목 이전 백업 파일 작성
+- `docs/todo.md`: 완료 내역 섹션 삭제 및 백업 안내 문구 추가
+- `docs/askLogs/ask-20260727213300.md`: 작업 이력 문서 기록
+
+---
+
 ## 2026-07-27 소스 코드 분석 기반 리팩토링 및 고도화 과제 todo.md 등록
 
 ### 처리 요약

@@ -130,6 +130,54 @@
 
 ---
 
+### 🛠️ 소스 코드 분석 기반 리팩토링 & 고도화 과제 (Codebase Refactoring & Enhancement Tasks)
+
+#### 1. 백엔드 코어 & 서버 아키텍처 개선 (Backend Core Architecture)
+- [ ] **`server/app.js` 모듈화 및 서버 수명주기(Graceful Shutdown) 분리**:
+  - Express 어플리케이션 설정, 라우터 등록, WebSocket 서버 인스턴스 생성을 독립 모듈로 분리하고, 프로세스 종료 신호(`SIGTERM`, `SIGINT`) 시 DB 커넥션 및 소켓 서버 안전 정리를 수행하는 Graceful Shutdown 핸들러 구현.
+- [ ] **계층화 아키텍처(Layered Architecture) 완전 도입 (`routes/` -> `services/`)**:
+  - `server/routes/*.js` 컨트롤러에 포함된 비즈니스 로직 및 DB 직접 접근 코드를 `server/services/` 계층으로 완전 분리하여 관심사 분리(SoC) 달성.
+- [ ] **중앙 집중식 커스텀 에러 핸들러 및 비동기 Wrapper 도입**:
+  - 반복적인 `try-catch` 블록 제거를 위한 `asyncHandler` 미들웨어 및 표준화된 에러 객체(`AppError`)와 글로벌 에러 처리 미들웨어 구현.
+- [ ] **라우트 요청 파라미터 유효성 검증 미들웨어(Schema Validation) 구축**:
+  - API 요청 Body 및 Query 파라미터 스키마 검증 미들웨어를 도입하여 잘못된 입력값 차단 및 데이터 안정성 확보.
+
+#### 2. 워크플로우 & 스케줄러 실행 엔진 고도화 (Engine Optimization)
+- [ ] **`workflowEngine.js` 실행 컨텍스트 격리 및 메모리 누수 방지**:
+  - 대용량 반복문/조건문 실행 시 변수 스코프 격리 강화 및 무한 루프 방지용 최대 뎁스/실행 시간 제한(Timeout) 서킷 브레이커 적용.
+- [ ] **비동기 태스크 취소 신호(`AbortController`) 및 재시도 백오프(Exponential Backoff)**:
+  - 워크플로우 및 크롤링 노드 실행 실패 시 설정된 횟수만큼 지수 백오프 재시도를 수행하고, 중단 요청 시 실행 중인 비동기 작업을 즉시 멈추는 Cancel Signal 구현.
+- [ ] **`jobRunner.js` 태스크 큐 및 동시성 제어 (Concurrency Limiter)**:
+  - 동일 스케줄러/모듈 중복 실행 방지 락(Locking) 및 인메모리/SQLite 백킹 태스크 큐를 구성하여 서버 CPU/메모리과부하 방지.
+
+#### 3. SQLite DB & 저장소 관리 최적화 (Database & Persistence)
+- [ ] **`server/db/helper.js` SQLite WAL 모드 및 Busy Timeout 최적화**:
+  - SQLite동시 쓰기/읽기 락 충돌 방지를 위해 WAL(Write-Ahead Logging) 모드 활성화 및 `busy_timeout` 설정 적용.
+- [ ] **안전한 DB 트랜잭션 래퍼 함수 및 커스텀 스키마 동기화 엔진 보강**:
+  - 여러 SQL 쿼리를 원자적으로 처리할 수 있는 `db.transaction()` 도 도 도 도입 및 모듈별 `schema.sql` 동적 생성/적용 시 문법 검증 레이어 추가.
+
+#### 4. 브라우저 플러그인 리팩토링 (Extension Manifest V3 Refactoring)
+- [ ] **`plugin/background.js` Service Worker 수명주기 대응 및 메세지 큐 구축**:
+  - Chrome Manifest V3 Service Worker의 비활성화/재시동 시 WebSocket 연결 상태 복구 및 비대면 상태에서 발생한 패킷을 보관/재전송하는 메시지 큐(Message Queue) 구현.
+- [ ] **`contentScript.js` DOM 수집 오버헤드 감소 및 안전한 커스텀 액션 주입**:
+  - 대용량 DOM 스크래핑 시 메인 스레드 블로킹 방지를 위한 비동기 chunk 분할 수집 및 오류 방지용 래퍼 함수 적용.
+
+#### 5. 관리자 UI 프론트엔드 코드 구조 개선 (Frontend Refactoring)
+- [ ] **API 클라이언트 레벨(`server/admin-ui/src/api.js`) 표준화 및 에러 인터셉터**:
+  - API 호출 시 인증 토큰 자동 첨부, 네트워크 에러 시 자동 재시도 및 표준화된 Toast 알림 처리 미들웨어 도입.
+- [ ] **대형 컴포넌트 관심사 분리 및 커스텀 훅(Custom Hooks) 추출**:
+  - `VisualWorkflowEditor.jsx`, `SpreadsheetView.jsx`, `ConnectionPage.jsx` 내 복잡한 캔버스/그리드 연산 및 소켓 통신 로직을 커스텀 훅으로 분리하여 가독성 개선.
+- [ ] **전역 상태 관리(Zustand / Context) 도입을 통한 Props Drilling 해소**:
+  - 활성 연결 상태, 사용자 설정, 시스템 테마 및 알림 상태를 관리하는 전역 스토어 구축.
+
+#### 6. 보안, 모니터링 & 테스트 커버리지 강화 (Security & Testing)
+- [ ] **Rate Limiting(요청 제한) 및 Security Headers 미들웨어 적용**:
+  - `express-rate-limit` 적용으로 무차별 API 호출 방지 및 Helmet 기반 보안 헤더 설정.
+- [ ] **핵심 모듈 단위/통합 테스트 코드 확충 (Test Coverage > 80%)**:
+  - `server/app.test.js`, 스케줄러 `jobRunner`, `workflowEngine`에 대한 Jest/Supertest 테스트 모듈 추가 작성 및 CI/CD 검증 체계 강화.
+
+---
+
 ## 완료된 항목
 
 ### 브라우저 플러그인 개발 (plugin/)

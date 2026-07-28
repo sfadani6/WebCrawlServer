@@ -1,5 +1,17 @@
 # 작업 이력
 
+## 2026-07-27 admin-ui 실시간 웹소켓 로그 스트리밍 뷰어(LogsPage.jsx) 구현
+
+### 처리 요약
+- 관리자 UI(`server/admin-ui`)의 `LogsPage.jsx`를 개편하여 WebSocket 통신 연결 수신 기반의 실시간 서버 로그 스트리밍 뷰어를 구현했습니다.
+- GCP 컴팩트 다크 테마 디자인 규격을 적용하였으며, 자동 하단 스크롤, 스트리밍 일시정지, 로그 레벨/모듈 필터링, 검색, JSON 내보내기 기능을 제공합니다.
+
+### 완료 항목
+- `server/admin-ui/src/components/LogsPage.jsx`: 실시간 웹소켓 스트리밍 및 GCP 다크 테마 콘솔 뷰어로 전면 개편
+- `docs/askLogs/ask-20260727220000.md`: 작업 처리 이력 문서 작성
+
+---
+
 ## 2026-07-27 admin-ui WebSocketConnections 컴포넌트 기능 고도화 (소켓 수, 지속시간, 핑퐁 지연시간 시각화)
 
 ### 처리 요약

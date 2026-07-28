@@ -1,5 +1,17 @@
 # 작업 이력
 
+## 2026-07-27 admin-ui 실시간 CPU/Memory 성능 모니터링(SystemPerformance.jsx) 구현
+
+### 처리 요약
+- 관리자 UI(`server/admin-ui`)에 Recharts 기반으로 서버 CPU 사용률(%) 및 RAM/Heap 메모리 사용량을 실시간으로 시각화하는 `SystemPerformance` 컴포넌트를 신규 구현하고 GCP 다크 테마 디자인 규격을 적용했습니다.
+
+### 완료 항목
+- `server/admin-ui/src/components/SystemPerformance.jsx`: CPU/Memory 실시간 추이 Recharts 차트 및 메트릭 카드 컴포넌트 신규 구현
+- `server/admin-ui/src/components/ConnectionPage.jsx`: 상단 탭 메뉴("💻 서버 성능 모니터링") 연동
+- `docs/askLogs/ask-20260727220334.md`: 작업 처리 이력 문서 작성
+
+---
+
 ## 2026-07-27 admin-ui 실시간 웹소켓 로그 스트리밍 뷰어(LogsPage.jsx) 구현
 
 ### 처리 요약

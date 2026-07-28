@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { fetchJSON } from '../api';
 import WebSocketDashboard from './WebSocketDashboard';
 import WebSocketConnections from './WebSocketConnections';
+import SystemPerformance from './SystemPerformance';
 
 function ConnectionPage({ onNavigate }) {
-  const [activeTab, setActiveTab] = useState('connections'); // 'connections', 'dashboard', 또는 'list'
+  const [activeTab, setActiveTab] = useState('connections'); // 'connections', 'performance', 'dashboard', 또는 'list'
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -169,6 +170,21 @@ function ConnectionPage({ onNavigate }) {
           📈 소켓 연결 시각화 (WebSocketConnections)
         </button>
         <button
+          onClick={() => setActiveTab('performance')}
+          style={{
+            padding: '8px 16px',
+            fontSize: '13px',
+            fontWeight: 600,
+            border: 'none',
+            borderBottom: activeTab === 'performance' ? '2px solid var(--gcp-accent)' : '2px solid transparent',
+            backgroundColor: 'transparent',
+            color: activeTab === 'performance' ? 'var(--gcp-accent)' : 'var(--gcp-text-secondary)',
+            cursor: 'pointer'
+          }}
+        >
+          💻 서버 성능 모니터링 (SystemPerformance)
+        </button>
+        <button
           onClick={() => setActiveTab('dashboard')}
           style={{
             padding: '8px 16px',
@@ -202,6 +218,8 @@ function ConnectionPage({ onNavigate }) {
 
       {activeTab === 'connections' ? (
         <WebSocketConnections onNavigate={onNavigate} />
+      ) : activeTab === 'performance' ? (
+        <SystemPerformance onNavigate={onNavigate} />
       ) : activeTab === 'dashboard' ? (
         <WebSocketDashboard onNavigate={onNavigate} />
       ) : (

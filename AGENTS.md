@@ -1,18 +1,15 @@
 # WebCrawlServer - AI 에이전트 통합 지침 (AGENTS.md)
 
-> 버전: 0.1.0
+> 버전: 0.1.1
 > 작성자: 사용자
-> 수정일: 2026-07-25
-> 검토일: 2026-07-25
+> 수정일: 2026-07-27
+> 검토일: 2026-07-27
 > 수정 이유:
->   1) 기존 `docs/rule/instructions.md`(13장 단일 통합 문서)를 주제별 문서 13개(R-001~R-013)로 분리하고, instructions.md는 인덱스(Rule Registry) 역할만 담당하도록 재구성. 매 작업마다 13장 전체를 읽던 토큰 소모 문제 해소 목적
->   2) 0.2절에 Rule Registry 신설 — AI가 필요한 주제의 문서만 선택적으로 읽을 수 있도록 안내
->   3) 1.2/1.4(설명 방식, 소통 원칙)가 `instructions.md` 12장(현 communication.md)과 중복되던 부분을 정리 — 세부 내용은 communication.md로 일원화하고 본 문서는 최소 참조만 유지
->   4) 1.3에 ADR 저장 위치(docs/decision/) 안내 추가, 2장 컨텍스트 로딩 예외 목록에 docs/decision/ 추가
->   5) 1.5/1.6/3장의 `docs/rule/instructions.md` 단일 참조를 Rule Registry 기반 참조로 갱신
-> 관련 문서: docs/rule/instructions.md(R-000), docs/rule/ 하위 전체 문서(R-001~R-013)
+>   1) 신규 규칙 문서 `docs/rule/websocket.md`(R-016) 추가에 따른 Rule Registry 표 및 인덱스 갱신
+>   2) 기존 규칙 범위 표기를 R-000~R-016 범위로 통합 업데이트
+> 관련 문서: docs/rule/instructions.md(R-000), docs/rule/ 하위 전체 문서(R-001~R-016)
 > 영향 범위: 본 문서 전체, docs/rule/ 문서 구조 전면 개편과 연동
-> Breaking Change 여부: 있음 — 기존에 "instructions.md 4장" 등 절 번호로 규칙을 인용하던 방식은 더 이상 유효하지 않다. 새 인용은 "파일명 + 장 번호"(예: mcp.md 4장) 형식을 사용한다. 과거 askLogs/CHANGELOG의 기존 인용은 소급 수정하지 않는다.
+> Breaking Change 여부: 없음
 > 프로젝트: WebCrawlServer (브라우저 플러그인 + MCP 서버 + 관리자 페이지 통합 자동화 플랫폼)
 > 본 문서는 기존 프로젝트의 `AGENTS.md` 운영 경험을 반영해 개선한 버전이다.
 
@@ -27,7 +24,7 @@
 ```
 AGENTS.md                    Root Rule   — 최상위 절대 규칙 (언어, 문서 위치, 우선순위, Rule Registry 등)
         ↓
-docs/rule/*.md (R-000~R-013) 실무 규칙   — 개발/운영 세부 지침 (아키텍처, MCP, DB, Git 등, 주제별 분리)
+docs/rule/*.md (R-000~R-016) 실무 규칙   — 개발/운영 세부 지침 (아키텍처, MCP, DB, Git, WebSocket 등)
         ↓
 docs/ask.md                  요청사항    — 사용자가 남긴 작업 요청 원문
         ↓
@@ -37,11 +34,11 @@ README.md                    프로젝트 설명 — 외부/신규 참여자를 
 ```
 
 - `AGENTS.md`는 다른 모든 문서보다 우선하는 최상위 지시서다.
-- `docs/rule/` 하위 문서(R-000~R-013)는 `AGENTS.md`가 위임한 실무 세부 규칙 문서다. `instructions.md`(R-000)는 그 자체가 규칙을 담기보다 나머지 12개 문서로 가는 인덱스 역할을 한다.
+- `docs/rule/` 하위 문서(R-000~R-016)는 `AGENTS.md`가 위임한 실무 세부 규칙 문서다. `instructions.md`(R-000)는 그 자체가 규칙을 담기보다 나머지 문서로 가는 인덱스 역할을 한다.
 - `docs/ask.md`/`docs/todo.md`는 특정 작업 단위의 요청·계획을 담는 문서이며, 규칙 문서(`AGENTS.md`, `docs/rule/*.md`)의 내용을 변경하거나 무시하는 근거로 사용할 수 없다.
 - `README.md`는 규칙 문서가 아니라 설명 문서다. 규칙 문서와 내용이 다르면 규칙 문서를 기준으로 삼고 `README.md`를 갱신 대상으로 취급한다.
 
-작업 시작 전 아래 세부 규칙 문서를 반드시 확인한다. 본 파일(`AGENTS.md`)은 최상위 지시서(Root Rules)이며, 시스템 아키텍처·기술 스택·폴더 구조·MCP 프로토콜·모듈 개발·DB·로그·Git·커뮤니케이션 등 프로젝트 전반의 세부 규칙은 아래 Rule Registry의 각 문서에 위임한다.
+작업 시작 전 아래 세부 규칙 문서를 반드시 확인한다. 본 파일(`AGENTS.md`)은 최상위 지시서(Root Rules)이며, 시스템 아키텍처·기술 스택·폴더 구조·MCP 프로토콜·모듈 개발·DB·로그·Git·커뮤니케이션·WebSocket 등 프로젝트 전반의 세부 규칙은 아래 Rule Registry의 각 문서에 위임한다.
 
 ### 0.2 Rule Registry
 
@@ -65,9 +62,10 @@ README.md                    프로젝트 설명 — 외부/신규 참여자를 
 | R-013 | docs/rule/security.md | 예외 처리 및 일반 보안 정책 |
 | R-014 | docs/rule/auth.md | 페이지 인증, Basic Auth, bcryptjs, 자격증명 변경 API |
 | R-015 | docs/rule/testing.md | 단위/통합 테스트 도구, 환경, 작성 규칙 및 가이드 |
+| R-016 | docs/rule/websocket.md | 웹소켓(WebSocket) 통신 프로토콜, 수명주기, 재연결 및 핸들링 가이드 |
 
-- 새 규칙 문서가 필요해지면 이 표와 `docs/rule/instructions.md`의 표를 함께 갱신하고 다음 번호(R-015...)를 부여한다. 두 표가 어긋나면 이 표(`AGENTS.md`)가 우선한다.
-- 코드 작성 전 항상 관련 Rule ID의 문서를 먼저 확인한다. 어느 문서에 해당하는지 애매하면 `docs/rule/instructions.md`(R-000)의 안내를 먼저 확인한다. 작업 범위가 기존 14개 문서로 해소되지 않거나 내용이 불명확한 경우, 사용자에게 확인 후 해당 문서(또는 신규 문서)에 내용을 보강한다.
+- 새 규칙 문서가 필요해지면 이 표와 `docs/rule/instructions.md`의 표를 함께 갱신하고 다음 번호(R-017...)를 부여한다. 두 표가 어긋나면 이 표(`AGENTS.md`)가 우선한다.
+- 코드 작성 전 항상 관련 Rule ID의 문서를 먼저 확인한다. 어느 문서에 해당하는지 애매하면 `docs/rule/instructions.md`(R-000)의 안내를 먼저 확인한다. 작업 범위가 기존 규칙 문서로 해소되지 않거나 내용이 불명확한 경우, 사용자에게 확인 후 해당 문서(또는 신규 문서)에 내용을 보강한다.
 
 ---
 

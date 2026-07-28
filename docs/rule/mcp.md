@@ -1,12 +1,12 @@
 # R-004 MCP(Modular Control Platform) 프로토콜 규칙 (mcp.md)
 
-> Version: 1.1.1
+> Version: 1.1.2
 > 작성자: 사용자
-> 수정일: 2026-07-26
-> 검토일: 2026-07-26
-> 수정 이유: 4장(워크플로우 엔진)에 현재 미구현 상태 명시 — 스크립트 페이로드(steps 배열), condition/loop 처리, 워크플로우 실행 엔진이 아직 구현되지 않았음을 문서에 반영
-> 관련 문서: docs/rule/instructions.md(R-000), docs/rule/structure.md(R-003), docs/rule/scheduler.md(R-005)
-> 영향 범위: 문서 상태 명시 추가, 기존 내용 변경 없음
+> 수정일: 2026-07-27
+> 검토일: 2026-07-27
+> 수정 이유: WebSocket 전송 채널 및 실시간 수명주기 관리에 대한 세부 지침 R-016(docs/rule/websocket.md) 상호 참조 추가
+> 관련 문서: docs/rule/instructions.md(R-000), docs/rule/structure.md(R-003), docs/rule/scheduler.md(R-005), docs/rule/websocket.md(R-016)
+> 영향 범위: 전송 채널 세부 규칙 참조 연동
 > Breaking Change 여부: 없음
 
 ---
@@ -73,6 +73,7 @@
 
 ## 6. 전송 채널
 - 실시간 양방향 통신이 필요한 경우 WebSocket, 단순 폴링이면 HTTP POST를 사용한다.
+- WebSocket 연결 수명주기, 토큰 인증, heartbeat, Service Worker 킵얼라이브 및 지수 백오프 재연결 상세 가이드는 `websocket.md`(R-016)를 준수한다.
 - 헬스 체크는 `heartbeat` 메시지로 수행하며, 연결 끊김 시 지수 백오프로 재연결한다.
 
 ## 7. 오류/재시도 정책

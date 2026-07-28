@@ -1,5 +1,19 @@
 # 작업 이력
 
+## 2026-07-27 웹소켓 통신 가이드라인 규칙 신설 및 Rule Registry 연동 (R-016)
+
+### 처리 요약
+- WebSocket 통신 수명주기, 인증, Service Worker 킵얼라이브, 지수 백오프, 오프라인 큐 및 대용량 패킷 분할 규칙을 포함하는 `docs/rule/websocket.md`(R-016)를 신설하고, `AGENTS.md`, `docs/rule/instructions.md`(R-000), `docs/rule/mcp.md`(R-004)의 Rule Registry와 상호 참조 관계를 업데이트했습니다.
+
+### 완료 항목
+- `docs/rule/websocket.md`: 웹소켓 통신 가이드라인 규칙 작성 (R-016)
+- `AGENTS.md`: Rule Registry 표 R-016 등록 및 버전 업데이트
+- `docs/rule/instructions.md`: R-000 규칙 인덱스 표 R-016 업데이트
+- `docs/rule/mcp.md`: WebSocket 전송 채널 연동 참조 기재
+- `docs/askLogs/ask-20260727214400.md`: 작업 이력 문서 작성
+
+---
+
 ## 2026-07-27 브라우저 플러그인 개발자 모드 오페라/크로미움 전체 권한 가이드 README 반영
 
 ### 처리 요약

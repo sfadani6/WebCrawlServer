@@ -656,6 +656,50 @@ router.post('/databases/upload', express.raw({ type: '*/*', limit: '100mb' }), a
   }
 });
 
+// ------------------- DB VACUUM 최적화 API -------------------
+// POST /admin/api/databases/vacuum?db=filename.db
+router.post('/databases/vacuum', async (req, res, next) => {
+  try {
+    const targetDb = req.query.db;
+    const dbDir = path.join(__dirname, '../../database');
+    await fs.ensureDir(dbDir);
+    const files = await fs.readdir(dbDir);
+    const dbFiles = files.filter(f => f.endsWith('.db'));
+
+    const results = [];
+    const targetsToVacuum = targetDb ? [targetDb] : dbFiles;
+
+    for (const fileName of targetsToVacuum) {
+      const filePath = path.join(dbDir, fileName);
+      if (!await fs.pathExists(filePath)) continue;
+
+      const beforeStats = await fs.stat(filePath);
+      
+      await new Promise((resolve) => {
+        const db = new sqlite3.Database(filePath, (err) => {
+          if (err) return resolve();
+          db.run('VACUUM;', () => {
+            db.close();
+            resolve();
+          });
+        });
+      });
+
+      const afterStats = await fs.stat(filePath);
+      results.push({
+        name: fileName,
+        beforeSize: `${(beforeStats.size / 1024).toFixed(1)} KB`,
+        afterSize: `${(afterStats.size / 1024).toFixed(1)} KB`,
+        freedBytes: Math.max(0, beforeStats.size - afterStats.size)
+      });
+    }
+
+    return success(res, '데이터베이스 용량 최적화(VACUUM)가 완료되었습니다.', results);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ------------------- 테이블 생성 (DDL) -------------------
 // POST /admin/api/tables
 router.post('/tables', express.json(), async (req, res, next) => {

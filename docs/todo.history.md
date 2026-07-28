@@ -1,5 +1,17 @@
 # 작업 이력
 
+## 2026-07-27 노트북 리소스 최적화 & 로컬 DB VACUUM 용량 정리 연동
+
+### 처리 요약
+- `POST /admin/api/databases/vacuum` API를 통해 SQLite DB 디스크 불필요 공간을 원클릭으로 정리 압축할 수 있도록 백엔드 및 `DatabaseOverviewPage.jsx` UI 버튼을 연동했습니다.
+
+### 완료 항목
+- `server/routes/adminDb.js`: SQLite VACUUM 실행 및 파일 크기 변화 보고 API 구축
+- `server/admin-ui/src/components/DatabaseOverviewPage.jsx`: 전체 DB 용량 최적화 버튼 및 연동
+- `docs/askLogs/ask-20260727223200.md`: 작업 처리 이력 작성
+
+---
+
 ## 2026-07-27 수집 결과 자동 정리 및 중복 제거 필터 구현
 
 ### 처리 요약

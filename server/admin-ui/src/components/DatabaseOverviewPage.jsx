@@ -116,6 +116,17 @@ function DatabaseOverviewPage({ selectedDb, selectedTable, onSelectDb, onSelectT
     }
   };
 
+  const handleVacuumDatabase = async (dbName = null) => {
+    try {
+      const url = dbName ? `/admin/api/databases/vacuum?db=${encodeURIComponent(dbName)}` : '/admin/api/databases/vacuum';
+      const res = await fetchJSON(url, { method: 'POST' });
+      alert(res.message || 'DB 최적화가 완료되었습니다.');
+      loadDatabases();
+    } catch (err) {
+      alert(err.message || 'VACUUM 수행 실패');
+    }
+  };
+
   // Case 1: 특정 데이터베이스가 선택된 경우 -> 해당 DB의 테이블 목록 및 스프레드시트 뷰 표시
   if (selectedDb) {
     return (
@@ -183,6 +194,9 @@ function DatabaseOverviewPage({ selectedDb, selectedTable, onSelectDb, onSelectT
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="gcp-btn gcp-btn-secondary" onClick={() => handleVacuumDatabase(null)} title="전체 DB 파일의 미사용 용량 정리 (VACUUM)">
+            🧹 전체 DB 용량 최적화 (VACUUM)
+          </button>
           <label className="gcp-btn gcp-btn-secondary" style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             📥 DB 스냅샷 복원/업로드
             <input type="file" accept=".db" onChange={handleRestoreDatabase} style={{ display: 'none' }} />

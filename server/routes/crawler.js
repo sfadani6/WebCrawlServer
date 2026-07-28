@@ -73,20 +73,70 @@ router.delete('/targets/:id', async (req, res, next) => {
   }
 });
 
-// ------------------- Item 목록 -------------------
+// ------------------- Item 목록 (중복 제거 필터 지원) -------------------
 // GET /admin/api/crawler/items
 router.get('/items', async (req, res, next) => {
   try {
     const targetId = req.query.target_id;
+    const dedupe = req.query.dedupe === 'true' || req.query.dedupe === '1';
     const params = [];
-    let sql = `SELECT * FROM crawler_items WHERE 1=1`;
+    let sql = '';
+
+    if (dedupe) {
+      sql = `
+        SELECT * FROM crawler_items
+        WHERE id IN (
+          SELECT MAX(id)
+          FROM crawler_items
+          WHERE 1=1
+      `;
+      if (targetId) {
+        sql += ` AND target_id = ?`;
+        params.push(targetId);
+      }
+      sql += `
+          GROUP BY COALESCE(NULLIF(external_id, ''), title)
+        )
+        ORDER BY fetched_at DESC LIMIT 200
+      `;
+    } else {
+      sql = `SELECT * FROM crawler_items WHERE 1=1`;
+      if (targetId) {
+        sql += ` AND target_id = ?`;
+        params.push(targetId);
+      }
+      sql += ` ORDER BY fetched_at DESC LIMIT 200`;
+    }
+
+    const rows = await queryDatabase(sql, params);
+    return success(res, rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------- Item 중복 원클릭 자동 정리 -------------------
+// POST /admin/api/crawler/items/deduplicate
+router.post('/items/deduplicate', async (req, res, next) => {
+  try {
+    const targetId = req.body && req.body.target_id;
+    let sql = `
+      DELETE FROM crawler_items
+      WHERE id NOT IN (
+        SELECT MAX(id)
+        FROM crawler_items
+        GROUP BY COALESCE(NULLIF(external_id, ''), title)
+      )
+    `;
+    const params = [];
     if (targetId) {
       sql += ` AND target_id = ?`;
       params.push(targetId);
     }
-    sql += ` ORDER BY fetched_at DESC LIMIT 200`;
-    const rows = await queryDatabase(sql, params);
-    return success(res, rows);
+    const result = await execute(sql, params);
+    return success(res, '중복 크롤링 수집 데이터 정리가 완료되었습니다.', {
+      deletedCount: result.changes
+    });
   } catch (err) {
     next(err);
   }

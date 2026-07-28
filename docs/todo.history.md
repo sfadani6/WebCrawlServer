@@ -1,5 +1,17 @@
 # 작업 이력
 
+## 2026-07-27 수집 결과 자동 정리 및 중복 제거 필터 구현
+
+### 처리 요약
+- 크롤링 수집 항목 조회 시 고유 항목만 필터링하는 `dedupe=true` 지원 및 중복 데이터를 일괄 삭제 정리하는 `POST /admin/api/crawler/items/deduplicate` API를 구축하고 `CrawlerPage.jsx` UI에 필터 토글 및 정리 액션을 연동했습니다.
+
+### 완료 항목
+- `server/routes/crawler.js`: 중복 필터링 조회 및 원클릭 중복 정리 API 추가
+- `server/admin-ui/src/components/CrawlerPage.jsx`: 중복 필터 스위치 및 정리 버튼 UI 연동
+- `docs/askLogs/ask-20260727223100.md`: 작업 처리 이력 작성
+
+---
+
 ## 2026-07-27 수집 데이터 원클릭 Excel (.xlsx) 및 UTF-8 BOM CSV 내보내기 구현
 
 ### 처리 요약

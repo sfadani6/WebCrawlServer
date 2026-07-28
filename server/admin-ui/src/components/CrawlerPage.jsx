@@ -8,6 +8,7 @@ function CrawlerPage({ onNavigate }) {
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', url: '', kind: 'rss', interval_seconds: '' });
   const [selectedTargetId, setSelectedTargetId] = useState('');
+  const [dedupe, setDedupe] = useState(false);
 
   const loadTargets = async () => {
     try {
@@ -25,7 +26,11 @@ function CrawlerPage({ onNavigate }) {
   const loadItems = async () => {
     try {
       const targetId = selectedTargetId || undefined;
-      const data = await fetchJSON(`/admin/api/crawler/items${targetId ? `?target_id=${targetId}` : ''}`);
+      const query = [];
+      if (targetId) query.push(`target_id=${targetId}`);
+      if (dedupe) query.push(`dedupe=true`);
+      const queryString = query.length > 0 ? `?${query.join('&')}` : '';
+      const data = await fetchJSON(`/admin/api/crawler/items${queryString}`);
       setItems(data || []);
     } catch (e) {
       setError(e.message);
@@ -33,7 +38,22 @@ function CrawlerPage({ onNavigate }) {
   };
 
   useEffect(() => { loadTargets(); }, []);
-  useEffect(() => { if (selectedTargetId) loadItems(); }, [selectedTargetId]);
+  useEffect(() => { if (selectedTargetId) loadItems(); }, [selectedTargetId, dedupe]);
+
+  const handleDeduplicate = async () => {
+    if (!window.confirm('중복 수집된 항목을 정리하시겠습니까?\n동일한 제목 또는 ID의 이전 수집 기록이 삭제됩니다.')) return;
+    try {
+      const res = await fetchJSON('/admin/api/crawler/items/deduplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_id: selectedTargetId || null })
+      });
+      alert(res.message || '중복 데이터 정리가 완료되었습니다.');
+      loadItems();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
 
   const handleCreateTarget = async (e) => {
     e.preventDefault();
@@ -155,7 +175,27 @@ function CrawlerPage({ onNavigate }) {
 
       {selectedTargetId && (
         <div style={{ marginTop: '24px' }}>
-          <h2 style={{ fontSize: '16px', margin: '0 0 8px 0' }}>아이템 목록</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h2 style={{ fontSize: '16px', margin: 0 }}>아이템 목록</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--gcp-text-primary)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={dedupe}
+                  onChange={(e) => setDedupe(e.target.checked)}
+                />
+                중복 필터링 (고유 항목만 보기)
+              </label>
+              <button
+                type="button"
+                className="gcp-btn gcp-btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '12px' }}
+                onClick={handleDeduplicate}
+              >
+                🧹 원클릭 중복 데이터 정리
+              </button>
+            </div>
+          </div>
           <div style={{ border: '1px solid var(--gcp-border)', borderRadius: '6px', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>

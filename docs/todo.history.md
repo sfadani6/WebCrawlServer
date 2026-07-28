@@ -1,5 +1,16 @@
 # 작업 이력
 
+## 2026-07-27 브라우저 플러그인-서버-관리자 페이지 간 채팅쉘 통신 및 UI/UX ADR 문서 작성 (ADR-0003)
+
+### 처리 요약
+- 브라우저 플러그인, Express 백엔드 서버, 관리자 UI 간 대화형 채팅쉘(Chat Shell) 내부 기술적 통신 아키텍처(WebSocket 삼각 토폴로지, WS_TOKEN 인증 및 2단계 관리자 승인, MV3 킵얼라이브, 지수 백오프, 대용량 패킷 분할) 및 UI/UX 인터랙션 설계 결정(타겟 플러그인 셀렉터, 대화/터미널 레이아웃, 승인 대기 뱃지, 인라인 JSON 뷰어, 자동 스크롤 오버라이드)을 정리하여 `docs/decision/0003-chat-shell-communication-uiux.md`에 생성했습니다.
+
+### 완료 항목
+- `docs/decision/0003-chat-shell-communication-uiux.md`: ADR-0003 설계 결정 문서 생성
+- `docs/askLogs/ask-20260727214900.md`: 작업 이력 문서 작성
+
+---
+
 ## 2026-07-27 웹소켓 통신 가이드라인 규칙 신설 및 Rule Registry 연동 (R-016)
 
 ### 처리 요약

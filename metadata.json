@@ -1,0 +1,6 @@
+{
+  "name": "WebCrawlServer",
+  "description": "브라우저 플러그인, MCP 서버, 관리자 페이지 통합 자동화 플랫폼",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

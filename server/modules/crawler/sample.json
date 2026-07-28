@@ -1,0 +1,8 @@
+{
+  "name": "예제 RSS 피드",
+  "url": "https://example.com/feed.xml",
+  "kind": "rss",
+  "interval_seconds": 600,
+  "last_checked_at": "2026-01-01T00:00:00Z",
+  "last_result": "ok"
+}

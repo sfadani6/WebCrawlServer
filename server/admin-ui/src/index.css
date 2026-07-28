@@ -1,0 +1,141 @@
+/* Google Cloud Console 스타일 콤팩트 제어판 테마 */
+:root {
+  --gcp-bg-main: #18191c;
+  --gcp-bg-header: #202124;
+  --gcp-bg-sidebar: #1e1f23;
+  --gcp-bg-card: #242529;
+  --gcp-bg-hover: #2d2e33;
+  --gcp-border: #33353b;
+  --gcp-text-primary: #e8eaed;
+  --gcp-text-secondary: #9aa0a6;
+  --gcp-accent: #8ab4f8;
+  --gcp-accent-hover: #aecbfa;
+  --gcp-status-green: #81c995;
+  --gcp-status-yellow: #fdd663;
+  --gcp-status-red: #f28b82;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--gcp-text-primary);
+  background-color: var(--gcp-bg-main);
+  box-sizing: border-box;
+}
+
+[data-theme='light'] {
+  --gcp-bg-main: #f8f9fa;
+  --gcp-bg-header: #ffffff;
+  --gcp-bg-sidebar: #f1f3f4;
+  --gcp-bg-card: #ffffff;
+  --gcp-bg-hover: #e8eaed;
+  --gcp-border: #dadce0;
+  --gcp-text-primary: #202124;
+  --gcp-text-secondary: #5f6368;
+  --gcp-accent: #1a73e8;
+  --gcp-accent-hover: #1557b0;
+  --gcp-status-green: #188038;
+  --gcp-status-yellow: #f29900;
+  --gcp-status-red: #d93025;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 데이터 테그/테이블 공통 콤팩트 스타일 */
+.gcp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background-color: var(--gcp-bg-card);
+  border: 1px solid var(--gcp-border);
+}
+
+.gcp-table th {
+  background-color: var(--gcp-bg-header);
+  color: var(--gcp-text-secondary);
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--gcp-border);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.gcp-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--gcp-border);
+  color: var(--gcp-text-primary);
+}
+
+.gcp-table tr:hover {
+  background-color: var(--gcp-bg-hover);
+}
+
+/* 버튼 및 태그 */
+.gcp-btn {
+  background-color: var(--gcp-accent);
+  color: #18191c;
+  border: none;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.gcp-btn:hover {
+  background-color: var(--gcp-accent-hover);
+}
+
+.gcp-btn-secondary {
+  background-color: transparent;
+  color: var(--gcp-text-primary);
+  border: 1px solid var(--gcp-border);
+}
+
+.gcp-btn-secondary:hover {
+  background-color: var(--gcp-bg-hover);
+}
+
+.gcp-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.gcp-badge-active {
+  background-color: rgba(129, 201, 149, 0.2);
+  color: var(--gcp-status-green);
+  border: 1px solid rgba(129, 201, 149, 0.4);
+}
+
+.gcp-badge-warn {
+  background-color: rgba(253, 214, 99, 0.2);
+  color: var(--gcp-status-yellow);
+  border: 1px solid rgba(253, 214, 99, 0.4);
+}

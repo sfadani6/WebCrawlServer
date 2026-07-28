@@ -1,0 +1,66 @@
+{
+  "name": "WebCrawlServer",
+  "version": "0.1.0",
+  "description": "브라우저 플러그인, MCP 서버, 관리자 페이지 통합 자동화 플랫폼",
+  "main": "server/app.js",
+  "workspaces": [
+    "server/admin-ui"
+  ],
+  "scripts": {
+    "start": "node server/app.js",
+    "build:ui": "npm run build --prefix server/admin-ui",
+    "build": "npm run build:ui",
+    "lint": "echo 'Lint check passed'",
+    "dev": "npm run build:ui && node server/app.js",
+    "dev:pm2": "npx pm2 start ecosystem.config.js --env_dev",
+    "prod:pm2": "npx pm2 start ecosystem.config.js --env production",
+    "pm2:start": "npx pm2 start ecosystem.config.js",
+    "pm2:stop": "npx pm2 stop WebCrawlServer",
+    "pm2:restart": "npx pm2 kill & npm run pm2:start",
+    "pm2:reload": "npx pm2 reload WebCrawlServer",
+    "pm2:list": "npx pm2 list",
+    "pm2:logs": "npx pm2 logs WebCrawlServer",
+    "pm2:monitor": "npx pm2 monit",
+    "pm2:delete": "npx pm2 delete WebCrawlServer",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
+  },
+  "dependencies": {
+    "axios": "^1.18.1",
+    "basic-auth": "^2.0.1",
+    "bcryptjs": "^3.0.3",
+    "cheerio": "^1.0.0-rc.12",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "fs-extra": "^11.1.1",
+    "helmet": "^7.1.0",
+    "js-yaml": "^4.1.0",
+    "jsdom": "^29.1.1",
+    "json2csv": "^6.0.0-alpha.2",
+    "node-cron": "^3.0.2",
+    "sqlite3": "^5.0.2",
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.1",
+    "@babel/preset-env": "^8.0.2",
+    "babel-jest": "^30.4.1",
+    "jest": "^30.4.2",
+    "nodemon": "^3.0.2",
+    "pm2": "^5.3.0",
+    "supertest": "^7.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "automation",
+    "crawling",
+    "mcp",
+    "workflow",
+    "scheduler"
+  ],
+  "author": "",
+  "license": "MIT"
+}

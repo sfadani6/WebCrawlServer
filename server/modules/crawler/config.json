@@ -1,0 +1,7 @@
+{
+  "default_page_size": 20,
+  "request_timeout_seconds": 15,
+  "retry_count": 2,
+  "user_agent": "WebCrawlServer/0.1",
+  "respect_robots_txt": true
+}

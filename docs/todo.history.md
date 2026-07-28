@@ -1,5 +1,18 @@
 # 작업 이력
 
+## 2026-07-27 admin-ui 내 Recharts 기반 실시간 WebSocketConnections 컴포넌트 신설 및 연동
+
+### 처리 요약
+- 관리자 UI(`server/admin-ui`)에 Recharts 라이브러리(`LineChart`, `AreaChart`, `XAxis`, `YAxis`, `Tooltip`, `ResponsiveContainer`) 기반의 실시간 소켓 연결 및 메시지 처리 빈도(Inbound/Outbound Message Frequency) 모니터링 컴포넌트 `WebSocketConnections`를 구현하고 `ConnectionPage.jsx` 상단 탭으로 연동했습니다.
+
+### 완료 항목
+- `server/admin-ui/src/components/WebSocketConnections.jsx`: Recharts 기반 소켓 연결 및 메시지 빈도 모니터링 컴포넌트 신규 구현
+- `server/admin-ui/src/components/ConnectionPage.jsx`: 소켓 연결 시각화 탭("📈 소켓 연결 시각화") 추가 및 default 탭 지정
+- `server/admin-ui/package.json`: `recharts` 및 `lucide-react` 패키지 추가
+- `docs/askLogs/ask-20260727215300.md`: 작업 처리 이력 문서 작성
+
+---
+
 ## 2026-07-27 브라우저 플러그인-서버-관리자 페이지 채팅쉘 통신 및 UI/UX 개선 과제 todo.md 등록
 
 ### 처리 요약

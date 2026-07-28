@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchJSON } from '../api';
 import WebSocketDashboard from './WebSocketDashboard';
+import WebSocketConnections from './WebSocketConnections';
 
 function ConnectionPage({ onNavigate }) {
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' 또는 'list'
+  const [activeTab, setActiveTab] = useState('connections'); // 'connections', 'dashboard', 또는 'list'
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -153,6 +154,21 @@ function ConnectionPage({ onNavigate }) {
         gap: '8px'
       }}>
         <button
+          onClick={() => setActiveTab('connections')}
+          style={{
+            padding: '8px 16px',
+            fontSize: '13px',
+            fontWeight: 600,
+            border: 'none',
+            borderBottom: activeTab === 'connections' ? '2px solid var(--gcp-accent)' : '2px solid transparent',
+            backgroundColor: 'transparent',
+            color: activeTab === 'connections' ? 'var(--gcp-accent)' : 'var(--gcp-text-secondary)',
+            cursor: 'pointer'
+          }}
+        >
+          📈 소켓 연결 시각화 (WebSocketConnections)
+        </button>
+        <button
           onClick={() => setActiveTab('dashboard')}
           style={{
             padding: '8px 16px',
@@ -184,7 +200,9 @@ function ConnectionPage({ onNavigate }) {
         </button>
       </div>
 
-      {activeTab === 'dashboard' ? (
+      {activeTab === 'connections' ? (
+        <WebSocketConnections onNavigate={onNavigate} />
+      ) : activeTab === 'dashboard' ? (
         <WebSocketDashboard onNavigate={onNavigate} />
       ) : (
         <div style={{ padding: '20px 24px' }}>

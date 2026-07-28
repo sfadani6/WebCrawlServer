@@ -1,5 +1,16 @@
 # 작업 이력
 
+## 2026-07-27 GitHub 저장소 최신 커밋 및 푸시 완료
+
+### 처리 요약
+- Personal Access Token 인증을 통해 GitHub 원격 저장소(`https://github.com/sfadani6/WebCrawlServer.git`) `main` 브랜치로 최신 코드 및 규정 문서 일체를 푸시 완료했습니다.
+
+### 완료 항목
+- `git push -u origin main`: 원격 저장소 커밋 푸시 완료
+- `docs/askLogs/ask-20260727232000.md`: 작업 이력 생성
+
+---
+
 ## 2026-07-27 README.md 내 규칙 문서 참조 경로 오기 수정
 
 ### 처리 요약

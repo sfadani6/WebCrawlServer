@@ -45,7 +45,7 @@
 ### 💻 노트북 단일 사용자(Local Single-User) 맞춤 개선 과제
 
 #### 1. 로컬 개발 및 실행 환경 편의성 개선 (DX & Local Launch)
-- [ ] **로컬 자동 인증/무인증 개발 모드 옵션 추가**:
+- [x] **로컬 자동 인증/무인증 개발 모드 옵션 추가**:
   - `.env` 내 `LOCAL_SINGLE_USER_MODE=true` 설정 시, 개인 노트북 환경에서 매번 Basic Auth 로그인 창 없이 즉시 관리자 UI에 접근할 수 있도록 자동 바이패스/자동 토큰 주입 미들웨어 옵션 제공.
 - [ ] **단일 명령어 원스톱 로컬 구동 스크립트 구축**:
   - `package.json`에 로컬 전용 concurrent/dev 구동 스크립트 정리 (UI 빌드 생략 및 Vite dev server + Express backend 동시 시동).

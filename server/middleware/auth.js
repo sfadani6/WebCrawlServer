@@ -48,6 +48,16 @@ function getCredentialsCache() {
  */
 function basicAuthMiddleware(realm = 'Admin Area') {
   return async (req, res, next) => {
+    // 로컬 단일 사용자 무인증 개발 모드 (LOCAL_SINGLE_USER_MODE=true) 자동 바이패스
+    if (process.env.LOCAL_SINGLE_USER_MODE === 'true' || process.env.LOCAL_SINGLE_USER_MODE === '1') {
+      req.user = {
+        username: credentialsCache.username || 'admin',
+        authenticated: true,
+        roles: ['admin']
+      };
+      return next();
+    }
+
     const credentials = basicAuth(req);
 
     if (!credentials) {

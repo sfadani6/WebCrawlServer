@@ -1,5 +1,17 @@
 # 작업 이력
 
+## 2026-07-27 로컬 자동 인증/무인증 개발 모드 옵션(LOCAL_SINGLE_USER_MODE) 추가
+
+### 처리 요약
+- `.env` 내 `LOCAL_SINGLE_USER_MODE=true` 설정 시 매번 Basic Auth 로그인 창 없이 관리자 UI에 즉시 접근할 수 있도록 `server/middleware/auth.js` 미들웨어 바이패스 로직을 구현하였습니다.
+
+### 완료 항목
+- `server/middleware/auth.js`: `LOCAL_SINGLE_USER_MODE` 활성화 시 Basic Auth 무인증 바이패스 로직 추가
+- `.env.example`: `LOCAL_SINGLE_USER_MODE=false` 환경변수 항목 선언 추가
+- `docs/askLogs/ask-20260727222600.md`: 작업 처리 이력 문서 작성
+
+---
+
 ## 2026-07-27 admin-ui 실시간 CPU/Memory 성능 모니터링(SystemPerformance.jsx) 구현
 
 ### 처리 요약

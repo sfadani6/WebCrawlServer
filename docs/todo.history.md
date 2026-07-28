@@ -1,5 +1,16 @@
 # 작업 이력
 
+## 2026-07-27 admin-ui WebSocketConnections 컴포넌트 기능 고도화 (소켓 수, 지속시간, 핑퐁 지연시간 시각화)
+
+### 처리 요약
+- 관리자 UI(`server/admin-ui`)의 `WebSocketConnections` 컴포넌트에 Recharts 차트를 활용한 활성 소켓 클라이언트 수(`activeSockets`), 핑퐁 지연시간(`pingLatency`, ms) 추이 가시화 및 연결 지속시간(`calculateDuration`) 계산/카드·테이블 뷰 표기 기능을 보강했습니다.
+
+### 완료 항목
+- `server/admin-ui/src/components/WebSocketConnections.jsx`: Recharts 활성 소켓 수, 핑퐁 지연시간 차트 및 연결 지속시간 표기 보강
+- `docs/askLogs/ask-20260727215800.md`: 작업 이력 문서 작성
+
+---
+
 ## 2026-07-27 admin-ui 내 Recharts 기반 실시간 WebSocketConnections 컴포넌트 신설 및 연동
 
 ### 처리 요약

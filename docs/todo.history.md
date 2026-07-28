@@ -1,5 +1,16 @@
 # 작업 이력
 
+## 2026-07-27 수집 데이터 원클릭 Excel (.xlsx) 및 UTF-8 BOM CSV 내보내기 구현
+
+### 처리 요약
+- `SpreadsheetView.jsx`의 내보내기 핸들러를 개선하여 UTF-8 BOM(`\uFEFF`)이 포함된 Excel(`.xlsx`) 및 CSV 내보내기 버튼을 신설함으로써 엑셀 한글 깨짐 없이 데이터를 원클릭으로 추출할 수 있도록 보강했습니다.
+
+### 완료 항목
+- `server/admin-ui/src/components/SpreadsheetView.jsx`: Excel (.xlsx) 내보내기 및 UTF-8 BOM CSV 파일 다운로드 연동
+- `docs/askLogs/ask-20260727223000.md`: 작업 처리 이력 작성
+
+---
+
 ## 2026-07-27 로컬 SQLite DB 원클릭 스냅샷 백업 및 복원 도구 연동
 
 ### 처리 요약

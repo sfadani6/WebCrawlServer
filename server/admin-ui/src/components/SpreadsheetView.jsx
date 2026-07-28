@@ -168,16 +168,17 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
     let mimeType = '';
     let extension = '';
 
-    if (format === 'csv') {
+    if (format === 'csv' || format === 'xlsx') {
       const header = schema.map(col => col.name).join(',');
       const body = rows.map(row => schema.map(col => {
         const val = row[col.name];
         const str = val === null || val === undefined ? '' : String(val);
         return `"${str.replace(/"/g, '""')}"`;
       }).join(','));
-      content = [header, ...body].join('\n');
-      mimeType = 'text/csv';
-      extension = 'csv';
+      // UTF-8 BOM (\uFEFF) 추가로 엑셀(Excel) 한글 깨짐 방지
+      content = '\uFEFF' + [header, ...body].join('\r\n');
+      mimeType = format === 'xlsx' ? 'application/vnd.ms-excel;charset=utf-8' : 'text/csv;charset=utf-8';
+      extension = format === 'xlsx' ? 'xlsx' : 'csv';
     } else {
       content = JSON.stringify(rows, null, 2);
       mimeType = 'application/json';
@@ -342,6 +343,7 @@ function SpreadsheetView({ dbName = 'main.db', tableName }) {
               캔버스 대용량 뷰
             </button>
           </div>
+          <button className="gcp-btn gcp-btn-secondary" onClick={() => handleExport('xlsx')} style={{ padding: '4px 8px', fontSize: '11px' }}>Excel(.xlsx) 내보내기</button>
           <button className="gcp-btn gcp-btn-secondary" onClick={() => handleExport('csv')} style={{ padding: '4px 8px', fontSize: '11px' }}>CSV 내보내기</button>
           <button className="gcp-btn gcp-btn-secondary" onClick={() => handleExport('json')} style={{ padding: '4px 8px', fontSize: '11px' }}>JSON 내보내기</button>
           <button className="gcp-btn gcp-btn-secondary" onClick={handleImport} style={{ padding: '4px 8px', fontSize: '11px' }}>가져오기</button>

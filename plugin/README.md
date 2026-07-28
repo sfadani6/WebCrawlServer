@@ -37,14 +37,30 @@ plugin/
 └── README.md              # 본 파일
 ```
 
-## 설치 방법
+## 설치 방법 및 권한 설정 가이드
 
-### Chrome / Edge / Opera
+### Chrome / Edge / Opera 개발자 모드 설치
 
-1. 브라우저 주소창에 `chrome://extensions` 입력
-2. 우측 상단의 "개발자 모드" 활성화
-3. "압축 해제된 확장 프로그램 로드" 클릭
-4. `plugin/` 디렉토리 선택
+1. 브라우저 주소창에 확장 프로그램 관리 페이지 접속
+   - Chrome / Edge: `chrome://extensions`
+   - Opera: `opera://extensions`
+2. 우측 상단의 **"개발자 모드 (Developer mode)"** 토글 활성화
+3. **"압축 해제된 확장 프로그램 로드 (Load unpacked)"** 버튼 클릭
+4. 프로젝트의 `plugin/` 디렉토리 선택
+
+### 💡 Opera 및 크로미움 브라우저 모든 권한(All Permissions) 자동 부여 및 설정 가이드
+
+개발자 모드로 로드 시 `manifest.json` 설정에 따라 기본적으로 모든 도메인 권한이 승인되지만, 보안 정책상 완전 무제한 자동 실행을 위해서는 아래 설정을 확인해야 합니다.
+
+1. **Manifest V3 파일 설정 (`manifest.json`)**:
+   - `host_permissions`에 `"<all_urls>"`가 지정되어 있으므로 설치 시 모든 웹사이트 접근 권한을 기본으로 가지게 됩니다.
+   - `content_scripts`에 `matches: ["<all_urls>"]` 및 `all_frames: true`가 등록되어 모든 탭 및 프레임에서 스크립트가 자동 실행됩니다.
+
+2. **Opera / 크로미움 브라우저 상세 권한 토글 (필수 체크)**:
+   - `opera://extensions` (또는 `chrome://extensions`)에서 WebCrawlServer 플러그인의 **"세부정보 (Details)"** 클릭
+   - **사이트 접근 (Site access)**: `모든 사이트에서 (On all sites)`로 선택되어 있는지 확인 (기본값)
+   - **시크릿 모드에서 허용 (Allow in incognito)**: 켜기 (시크릿 창 자동화 지원 시 필수)
+   - **파일 URL에 대한 접근 허용 (Allow access to file URLs)**: 켜기 (로컬 HTML 파일 분석 시 필수)
 
 ### Firefox
 

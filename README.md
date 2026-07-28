@@ -125,6 +125,24 @@ npm run build:ui
 
 ---
 
+# 브라우저 플러그인 설치 & Opera/크로미움 권한 설정 가이드
+
+### 1. 개발자 모드 설치 방법 (Chrome / Opera / Edge)
+1. 브라우저 주소창에 확장 프로그램 설정 페이지 접속 (`opera://extensions` 또는 `chrome://extensions`)
+2. 우측 상단 **"개발자 모드 (Developer mode)"** 활성화
+3. **"압축 해제된 확장 프로그램 로드 (Load unpacked)"** 클릭 후 저장소의 `plugin/` 폴더 선택
+
+### 2. Opera / 크로미움 브라우저 모든 권한(All Permissions) 자동 부여 메커니즘 및 체크사항
+* **자동 권한 부여 메커니즘 (`manifest.json`)**:
+  * `host_permissions: ["<all_urls>"]` 설정이 적용되어 있어 개발자 모드로 로드 시 **모든 웹사이트에 대한 읽기/쓰기 권한이 자동으로 승인**됩니다.
+  * `content_scripts`에 `matches: ["<all_urls>"]` 및 `all_frames: true`가 지정되어 모든 탭과 프레임에서 백그라운드 자동화 스크립트가 기본 실행됩니다.
+* **추가 권한 토글 설정 (`opera://extensions` -> 세부정보 클릭)**:
+  * **사이트 접근**: `모든 사이트에서 (On all sites)` 선택 확인
+  * **시크릿 모드에서 허용 (Allow in incognito)**: 토글 ON (시크릿 창 웹 수집 시 필수)
+  * **파일 URL에 대한 접근 허용 (Allow access to file URLs)**: 토글 ON (로컬 파일분석 시 필수)
+
+---
+
 # 서버 실행 및 프로세스 관리
 
 ## 1. 서버 정보 및 접속 주소

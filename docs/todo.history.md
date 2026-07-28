@@ -1,5 +1,17 @@
 # 작업 이력
 
+## 2026-07-27 브라우저 플러그인 개발자 모드 오페라/크로미움 전체 권한 가이드 README 반영
+
+### 처리 요약
+- 크로미움 기반 브라우저(Opera, Chrome, Edge) 개발자 모드에서 `manifest.json` 설정(`host_permissions: ["<all_urls>"]`)을 통한 모든 웹사이트 권한 자동 승인 메커니즘과 세부 설정(`opera://extensions` 세부정보 - 시크릿 모드 허용, 파일 URL 접근 허용) 가이드를 정리하여 `README.md` 및 `plugin/README.md` 문서에 추가했습니다.
+
+### 완료 항목
+- `README.md`: 브라우저 플러그인 설치 및 Opera/크로미움 권한 가이드 세션 추가
+- `plugin/README.md`: 개발자 모드 설치 및 자동 권한 부여 상세 가이드 보강
+- `docs/askLogs/ask-20260727214100.md`: 작업 처리 이력 문서 작성
+
+---
+
 ## 2026-07-27 브라우저 플러그인 소스 코드 분석 및 오류/UIUX 개선 과제 todo.md 등록
 
 ### 처리 요약

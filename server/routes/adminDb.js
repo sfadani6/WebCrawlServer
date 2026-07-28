@@ -597,6 +597,65 @@ router.delete('/databases/:name', async (req, res, next) => {
   }
 });
 
+// ------------------- DB 원클릭 스냅샷 다운로드 (백업) -------------------
+// GET /admin/api/databases/:name/download
+router.get('/databases/:name/download', async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const cleanName = path.basename(name).trim();
+    const dbFileName = cleanName.endsWith('.db') ? cleanName : `${cleanName}.db`;
+    const dbDir = path.join(__dirname, '../../database');
+    const filePath = path.join(dbDir, dbFileName);
+
+    if (!await fs.pathExists(filePath)) {
+      return fail(res, '존재하지 않는 데이터베이스 파일입니다.', 404);
+    }
+
+    res.setHeader('Content-Type', 'application/x-sqlite3');
+    res.setHeader('Content-Disposition', `attachment; filename="${dbFileName}"`);
+    return res.sendFile(filePath);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------- DB 원클릭 스냅샷 업로드 (복원 및 신규 등록) -------------------
+// POST /admin/api/databases/upload?name=filename.db
+router.post('/databases/upload', express.raw({ type: '*/*', limit: '100mb' }), async (req, res, next) => {
+  try {
+    const dbName = req.query.name || `snapshot_${Date.now()}.db`;
+    const cleanName = path.basename(dbName).trim();
+    const dbFileName = cleanName.endsWith('.db') ? cleanName : `${cleanName}.db`;
+    const dbDir = path.join(__dirname, '../../database');
+    await fs.ensureDir(dbDir);
+    const filePath = path.join(dbDir, dbFileName);
+
+    if (!req.body || !Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return fail(res, '업로드할 DB 스냅샷 데이터(버퍼)가 비어있습니다.', 400);
+    }
+
+    // 파일 저장
+    await fs.writeFile(filePath, req.body);
+
+    // WAL 모드 설정 및 검증
+    const db = new sqlite3.Database(filePath, async (err) => {
+      if (err) return next(err);
+      db.run('PRAGMA journal_mode=WAL;');
+      db.close();
+
+      const stats = await fs.stat(filePath);
+      return success(res, '데이터베이스 스냅샷이 성공적으로 복원/업로드되었습니다.', {
+        name: dbFileName,
+        sizeBytes: stats.size,
+        sizeFormatted: `${(stats.size / 1024).toFixed(1)} KB`,
+        updatedAt: stats.mtime
+      });
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ------------------- 테이블 생성 (DDL) -------------------
 // POST /admin/api/tables
 router.post('/tables', express.json(), async (req, res, next) => {

@@ -75,6 +75,47 @@ function DatabaseOverviewPage({ selectedDb, selectedTable, onSelectDb, onSelectT
     }
   };
 
+  const handleDownloadDatabase = (dbName) => {
+    const url = `/admin/api/databases/${encodeURIComponent(dbName)}/download`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = dbName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleRestoreDatabase = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    if (!window.confirm(`'${file.name}' DB 스냅샷을 업로드하여 복원하시겠습니까?`)) {
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const res = await fetch(`/admin/api/databases/upload?name=${encodeURIComponent(file.name)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream'
+        },
+        body: buffer
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'DB 업로드 복원 실패');
+      }
+      alert(`'${file.name}' 데이터베이스가 성공적으로 복원/업로드되었습니다.`);
+      loadDatabases();
+    } catch (err) {
+      alert(err.message || '데이터베이스 복원 실패');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   // Case 1: 특정 데이터베이스가 선택된 경우 -> 해당 DB의 테이블 목록 및 스프레드시트 뷰 표시
   if (selectedDb) {
     return (
@@ -138,12 +179,18 @@ function DatabaseOverviewPage({ selectedDb, selectedTable, onSelectDb, onSelectT
         <div>
           <h1 style={{ fontSize: '18px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--gcp-text-primary)' }}>데이터베이스 요약 및 관리</h1>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--gcp-text-secondary)' }}>
-            서버에 등록된 SQLite 데이터베이스 목록과 요약 정보를 확인하고 신규 DB 생성 및 삭제를 수행합니다.
+            서버에 등록된 SQLite 데이터베이스 목록과 요약 정보를 확인하고 신규 DB 생성, 원클릭 스냅샷 백업/복원 및 삭제를 수행합니다.
           </p>
         </div>
-        <button className="gcp-btn" onClick={() => setShowCreateModal(true)}>
-          + 새 데이터베이스 생성
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <label className="gcp-btn gcp-btn-secondary" style={{ cursor: 'pointer', margin: 0, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            📥 DB 스냅샷 복원/업로드
+            <input type="file" accept=".db" onChange={handleRestoreDatabase} style={{ display: 'none' }} />
+          </label>
+          <button className="gcp-btn" onClick={() => setShowCreateModal(true)}>
+            + 새 데이터베이스 생성
+          </button>
+        </div>
       </div>
 
       {/* Database Table View */}
@@ -185,6 +232,14 @@ function DatabaseOverviewPage({ selectedDb, selectedTable, onSelectDb, onSelectT
                     <td><span className="gcp-badge gcp-badge-active">● ACTIVE</span></td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <button 
+                          className="gcp-btn gcp-btn-secondary" 
+                          style={{ padding: '3px 8px', fontSize: '11px' }}
+                          onClick={() => handleDownloadDatabase(db.name)}
+                          title="DB 파일 원클릭 스냅샷 다운로드 (백업)"
+                        >
+                          💾 백업
+                        </button>
                         <button 
                           className="gcp-btn" 
                           style={{ padding: '3px 8px', fontSize: '11px' }}

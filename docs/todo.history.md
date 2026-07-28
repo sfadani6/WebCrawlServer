@@ -1,5 +1,17 @@
 # 작업 이력
 
+## 2026-07-27 로컬 SQLite DB 원클릭 스냅샷 백업 및 복원 도구 연동
+
+### 처리 요약
+- SQLite DB 파일 다운로드(`GET /admin/api/databases/:name/download`) 및 파일 스냅샷 업로드 복원(`POST /admin/api/databases/upload`) API를 구현하고, `DatabaseOverviewPage.jsx` UI에 원클릭 백업/복원 버튼을 추가 연동하였습니다.
+
+### 완료 항목
+- `server/routes/adminDb.js`: DB 스냅샷 다운로드 및 복원 업로드 API 추가
+- `server/admin-ui/src/components/DatabaseOverviewPage.jsx`: 백업 다운로드/복원 업로드 핸들러 및 버튼 연동
+- `docs/askLogs/ask-20260727222900.md`: 작업 처리 이력 작성
+
+---
+
 ## 2026-07-27 단일 명령어 원스톱 로컬 구동 스크립트(dev:all) 구축 및 concurrently 보강
 
 ### 처리 요약

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchJSON, saveCredentials, getStoredCredentials } from '../api';
+import { requestNotificationPermission, sendDesktopNotification } from '../utils/notification';
 
 function SettingsPage() {
   const [configList, setConfigList] = useState([]);
@@ -441,6 +442,72 @@ function SettingsPage() {
             </span>
           </div>
         </form>
+      </div>
+
+      {/* ======================================================== */}
+      {/* 시스템 데스크톱 알림 설정 카드 */}
+      {/* ======================================================== */}
+      <div style={{
+        backgroundColor: 'var(--gcp-bg-card)',
+        border: '1px solid var(--gcp-border)',
+        borderRadius: '6px',
+        marginBottom: '24px',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: 'var(--gcp-bg-header)',
+          borderBottom: '1px solid var(--gcp-border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
+        }}>
+          <span style={{ fontSize: '16px' }}>🔔</span>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--gcp-text-primary)' }}>
+              로컬 OS 데스크톱 알림 연동
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', marginTop: '1px' }}>
+              크롤링 및 워크플로우 백그라운드 실행 완료/오류 발생 시 브라우저 Web Notification을 전송합니다.
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <span style={{ fontSize: '12px', color: 'var(--gcp-text-secondary)', marginRight: '8px' }}>현재 브라우저 알림 권한 상태:</span>
+            <span className="gcp-badge gcp-badge-active" style={{ fontSize: '12px' }}>
+              {('Notification' in window) ? Notification.permission.toUpperCase() : 'NOT SUPPORTED'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="gcp-btn gcp-btn-secondary"
+              onClick={async () => {
+                const p = await requestNotificationPermission();
+                showToast(`알림 권한 상태: ${p}`, p === 'granted' ? 'success' : 'error');
+              }}
+            >
+              알림 권한 요청
+            </button>
+            <button
+              type="button"
+              className="gcp-btn"
+              onClick={() => {
+                const n = sendDesktopNotification('🧪 테스트 데스크톱 알림', {
+                  body: 'WebCrawlServer 알림 연동이 성공적으로 동작합니다.'
+                });
+                if (!n) {
+                  showToast('알림 권한이 허용되지 않았거나 지원되지 않는 브라우저입니다.', 'error');
+                } else {
+                  showToast('테스트 알림을 발송했습니다.', 'success');
+                }
+              }}
+            >
+              🔔 테스트 알림 전송
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Header section */}

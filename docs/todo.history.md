@@ -1,5 +1,18 @@
 # 작업 이력
 
+## 2026-07-27 백그라운드 작업 완료 및 오류 시 로컬 데스크톱 Web Notification 연동
+
+### 처리 요약
+- `server/admin-ui/src/utils/notification.js` 알림 헬퍼를 작성하고, `App.jsx`에서 WebSocket 실시간 이벤트(`workflow_completed`, `crawl_completed` 등) 수신 시 데스크톱 알림을 발송하도록 연동했습니다. 또한 `SettingsPage.jsx`에 알림 권한 확인 및 테스트 발송 카드를 구축했습니다.
+
+### 완료 항목
+- `server/admin-ui/src/utils/notification.js`: Web Notification 헬퍼 생성
+- `server/admin-ui/src/App.jsx`: WebSocket 실시간 작업 결과 알림 통합
+- `server/admin-ui/src/components/SettingsPage.jsx`: 알림 설정 및 테스트 카드 추가
+- `docs/askLogs/ask-20260727223400.md`: 작업 처리 이력 작성
+
+---
+
 ## 2026-07-27 노트북 리소스 최적화 & 로컬 DB VACUUM 용량 정리 연동
 
 ### 처리 요약

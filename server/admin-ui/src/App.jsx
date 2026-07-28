@@ -13,6 +13,7 @@ import VisualWorkflowEditor from './components/VisualWorkflowEditor';
 import PluginRemoteTerminal from './components/PluginRemoteTerminal';
 import PluginsPage from './components/PluginsPage';
 import ConnectionPage from './components/ConnectionPage';
+import { requestNotificationPermission, sendDesktopNotification } from './utils/notification';
 import './App.css';
 
 function App() {
@@ -54,6 +55,36 @@ function App() {
       sessionStorage.setItem('selectedTable', selectedTable);
     }
   }, [selectedTable]);
+
+  useEffect(() => {
+    requestNotificationPermission();
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    let ws = null;
+
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          if (msg.action === 'workflow_completed' || msg.action === 'crawl_completed') {
+            sendDesktopNotification('✅ 백그라운드 작업 완료', {
+              body: msg.message || `${msg.action} 백그라운드 작업이 성공적으로 완료되었습니다.`
+            });
+          } else if (msg.action === 'workflow_error' || msg.action === 'crawl_error') {
+            sendDesktopNotification('🚨 백그라운드 작업 오류', {
+              body: msg.message || `${msg.action} 실행 도중 오류가 발생했습니다.`
+            });
+          }
+        } catch (_) {}
+      };
+    } catch (_) {}
+
+    return () => {
+      if (ws) ws.close();
+    };
+  }, []);
 
   const handleNavigate = (path) => {
     window.history.pushState({}, '', path);

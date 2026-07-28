@@ -130,6 +130,46 @@
 
 ---
 
+### 🔌 브라우저 플러그인 (plugin/) 소스 코드 분석, 오류 대응 & UI/UX 고도화 과제
+
+#### 1. Manifest V3 Service Worker 수명주기 & 연결 신뢰성 (Service Worker & Connection Health)
+- [ ] **Chrome Service Worker 휴면(Idle Shutdown) 대응 킵얼라이브(Keep-alive) 알람 적용**:
+  - Service Worker가 30초 후 비활성화될 때 `STATE.ws` 인스턴스 유실 및 `setInterval` 타이머 정지 문제 해결을 위해 `chrome.alarms` 기반 킵얼라이브 구축.
+- [ ] **지수 백오프 재연결 및 서버 접속 거부 서킷 브레이커(Circuit Breaker)**:
+  - 서버 승인 거부, 토큰 불일치 또는 네트워크 단절 발생 시 무한 접속 요청을 방지하는 최대 재시도 횟수 제한 및 지수 백오프(Exponential Backoff) 구현.
+- [ ] **Service Worker 재시동 시 오프라인 메시지 큐(Message Queue) 보관 및 재전송**:
+  - WebSocket 비연결 상태에서 백그라운드 이벤트 발생 시 패킷 유실을 방지하기 위해 `chrome.storage.local` 기반 오프라인 큐 보관 및 재연결 즉시 순차 재전송.
+
+#### 2. 콘텐츠 스크립트(contentScript.js) DOM 스크래핑 & 스크립트 실행 오류 개선 (Content Script Robustness)
+- [ ] **동적 DOM 요소 및 iFrame/Shadow DOM 타임아웃 예외 처리 강화**:
+  - `waitForElement` 스텝 실행 시 Element 존재 여부 감지 타임아웃 예외 핸들링을 강화하고, 접근 불가능한 Cross-origin iFrame 접근 실패 시 명확한 MCP 에러 구조체 반환.
+- [ ] **SPA 페이지 이동 감지 및 Content Script 중복 주입 충돌 방지**:
+  - `History API`(`pushState`/`replaceState`) 및 `webNavigation` 이벤트를 모니터링하여 단일 페이지 앱 이동 시 자동 스크래핑 컨텍스트 재설정 및 주입 충돌 차단.
+
+#### 3. 플러그인 팝업 UI (popup/popup.html, popup.js) UI/UX 고도화 (Popup UI/UX)
+- [ ] **접속 상태 실시간 인디케이터 및 승인 대기(Awaiting Approval) 뱃지 보강**:
+  - 미승인 접속 요청 상태(`requestId`)인 경우, 팝업 상단에 노란색 경고 뱃지, 요청 ID 및 "관리자 승인 대기 중" 직관적 레이아웃 표시.
+- [ ] **최근 수신/발신 MCP 패킷 실시간 로그 뷰어 & 원클릭 복사 기능**:
+  - 팝업 내 최신 20개 MCP 패킷 인라인 JSON 포맷터 뷰어 추가, 자동 하단 스크롤 토글 및 패킷 내용 단일 클릭 복사 버튼 제공.
+- [ ] **서버 URL 및 토큰 인라인 조작 숏컷 버튼**:
+  - 옵션 페이지로 이동하지 않고도 팝업 화면에서 현 설정 서버 URL을 즉시 확인하고 재연결을 시도할 수 있는 액션 바 추가.
+
+#### 4. 옵션 페이지 (options/options.html, options.js) UI/UX 개선 (Options UI/UX)
+- [ ] **WebSocket 서버 URL 유효성 검증 및 핑(Ping / Test Connection) 테스트 버튼**:
+  - `ws://` 또는 `wss://` 스킴 입력 유효성 실시간 라이브 검증 및 "서버 연결 테스트" 버튼으로 소켓 도달 가능 여부 사전 확인.
+- [ ] **저장된 토큰 마스킹 처리 및 보안 토큰 초기화 모달**:
+  - 개인정보/인증 토큰 노출 방지를 위한 토큰 마스킹(`••••••••`) 및 토큰 재발행/초기화 모달 인터랙션 적용.
+- [ ] **관리자 페이지 UI/UX 디자인 시스템(Tailwind 기반)과 테마 일치화**:
+  - 플러그인 팝업 및 옵션 페이지의 폰트, 다크/라이트 테마 색상 및 버튼 스타일을 Admin UI 디자인 가이드에 맞추어 시각적 통일성 확보.
+
+#### 5. 다중 탭 제어 & 대용량 패킷 분할 전송 (Multi-tab & Large Payload Handling)
+- [ ] **닫힌 탭 가비지 컬렉션(Tab Closed Garbage Collection)**:
+  - 브라우저 탭 닫힘 이벤트(`chrome.tabs.onRemoved`) 감지 시 `STATE.activeScripts` 및 `tabStates` 메모리에서 즉시 누수 자원 제거.
+- [ ] **대용량 수집 데이터 패킷 분할(Chunking) 전송 처리**:
+  - 대용량 이미지 Base64 또는 1만 줄 이상의 HTML 스크래핑 데이터 전송 시 메세지 크기 제한으로 인한 소켓 드롭 방지를 위한 패킷 분할 및 백엔드 재조합 로직 보강.
+
+---
+
 ### 🛠️ 소스 코드 분석 기반 리팩토링 & 고도화 과제 (Codebase Refactoring & Enhancement Tasks)
 
 #### 1. 백엔드 코어 & 서버 아키텍처 개선 (Backend Core Architecture)

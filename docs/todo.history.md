@@ -1,5 +1,16 @@
 # 작업 이력
 
+## 2026-07-27 브라우저 플러그인 소스 코드 분석 및 오류/UIUX 개선 과제 todo.md 등록
+
+### 처리 요약
+- `plugin/` 브라우저 플러그인 전체 소스 코드(Manifest V3, Service Worker, Content Script, Popup UI, Options UI)를 검토하고 백그라운드 휴면 대응 킵얼라이브, 지수 백오프 서킷 브레이커, 오프라인 메시지 큐, 동적 DOM 타임아웃, 팝업 MCP 패킷 로그 뷰어, 옵션 Ping 테스트 및 다중 탭 가비지 컬렉션 등 5대 개선 과제를 도출하여 `docs/todo.md` 문서에 반영했습니다.
+
+### 완료 항목
+- `docs/todo.md`: 브라우저 플러그인(plugin/) 소스 코드 분석, 오류 대응 & UI/UX 고도화 과제 11개 세부 항목 추가
+- `docs/askLogs/ask-20260727213700.md`: 정밀 검토 내역 및 작업 이력 작성
+
+---
+
 ## 2026-07-27 todo.md 완료 항목 docs/CHANGELOG 백업 및 정리
 
 ### 처리 요약

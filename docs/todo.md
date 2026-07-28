@@ -47,7 +47,7 @@
 #### 1. 로컬 개발 및 실행 환경 편의성 개선 (DX & Local Launch)
 - [x] **로컬 자동 인증/무인증 개발 모드 옵션 추가**:
   - `.env` 내 `LOCAL_SINGLE_USER_MODE=true` 설정 시, 개인 노트북 환경에서 매번 Basic Auth 로그인 창 없이 즉시 관리자 UI에 접근할 수 있도록 자동 바이패스/자동 토큰 주입 미들웨어 옵션 제공.
-- [ ] **단일 명령어 원스톱 로컬 구동 스크립트 구축**:
+- [x] **단일 명령어 원스톱 로컬 구동 스크립트 구축**:
   - `package.json`에 로컬 전용 concurrent/dev 구동 스크립트 정리 (UI 빌드 생략 및 Vite dev server + Express backend 동시 시동).
 - [ ] **로컬 SQLite DB 원클릭 스냅샷 백업 및 복원 도구**:
   - 개인 작업용 DB 데이터 손실 방지를 위한 관리자 UI 상의 단일 클릭 DB 백업/스냅샷 다운로드 및 복원 기능 보강 (`DatabaseOverviewPage.jsx` 연동).

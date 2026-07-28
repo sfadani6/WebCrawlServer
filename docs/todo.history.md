@@ -1,5 +1,16 @@
 # 작업 이력
 
+## 2026-07-27 단일 명령어 원스톱 로컬 구동 스크립트(dev:all) 구축 및 concurrently 보강
+
+### 처리 요약
+- `package.json`에 `concurrently`를 로컬 개발 의존성으로 추가하고, Vite 프론트엔드 dev server와 Express 백엔드 서버를 단일 명령어(`npm run dev:all`)로 동시에 실행할 수 있는 원스톱 구동 스크립트를 구축했습니다.
+
+### 완료 항목
+- `package.json`: `dev:all`, `dev:server`, `dev:ui`, `dev:fast` 스크립트 구축 및 `concurrently` 추가
+- `docs/askLogs/ask-20260727222730.md`: 작업 처리 이력 작성
+
+---
+
 ## 2026-07-27 로컬 자동 인증/무인증 개발 모드 옵션(LOCAL_SINGLE_USER_MODE) 추가
 
 ### 처리 요약

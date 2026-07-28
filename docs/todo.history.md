@@ -1,5 +1,99 @@
 # 작업 이력
 
+## 2026-07-28 WebSocket 패킷 필터링 및 하이라이팅 기능 구현
+
+### 처리 요약
+- `WebSocketDashboard.jsx`에 불필요한 노이즈를 줄이기 위한 'Heartbeat 숨김' 토글 기능을 추가했습니다.
+- 현재 로그 스트림에 존재하는 패킷 타입을 자동으로 추출하여 필터링할 수 있는 '타입 필터 칩' UI를 구현했습니다.
+- 검색어 입력 시 테이블 내 텍스트를 시각적으로 강조(Marking)하고, JSON 형식의 페이로드는 키(Key)와 값(Value)을 색상으로 구분하여 표시하는 인라인 하이라이팅 로직을 적용했습니다.
+
+### 완료 항목
+- `server/admin-ui/src/components/WebSocketDashboard.jsx`: 필터링 로직 강화 및 텍스트 하이라이팅 적용
+- `docs/todo.md`: UI/UX 고도화 과제 2-2 항목 완료 체크
+- `docs/CHANGELOG.md`: 0.1.14 버전 업데이트
+
+---
+## 2026-07-28 WebSocketDashboard 스트림 일시정지(Freeze) 기능 고도화
+
+### 처리 요약
+- `WebSocketDashboard.jsx`의 `isLive` 상태 제어 로직을 "Freeze/Pause" 개념으로 명확화했습니다.
+- 스트림 일시정지 시 로그 테이블 상단에 "FROZEN (점검 중)" 배지를 추가하고 테이블 투명도를 조절하여 사용자가 현재 패킷이 정지된 상태임을 쉽게 인지하도록 UX를 개선했습니다.
+- 제어 버튼의 라벨과 스타일을 변경하여 고속 패킷 유입 시 정밀 점검을 위한 의도를 명확히 했습니다.
+
+### 완료 항목
+- `server/admin-ui/src/components/WebSocketDashboard.jsx`: Freeze 버튼 UI 및 상태 인디케이터 구현
+- `docs/todo.md`: UI/UX 고도화 과제 2-1 항목 완료 체크
+- `docs/CHANGELOG.md`: 0.1.13 버전 업데이트
+
+---
+## 2026-07-28 시스템 테마 스위처 및 고대비 모드 구현
+
+### 처리 요약
+- `Layout.jsx`에 다크/라이트 테마와 고대비 모드를 독립적으로 제어할 수 있는 기능을 추가했습니다.
+- `localStorage`를 사용하여 사용자의 테마 및 고대비 설정 상태를 유지하도록 했습니다.
+- HTML 문서의 `data-theme` 속성을 `dark`, `light`, `dark-high-contrast`, `light-high-contrast` 중 하나로 설정하여 CSS에서 해당 테마를 적용할 수 있도록 기반을 마련했습니다.
+- 헤더에 고대비 모드를 토글할 수 있는 버튼을 추가했습니다.
+
+### 완료 항목
+- `server/admin-ui/src/components/Layout.jsx`: 테마 및 고대비 모드 상태 관리, 토글 기능, UI 버튼 추가
+- `docs/todo.md`: UI/UX 고도화 과제 1-4 항목 완료 체크
+- `docs/CHANGELOG.md`: 0.1.12 버전 업데이트
+
+---
+## 2026-07-28 글로벌 검색 및 핫키 모달(Command Palette) 구현
+
+### 처리 요약
+- `Layout.jsx` 최상위에 `Ctrl + K` 및 `/` 핫키로 호출 가능한 글로벌 검색 모달(Command Palette)을 구현했습니다.
+- 헤더의 검색창을 클릭하거나 핫키를 누르면 화면 중앙에 오버레이가 나타나며, 메뉴 항목을 실시간으로 필터링하여 빠르게 이동할 수 있는 기능을 제공합니다.
+- GCP 스타일의 디자인 시스템을 적용하여 다크 테마와의 일관성을 유지하고, 키보드 단축키 힌트를 추가하여 UX를 개선했습니다.
+
+### 완료 항목
+- `server/admin-ui/src/components/Layout.jsx`: 검색 모달 로직 및 UI 구현, 핫키 리스너 추가
+- `docs/todo.md`: UI/UX 고도화 과제 1-3 항목 완료 체크
+- `docs/CHANGELOG.md`: 0.1.11 버전 업데이트
+
+---
+## 2026-07-28 OverviewPage 실시간 자동 새로고침 기능 구현
+
+### 처리 요약
+- `OverviewPage.jsx`에 10초 주기 자동 새로고침 로직을 `useCallback`과 `setInterval`을 통해 구현했습니다.
+- 헤더 영역에 자동 새로고침을 제어할 수 있는 토글 버튼과 다음 갱신까지 남은 시간을 표시하는 실시간 카운트다운 타이머 UI를 추가했습니다.
+- KPI 카드에 활성 소켓, 크롤러, 워크플로우 등의 동적 통계 메트릭을 연동하여 데이터 밀도를 높였습니다.
+
+### 완료 항목
+- `server/admin-ui/src/components/OverviewPage.jsx`: 자동 새로고침 로직 및 제어 UI 구현
+- `docs/todo.md`: UI/UX 고도화 과제 1-2 항목 완료 체크
+- `docs/CHANGELOG.md`: 0.1.10 버전 업데이트
+
+---
+## 2026-07-28 관리자 화면 UI/UX 고도화 1단계 및 /modules 라우팅 수정
+
+### 처리 요약
+- `docs/verification_report.md` 개선 계획에 따라 `server/app.js`에서 `/modules` 경로가 404 JSON 대신 React SPA를 반환하도록 라우팅을 확립했습니다.
+- `docs/todo.md`의 "반응형 대시보드 및 모바일/패드 사이드바 Drawer 개선" 항목을 해결 완료 처리했습니다.
+
+### 완료 항목
+- `server/app.js`: `/modules` SPA 라우팅 통합 보강
+- `docs/todo.md`: UI/UX 고도화 과제 1-1 항목 완료 체크
+- `docs/CHANGELOG.md`: 0.1.9 버전 업데이트
+- `docs/askLogs/ask-20260728xxxxxx.md`: 작업 처리 이력 작성 (본 문서)
+
+---
+## 2026-07-28 docs/todo.md 노트북 단일 사용자 맞춤 개선 과제 섹션 정리
+
+### 처리 요약
+- `docs/todo.md` 파일 내 "진행 중인 항목" 섹션에 있던 "💻 노트북 단일 사용자(Local Single-User) 맞춤 개선 과제"의 모든 완료된 항목들을 "완료된 항목" 섹션으로 이동하여 문서의 정확성과 가독성을 개선했습니다. 이 항목들은 이미 이전 작업 이력에서 완료된 것으로 확인되었습니다.
+
+### 완료 항목
+- `docs/todo.md`: "💻 노트북 단일 사용자(Local Single-User) 맞춤 개선 과제" 섹션 이동 및 정리
+- `docs/CHANGELOG.md`: 변경 이력 추가
+- `docs/askLogs/ask-20260728xxxxxx.md`: 작업 처리 이력 작성 (본 문서)
+
+### 변경 파일
+- `docs/todo.md`: 섹션 이동 및 정리
+- `docs/CHANGELOG.md`: 변경 이력 추가
+
+---
 ## 2026-07-27 백그라운드 작업 완료 및 오류 시 로컬 데스크톱 Web Notification 연동
 
 ### 처리 요약

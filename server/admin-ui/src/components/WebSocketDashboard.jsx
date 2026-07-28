@@ -8,6 +8,8 @@ function WebSocketDashboard({ onNavigate }) {
   const [trafficHistory, setTrafficHistory] = useState([]);
   const [isLive, setIsLive] = useState(true);
   const [filterDirection, setFilterDirection] = useState('ALL'); // ALL, IN, OUT
+  const [excludeHeartbeat, setExcludeHeartbeat] = useState(true);
+  const [selectedType, setSelectedType] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFlow, setSelectedFlow] = useState(null);
   const [wsStatus, setWsStatus] = useState('connecting'); // connected, connecting, disconnected
@@ -143,16 +145,50 @@ function WebSocketDashboard({ onNavigate }) {
 
   // 필터링된 메시지 목록
   const filteredFlows = messageFlows.filter(flow => {
+    if (excludeHeartbeat && flow.type === 'heartbeat') return false;
+    if (selectedType !== 'ALL' && flow.type !== selectedType) return false;
     if (filterDirection !== 'ALL' && flow.direction !== filterDirection) return false;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      const matchSummary = (flow.summary || '').toLowerCase().includes(term);
+      const summaryStr = typeof flow.summary === 'string' ? flow.summary : JSON.stringify(flow.summary);
+      const matchSummary = (summaryStr || '').toLowerCase().includes(term);
       const matchType = (flow.type || '').toLowerCase().includes(term);
       const matchConn = (flow.connectionId || '').toLowerCase().includes(term);
       return matchSummary || matchType || matchConn;
     }
     return true;
   });
+
+  // 동적 타입 목록 추출 (heartbeat 제외)
+  const uniqueTypes = [...new Set(messageFlows.map(f => f.type))].filter(t => t && t !== 'heartbeat');
+
+  // 텍스트 하이라이팅 헬퍼
+  const highlightText = (text, highlight) => {
+    if (!highlight || !highlight.trim()) return text;
+    const parts = String(text).split(new RegExp(`(${highlight})`, 'gi'));
+    return (
+      <>
+        {parts.map((part, i) => 
+          part.toLowerCase() === highlight.toLowerCase() 
+            ? <mark key={i} style={{ backgroundColor: 'var(--gcp-status-yellow)', color: '#121212', padding: '0 2px', borderRadius: '2px' }}>{part}</mark> 
+            : part
+        )}
+      </>
+    );
+  };
+
+  // JSON 인라인 하이라이팅 헬퍼
+  const renderSummary = (summary) => {
+    const text = typeof summary === 'string' ? summary : JSON.stringify(summary);
+    if (!text) return '-';
+    if (text.startsWith('{') || text.startsWith('[')) {
+      return text.split(/(".*?"\s*:)/).map((part, i) => {
+        const isKey = part.match(/"(.*?)":/);
+        return <span key={i} style={{ color: isKey ? 'var(--gcp-accent)' : 'var(--gcp-status-green)' }}>{highlightText(part, searchTerm)}</span>;
+      });
+    }
+    return highlightText(text, searchTerm);
+  };
 
   // 최대 바이트 계산 (차트 상대 배율용)
   const maxTrafficVal = Math.max(...trafficHistory.map(t => Math.max(t.in, t.out, 1)), 10);
@@ -197,11 +233,11 @@ function WebSocketDashboard({ onNavigate }) {
             className="gcp-btn gcp-btn-secondary"
             onClick={() => setIsLive(!isLive)}
             style={{
-              borderColor: isLive ? 'var(--gcp-accent)' : 'var(--gcp-border)',
-              color: isLive ? 'var(--gcp-accent)' : 'var(--gcp-text-primary)'
+              borderColor: !isLive ? 'var(--gcp-status-yellow)' : 'var(--gcp-border)',
+              color: !isLive ? 'var(--gcp-status-yellow)' : 'var(--gcp-text-primary)'
             }}
           >
-            {isLive ? '⏸️ 모니터링 일시정지' : '▶️ 실시간 재개'}
+            {isLive ? '⏸️ 스트림 일시정지 (Freeze)' : '▶️ 실시간 스트림 재개'}
           </button>
           <button
             className="gcp-btn gcp-btn-secondary"
@@ -422,12 +458,25 @@ function WebSocketDashboard({ onNavigate }) {
             <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--gcp-text-primary)' }}>
               🌊 실시간 메시지 이벤트 스트림 (Message Stream)
             </span>
-            <span className="gcp-badge gcp-badge-active">
-              총 {filteredFlows.length}건
-            </span>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <span className="gcp-badge gcp-badge-active">총 {filteredFlows.length}건</span>
+              {!isLive && (
+                <span className="gcp-badge gcp-badge-warn" style={{ animation: 'pulse 2s infinite' }}>⏸️ FROZEN (점검 중)</span>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Heartbeat 토글 */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer', color: 'var(--gcp-text-secondary)' }}>
+              <input 
+                type="checkbox" 
+                checked={excludeHeartbeat} 
+                onChange={e => setExcludeHeartbeat(e.target.checked)} 
+              />
+              Heartbeat 숨김
+            </label>
+
             {/* 방향 필터 */}
             <div style={{ display: 'flex', border: '1px solid var(--gcp-border)', borderRadius: '4px', overflow: 'hidden' }}>
               {['ALL', 'IN', 'OUT'].map(dir => (
@@ -476,8 +525,30 @@ function WebSocketDashboard({ onNavigate }) {
           </div>
         </div>
 
+        {/* 타입 필터 칩 */}
+        <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--gcp-border)', display: 'flex', gap: '8px', flexWrap: 'wrap', backgroundColor: 'var(--gcp-bg-main)' }}>
+          <span style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', alignSelf: 'center', marginRight: '4px' }}>타입 필터:</span>
+          <button 
+            onClick={() => setSelectedType('ALL')}
+            style={{
+              padding: '2px 8px', borderRadius: '12px', fontSize: '10px', border: '1px solid var(--gcp-border)',
+              backgroundColor: selectedType === 'ALL' ? 'var(--gcp-accent)' : 'transparent',
+              color: selectedType === 'ALL' ? '#121212' : 'var(--gcp-text-secondary)',
+              cursor: 'pointer'
+            }}
+          >전체</button>
+          {uniqueTypes.map(type => (
+            <button key={type} onClick={() => setSelectedType(selectedType === type ? 'ALL' : type)} style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', border: '1px solid var(--gcp-border)', backgroundColor: selectedType === type ? 'var(--gcp-accent)' : 'transparent', color: selectedType === type ? '#121212' : 'var(--gcp-text-secondary)', cursor: 'pointer' }}>{type}</button>
+          ))}
+        </div>
+
         {/* 메시지 피드 테이블 */}
-        <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
+        <div style={{ 
+          maxHeight: '380px', 
+          overflowY: 'auto',
+          opacity: isLive ? 1 : 0.85,
+          transition: 'opacity 0.2s'
+        }}>
           <table className="gcp-table" style={{ border: 'none' }}>
             <thead>
               <tr>
@@ -522,10 +593,10 @@ function WebSocketDashboard({ onNavigate }) {
                       </span>
                     </td>
                     <td style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '11.5px', color: 'var(--gcp-text-primary)' }}>
-                      {flow.type || 'message'}
+                      {highlightText(flow.type || 'message', searchTerm)}
                     </td>
                     <td style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--gcp-accent)' }}>
-                      {flow.connectionId || 'system'}
+                      {highlightText(flow.connectionId || 'system', searchTerm)}
                     </td>
                     <td style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--gcp-text-secondary)' }}>
                       {flow.clientIp || '127.0.0.1'}
@@ -534,7 +605,7 @@ function WebSocketDashboard({ onNavigate }) {
                       {flow.size || 0} B
                     </td>
                     <td style={{ fontFamily: 'monospace', fontSize: '11.5px', color: 'var(--gcp-text-primary)', maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {typeof flow.summary === 'string' ? flow.summary : JSON.stringify(flow.summary)}
+                      {renderSummary(flow.summary)}
                     </td>
                     <td style={{ textAlign: 'right', fontSize: '11px', color: 'var(--gcp-text-secondary)' }}>
                       {new Date(flow.timestamp).toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}

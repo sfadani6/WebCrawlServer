@@ -249,10 +249,11 @@ app.use('/admin/api', adminApiLimiter, basicAuth(), adminDbRouter);
 app.use('/admin/api/crawler', crawlerRouter);
 app.use('/api/nlp', nlpLimiter, require('./routes/nlp'));
 
-// === 통합 콘솔 SPA 라우터 마운트 (server/routes/adminUi.js) ===
+// === 통합 콘솔 SPA 라우터 마운트 (React admin-ui 서빙) ===
+// R-003 (structure.md): 모든 관리자 웹 라우트를 adminUiRouter로 통합 서빙
 const adminUiRouter = require('./routes/adminUi');
 app.use('/database', adminUiRouter);
-app.use('/modules', adminUiRouter);
+app.use('/modules', adminUiRouter);   // verification_report.md에 따른 404 에러 수정
 app.use('/workflows', adminUiRouter);
 app.use('/scheduler', adminUiRouter);
 app.use('/logs', adminUiRouter);

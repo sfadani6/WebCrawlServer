@@ -8,6 +8,7 @@
 
 ## 최신 버전
 
+
 | 버전 | 날짜 | 제목 | 작성자 |
 |------|------|------|--------|
 | 0.1.7 | 2026-07-27 | 실시간 WebSocket 메시지 흐름 대시보드 추가 | AI Studio |
@@ -16,6 +17,65 @@
 | 0.1.4 | 2026-07-26 | P0-P3 일괄 처리 (8/27건) | Cline |
 | 0.1.3 | 2026-07-26 | 워크플로우 엔진 및 미구현 기능 6종 구현 | Cline |
 | 0.1.2 | 2026-07-26 | 페이지 구조 개선 및 드롭다운 메뉴 구현 | Mistral Vibe |
+
+### [0.1.14] - 2026-07-28
+
+#### 추가 (Added)
+- `server/admin-ui/src/components/WebSocketDashboard.jsx`: 패킷 타입별 필터 칩, Heartbeat 제외 토글, 검색어 강조 및 JSON 인라인 하이라이팅 기능을 추가했습니다.
+
+#### 변경 (Changed)
+- `docs/todo.md`: "패킷 유형별 필터링 및 텍스트 하이라이팅" 과제 완료 업데이트
+
+### [0.1.13] - 2026-07-28
+
+#### 변경 (Changed)
+- `server/admin-ui/src/components/WebSocketDashboard.jsx`: 실시간 패킷 정밀 점검을 위한 스트림 일시정지(Freeze) 기능과 시각적 인디케이터를 추가했습니다.
+
+#### 기타 (Other)
+- `docs/todo.md`: "WebSocketDashboard 스트림 제어 및 일시정지(Freeze/Pause) 기능" 과제 완료 업데이트
+
+### [0.1.12] - 2026-07-28
+
+#### 추가 (Added)
+- `server/admin-ui/src/components/Layout.jsx`: 시스템 테마(다크/라이트)와 고대비 모드를 독립적으로 제어하는 기능을 추가했습니다.
+
+#### 변경 (Changed)
+- `docs/todo.md`: "시스템 테마 스위처 및 고대비(High-contrast) 가독성 모드" 과제를 완료로 업데이트했습니다.
+
+### [0.1.11] - 2026-07-28
+
+#### 추가 (Added)
+- `server/admin-ui/src/components/Layout.jsx`: `Ctrl + K` 및 `/` 키를 통한 글로벌 검색 모달(Command Palette) 기능을 추가했습니다.
+
+#### 변경 (Changed)
+- `docs/todo.md`: "글로벌 검색 및 핫키 모달 도입" 과제를 완료로 업데이트했습니다.
+
+### [0.1.10] - 2026-07-28
+
+#### 추가 (Added)
+- `server/admin-ui/src/components/OverviewPage.jsx`: 실시간 메트릭 자동 새로고침 토글 스위치 및 카운트다운 타이머 기능을 추가했습니다.
+
+#### 변경 (Changed)
+- `docs/todo.md`: "OverviewPage 메트릭 실시간 자동 새로고침 토글" 과제를 완료로 업데이트했습니다.
+
+### [0.1.9] - 2026-07-28
+
+#### 변경 (Changed)
+- `server/app.js`: `/modules` 경로가 React SPA를 정상적으로 서빙하도록 라우팅 설정을 명확화하여 404 JSON 에러를 해결했습니다.
+- `docs/todo.md`: "반응형 대시보드 및 모바일/패드 사이드바 Drawer 개선" 과제를 완료로 업데이트했습니다.
+
+#### 기타 (Other)
+- `docs/todo.history.md`: UI/UX 고도화 첫 번째 과제 해결 이력 추가
+- `docs/CHANGELOG.md`: 버전 0.1.9 업데이트 (본 문서)
+
+### [0.1.8] - 2026-07-28
+
+#### 변경 (Changed)
+- `docs/todo.md`: "노트북 단일 사용자(Local Single-User) 맞춤 개선 과제" 섹션의 완료된 항목들을 "완료된 항목" 섹션으로 이동하여 문서의 정확성과 가독성을 개선했습니다.
+
+#### 기타 (Other)
+- `docs/todo.history.md`: `docs/todo.md` 정리 이력 추가
+- `docs/CHANGELOG.md`: `docs/todo.md` 정리 이력 추가 (본 문서)
 
 ---
 

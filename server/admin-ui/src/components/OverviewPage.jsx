@@ -1,21 +1,53 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { fetchJSON } from '../api';
 
 function OverviewPage({ onNavigate }) {
   const [health, setHealth] = useState(null);
   const [dbCount, setDbCount] = useState(0);
+  const [stats, setStats] = useState({ connections: 0, crawlers: 0, workflows: 0 });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([
+  // 자동 새로고침(Auto-refresh) 상태 관리
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [countdown, setCountdown] = useState(10);
+  const timerRef = useRef(null);
+
+  const fetchData = useCallback(() => {
+    return Promise.all([
       fetchJSON('/health').catch(() => null),
-      fetchJSON('/admin/api/databases').catch(() => [])
-    ]).then(([healthData, dbList]) => {
+      fetchJSON('/admin/api/databases').catch(() => []),
+      fetchJSON('/api').catch(() => ({ data: {} })) // 요약 통계 API
+    ]).then(([healthData, dbList, summary]) => {
       setHealth(healthData);
       setDbCount(Array.isArray(dbList) ? dbList.length : 0);
+      if (summary && summary.data) {
+        setStats({
+          connections: summary.data.activeConnections || 0,
+          crawlers: summary.data.crawlerCount || 0,
+          workflows: summary.data.workflowCount || 0
+        });
+      }
       setLoading(false);
+      setCountdown(10); // 데이터 갱신 후 카운트다운 초기화
     });
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    if (autoRefresh) {
+      timerRef.current = setInterval(() => {
+        setCountdown((prev) => (prev <= 1 ? (fetchData(), 10) : prev - 1));
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [autoRefresh, fetchData]);
 
   const services = [
     { name: 'SQLite 데이터베이스 엔진', type: 'Database Engine', status: 'RUNNING', endpoint: '/database', details: `${dbCount}개 DB 파일 활성화` },
@@ -37,35 +69,49 @@ function OverviewPage({ onNavigate }) {
             WebCrawlServer의 활성 모듈 및 관리 서비스 목록을 한눈에 파악하고 즉시 제어합니다.
           </p>
         </div>
-        <button className="gcp-btn" onClick={() => onNavigate('/database')}>
-          🗄️ 데이터베이스 관리로 이동
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--gcp-text-secondary)' }}>
+            <span style={{ color: autoRefresh ? 'var(--gcp-status-green)' : 'inherit', minWidth: '85px' }}>
+              {autoRefresh ? `🔄 ${countdown}초 후 갱신` : '⏸️ 자동 갱신 꺼짐'}
+            </span>
+            <button 
+              className="gcp-btn gcp-btn-secondary" 
+              style={{ padding: '4px 8px', fontSize: '11px', height: '28px' }}
+              onClick={() => setAutoRefresh(!autoRefresh)}
+            >
+              {autoRefresh ? '정지' : '자동 새로고침 시작'}
+            </button>
+          </div>
+          <button className="gcp-btn" onClick={() => onNavigate('/database')}>
+            🗄️ 데이터베이스 관리
+          </button>
+        </div>
       </div>
 
       {/* Summary KPI Panel */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
         <div style={{ backgroundColor: 'var(--gcp-bg-card)', border: '1px solid var(--gcp-border)', padding: '12px 16px', borderRadius: '4px' }}>
           <div style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', textTransform: 'uppercase' }}>시스템 상태</div>
-          <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--gcp-status-green)', marginTop: '4px' }}>
-            ● 정상 동작 (Healthy)
+          <div style={{ fontSize: '16px', fontWeight: 600, color: health ? 'var(--gcp-status-green)' : 'var(--gcp-status-red)', marginTop: '4px' }}>
+            ● {health ? '정상 동작 (Healthy)' : '연결 확인 중...'}
           </div>
         </div>
         <div style={{ backgroundColor: 'var(--gcp-bg-card)', border: '1px solid var(--gcp-border)', padding: '12px 16px', borderRadius: '4px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', textTransform: 'uppercase' }}>활성 데이터베이스</div>
+          <div style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', textTransform: 'uppercase' }}>활성 소켓 / DB</div>
           <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--gcp-text-primary)', marginTop: '4px' }}>
-            {dbCount} 개
+            {stats.connections} / {dbCount}
           </div>
         </div>
         <div style={{ backgroundColor: 'var(--gcp-bg-card)', border: '1px solid var(--gcp-border)', padding: '12px 16px', borderRadius: '4px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', textTransform: 'uppercase' }}>서버 포트</div>
+          <div style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', textTransform: 'uppercase' }}>크롤러 / 워크플로우</div>
           <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--gcp-text-primary)', marginTop: '4px' }}>
-            9600 (HTTP / WS)
+            {stats.crawlers} / {stats.workflows}
           </div>
         </div>
         <div style={{ backgroundColor: 'var(--gcp-bg-card)', border: '1px solid var(--gcp-border)', padding: '12px 16px', borderRadius: '4px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', textTransform: 'uppercase' }}>플랫폼 버전</div>
+          <div style={{ fontSize: '11px', color: 'var(--gcp-text-secondary)', textTransform: 'uppercase' }}>서버 업타임</div>
           <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--gcp-text-primary)', marginTop: '4px' }}>
-            v0.1.0 (SQLite WAL)
+            {health?.timestamp ? '정상 작동 중' : '정보 없음'}
           </div>
         </div>
       </div>

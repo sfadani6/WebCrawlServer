@@ -1,0 +1,144 @@
+# -------------------------
+# Node.js 관련
+# -------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+dist/
+build/
+.cache/
+.tmp/
+.env
+.env.local
+.env.*.local
+
+# -------------------------
+# Python 관련
+# -------------------------
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+*.egg
+*.log
+*.sqlite3
+*.db
+
+# -------------------------
+# Visual Studio / C# 관련
+# -------------------------
+# 빌드 출력
+bin/
+obj/
+Debug/
+Release/
+[Bb]uild/
+[Bb]in/
+[Oo]bj/
+
+# 사용자 설정
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# VS 캐시/백업
+.vs/
+*.dbmdl
+*.bak
+*.log
+*.ldf
+
+# NuGet 패키지
+*.nupkg
+packages/
+*.snupkg
+
+# 테스트 결과
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# -------------------------
+# IDE/에디터
+# -------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# -------------------------
+# OS 특화
+# -------------------------
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# -------------------------
+# .git
+# -------------------------
+.git/
+
+# Cache
+.cache/
+.vite/
+
+# Generated source artifacts
+admin/src/*.js
+admin/src/*.js.map
+plugins/basic-plugin/src/*.js
+plugins/basic-plugin/src/*.js.map
+
+#-------------------
+# ai 
+.agents/
+
+
+# -------------------------
+# db 파일
+# -------------------------
+databases/*
+
+# -------------------------
+# docs 하위폴더
+# -------------------------
+
+docs/askLogs/*
+docs/CHANGELOG/*
+
+
+.gitignore
+.replit
+.treeignore
+replit.md
+docs/ask.md
+docs/CHANGELOG.md
+docs/todo.history.md
+docs/todo.md
+WebCrawlServer.code-workspace
+WebCrawlServer.instructions.md
+WebCrawlServer.sources.md
+server/dist/*
+plugins/basic-plugin/dist/
+*.png
+*.jpg
+*.ico
+
+server/dist/*
+server/public/*
+plugins/basic-plugin/dist/*
+
+
+WebCrawlServer.source.md
+WebCrawlServer.merge.md
+WebCrawlServer.tree.f.md
+.treeignore
+
+
+docs/tips/*

@@ -1,0 +1,54 @@
+# Node modules
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+server/public/
+
+# Logs
+logs/
+logs/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Database artifacts
+databases/*.db
+databases/*.db-journal
+databases/*.db-wal
+databases/*.db-shm
+*.sqlite
+*.sqlite3
+databases/backups/*
+databases/workers/*
+
+# Server
+tmp/
+server/storage/
+
+# Environment files
+.env
+.env.*
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cache
+.cache/
+.vite/
+
+# Generated source artifacts
+admin/src/*.js
+admin/src/*.js.map
+plugins/basic-plugin/src/*.js
+plugins/basic-plugin/src/*.js.map

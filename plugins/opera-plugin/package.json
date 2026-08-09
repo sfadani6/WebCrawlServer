@@ -1,0 +1,16 @@
+{
+  "name": "opera-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preinstall": "node -e \"console.log('opera-plugin workspace preinstall skipped')\"",
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "server:start": "node -e \"console.log('server:start skipped in opera-plugin workspace')\"",
+    "admin:start": "node -e \"console.log('admin:start skipped in opera-plugin workspace')\""
+  },
+  "devDependencies": {
+    "pm2": "^5.4.3"
+  }
+}

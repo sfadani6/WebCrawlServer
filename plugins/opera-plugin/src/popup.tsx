@@ -9,6 +9,7 @@ import { usePopupState } from './hooks/usePopupState';
 import { Header } from './components/Header';
 import { TabBar } from './components/TabBar';
 import { Footer } from './components/Footer';
+import { TerminalConsole } from './components/TerminalConsole';
 import { BasicTab } from './components/tabs/BasicTab';
 import { InfoTab } from './components/tabs/InfoTab';
 import { DebugTab } from './components/tabs/DebugTab';
@@ -30,8 +31,17 @@ export default function Popup() {
     alias,
     setAlias,
     configSaveStatus,
+    isElementPicking,
+    isFrameCollecting,
+    hasFrame,
+    frameCount,
+    isImageCollecting,
     handleSaveClientConfig,
     handleSendFullDom,
+    handleStartElementPicker,
+    handleStopElementPicker,
+    handleCollectFrameDom,
+    handleCollectImages,
     handleSendDebugMessage,
     handleTabChange,
     terminalLogs,
@@ -61,48 +71,64 @@ export default function Popup() {
       <Header />
       <TabBar activeTab={activeTab} onSelectTab={handleTabChange} />
 
-      {activeTab === 'basic' && (
-        <BasicTab
-          isServerOnline={isServerOnline}
-          currentUrl={currentUrl}
-          isSending={isSending}
-          statusMessage={statusMessage}
-          onSendFullDom={handleSendFullDom}
-        />
-      )}
+      {/* 탭 콘텐츠 영역 (터미널 콘솔 위 공간) */}
+      <div className="tab-content">
+        {activeTab === 'basic' && (
+          <BasicTab
+            isServerOnline={isServerOnline}
+            currentUrl={currentUrl}
+            isSending={isSending}
+            statusMessage={statusMessage}
+            onSendFullDom={handleSendFullDom}
+            isElementPicking={isElementPicking}
+            onStartElementPicker={handleStartElementPicker}
+            onStopElementPicker={handleStopElementPicker}
+            hasFrame={hasFrame}
+            frameCount={frameCount}
+            isFrameCollecting={isFrameCollecting}
+            onCollectFrameDom={handleCollectFrameDom}
+            isImageCollecting={isImageCollecting}
+            onCollectImages={handleCollectImages}
+          />
+        )}
 
-      {activeTab === 'info' && (
-        <InfoTab browserInfo={browserInfo} processorInfo={processorInfo} />
-      )}
+        {activeTab === 'info' && (
+          <InfoTab browserInfo={browserInfo} processorInfo={processorInfo} />
+        )}
 
-      {activeTab === 'debug' && (
-        <DebugTab
-          debugMessage={debugMessage}
-          debugStatus={debugStatus}
-          onChangeDebugMessage={setDebugMessage}
-          onSendDebugMessage={handleSendDebugMessage}
-          terminalLogs={terminalLogs}
-          autoScroll={autoScroll}
-          setAutoScroll={setAutoScroll}
-          commandInput={commandInput}
-          setCommandInput={setCommandInput}
-          consoleHeight={consoleHeight}
-          onRunCommand={executePluginCommand}
-          onClearTerminal={handleClearTerminal}
-          onConsoleResizeStart={handleConsoleResizeStart}
-          onConsoleResizeMove={handleConsoleResizeMove}
-          onConsoleResizeEnd={handleConsoleResizeEnd}
-        />
-      )}
+        {activeTab === 'debug' && (
+          <DebugTab
+            debugMessage={debugMessage}
+            debugStatus={debugStatus}
+            onChangeDebugMessage={setDebugMessage}
+            onSendDebugMessage={handleSendDebugMessage}
+          />
+        )}
 
-      {activeTab === 'settings' && (
-        <SettingsTab
-          alias={alias}
-          onAliasChange={setAlias}
-          configSaveStatus={configSaveStatus}
-          onSave={() => handleSaveClientConfig(alias)}
-        />
-      )}
+        {activeTab === 'settings' && (
+          <SettingsTab
+            alias={alias}
+            onAliasChange={setAlias}
+            configSaveStatus={configSaveStatus}
+            onSave={() => handleSaveClientConfig(alias)}
+          />
+        )}
+      </div>
+
+      {/* 공통 터미널 콘솔 — 모든 탭 하단 맨 아래에 배치 */}
+      <TerminalConsole
+        terminalLogs={terminalLogs}
+        autoScroll={autoScroll}
+        setAutoScroll={setAutoScroll}
+        commandInput={commandInput}
+        setCommandInput={setCommandInput}
+        consoleHeight={consoleHeight}
+        onRunCommand={executePluginCommand}
+        onClearTerminal={handleClearTerminal}
+        onConsoleResizeStart={handleConsoleResizeStart}
+        onConsoleResizeMove={handleConsoleResizeMove}
+        onConsoleResizeEnd={handleConsoleResizeEnd}
+      />
 
       <Footer clientId={clientId} />
     </div>

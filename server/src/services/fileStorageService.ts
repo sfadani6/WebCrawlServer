@@ -152,3 +152,122 @@ export function savePluginMessageToFile(
     fileSize: buffer.length,
   };
 }
+
+/** 이미지 수집 저장 옵션 구조체 (CRAWL_IMAGE 액션) */
+export interface SaveCrawledImageOptions {
+  /** 글로벌 기본 저장 경로 (기본값: "./storage") */
+  globalDefaultPath?: string;
+  /** 수집 도메인 (예: "aaa.com") */
+  domain: string;
+  /** 원본 파일명 (확장자 폴백 후보) */
+  fileName?: string;
+  /** 이미지 MIME 타입 (예: "image/png") */
+  mimeType?: string;
+  /** 페이로드 물리 포맷 (binary_base64 성공 / json 실패) */
+  payloadType: string;
+  /** Base64 인코딩 이미지 바이너리 데이터 (성공 시) */
+  data?: string;
+  /** 이미지 원본 소스 URL */
+  url?: string;
+  /** 이미지가 포함된 페이지 URL */
+  pageUrl?: string;
+  /** 인출 실패 사유 (성공 시 미설정, 실패 시 "CORS" 등) */
+  error?: string;
+}
+
+/** 이미지 저장을 위한 서버 프로세스 내 순차 인덱스 (동일 타임스탬프 충돌 방지) */
+let imageSaveSeq = 0;
+
+/**
+ * MIME 타입을 파일 확장자로 매핑합니다. 매핑 실패 시 빈 문자열을 반환합니다.
+ *
+ * @param mimeType - 이미지 MIME 타입
+ * @returns 확장자 문자열 (점 제외, 미지원 시 "")
+ */
+function mimeToExtension(mimeType: string): string {
+  switch ((mimeType || "").toLowerCase()) {
+    case "image/png":
+      return "png";
+    case "image/jpeg":
+    case "image/jpg":
+      return "jpg";
+    case "image/gif":
+      return "gif";
+    case "image/webp":
+      return "webp";
+    case "image/avif":
+      return "avif";
+    case "image/bmp":
+      return "bmp";
+    case "image/svg+xml":
+      return "svg";
+    case "image/ico":
+    case "image/x-icon":
+      return "ico";
+    default:
+      return "";
+  }
+}
+
+/**
+ * 수집된 이미지를 전용 폴더에 물리 파일로 보관합니다. (R-00208 이미지 저장소 규격)
+ *
+ * 저장 경로 규격: <기본경로>/images/<도메인>/<timestamp>-<index>.<ext>
+ * - binary_base64 성공 페이로드: Base64 디코딩 후 MIME 확장자로 바이너리 저장
+ * - json 실패 페이로드(CORS 등): 원본 URL만 담은 .url 참조 파일로 보관 (스킵하지 않음)
+ *
+ * @param options - 이미지 저장 옵션 객체
+ * @returns 저장된 파일 경로 및 크기 정보
+ */
+export function saveCrawledImage(
+  options: SaveCrawledImageOptions
+): SaveContentResult {
+  // 1. 저장소 최상위 루트 경로 결정
+  const rootPath = options.globalDefaultPath || "./storage";
+
+  // 2. 도메인 특수문자 정화 후 이미지 전용 디렉터리 구성 (예: ./storage/images/aaa_com/)
+  const safeDomain = sanitizeFolderName(options.domain);
+  const targetDir = resolve(rootPath, "images", safeDomain);
+
+  // 3. 대상 디렉터리 없을 경우 재귀적으로 자동 생성
+  if (!existsSync(targetDir)) {
+    mkdirSync(targetDir, { recursive: true });
+  }
+
+  // 4. 파일명 시퀀스 증가 및 확장자 결정
+  imageSaveSeq += 1;
+  const seq = String(imageSaveSeq % 10000).padStart(4, "0");
+  const baseName = `${Date.now()}-${seq}`;
+
+  let buffer: Buffer;
+  let ext: string;
+
+  if (options.payloadType === "binary_base64" && options.data) {
+    // 성공 페이로드: MIME 기반 확장자 → Base64 디코딩 바이너리 저장
+    ext = mimeToExtension(options.mimeType || "");
+    if (!ext) {
+      // MIME 미지원 시 원본 파일명 확장자 폴백
+      const fileExt = (options.fileName || "").split(".").pop();
+      ext = fileExt && fileExt.length > 0 && fileExt.length <= 5 ? fileExt : "bin";
+    }
+    buffer = Buffer.from(options.data, "base64");
+  } else {
+    // 실패 페이로드(CORS 등): 원본 URL만 담은 참조 파일로 보관
+    ext = "url";
+    const refText =
+      `# WebCrawlServer 이미지 참조 파일\n` +
+      `# 인출 실패 사유: ${options.error || "UNKNOWN"}\n` +
+      `page_url: ${options.pageUrl || ""}\n` +
+      `image_url: ${options.url || ""}\n`;
+    buffer = Buffer.from(refText, "utf-8");
+  }
+
+  // 5. 파일명: <timestamp>-<index>.<ext>
+  const targetFilePath = resolve(targetDir, `${baseName}.${ext}`);
+  writeFileSync(targetFilePath, buffer);
+
+  return {
+    savedFilePath: targetFilePath,
+    fileSize: buffer.length,
+  };
+}

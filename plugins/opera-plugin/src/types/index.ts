@@ -115,6 +115,49 @@ export interface CrawlBinaryPayload {
   [key: string]: unknown;
 }
 
+/** 이미지 수집 전송 페이로드 구조체 (CRAWL_IMAGE 액션) */
+export interface CrawlImagePayload {
+  /** 원본 파일명 */
+  fileName?: string;
+  /** 이미지 MIME 타입 */
+  mimeType?: string;
+  /** 이미지 원본 소스 URL */
+  url?: string;
+  /** 이미지가 포함된 페이지 URL */
+  pageUrl?: string;
+  /** Base64 인코딩 바이너리 데이터 (성공 시, payloadType: binary_base64) */
+  data?: string;
+  /** 크로스 오리진 등으로 인한 인출 실패 사유 (실패 시, payloadType: json) */
+  error?: string;
+  /** 수집 시점 타임스탬프 */
+  timestamp?: number;
+  /** 확장 가능 추가 필드 */
+  [key: string]: unknown;
+}
+
+/** 요소 선택 결과 전송 페이로드 구조체 (요소 선택 모드 → CRAWL_PARTIAL) */
+export interface CrawlElementPayload {
+  /** 수집 페이지 URL */
+  url?: string;
+  /** 페이지 타이틀 */
+  title?: string;
+  /** 선택된 요소의 outerHTML 전체 */
+  data?: {
+    /** 요소 태그명 (예: div, section) */
+    tag: string;
+    /** 요소 id 속성 */
+    id?: string;
+    /** 요소 class 목록 */
+    className?: string;
+    /** 선택된 요소의 outerHTML 원문 */
+    outerHTML: string;
+  };
+  /** 수집 시점 타임스탬프 */
+  timestamp?: number;
+  /** 확장 가능 추가 필드 */
+  [key: string]: unknown;
+}
+
 /** 일반 채팅 메시지 페이로드 구조체 (CHAT_MESSAGE 액션) */
 export interface ChatMessagePayload {
   /** 채팅 본문 */

@@ -164,7 +164,7 @@ export function requestCollectFullDom(): Promise<{
                 chrome.tabs.sendMessage(
                   targetTabId,
                   { command: "COLLECT_FULL_DOM" },
-                  (retryResponse: { success?: boolean } | undefined) => {
+                  (_retryResponse: { success?: boolean } | undefined) => {
                     if (chrome.runtime.lastError) {
                       resolve({
                         success: false,
@@ -195,6 +195,159 @@ export function requestCollectFullDom(): Promise<{
         }
       );
     });
+  });
+}
+
+/**
+ * 현재 활성 탭으로 콘텐츠 스크립트 명령을 송출합니다.
+ * 콘텐츠 스크립트 미주입 탭은 content.js를 주입 후 자동 재시도합니다.
+ *
+ * @param command - 콘텐츠 스크립트 명령 문자열
+ * @param payload - 명령에 전달할 페이로드 (선택)
+ * @returns 콘텐츠 스크립트 응답 객체 또는 실패 안내
+ */
+function sendCommandToActiveTab(
+  command: string,
+  payload?: unknown
+): Promise<{ success: boolean; message: string; data?: unknown }> {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTab = tabs[0];
+      if (!activeTab || typeof activeTab.id !== "number") {
+        resolve({ success: false, message: "활성화된 탭을 찾을 수 없습니다." });
+        return;
+      }
+      // 중첩 콜백에서 타입 안정성을 보장하도록 탭 ID를 상수로 고정
+      const targetTabId = activeTab.id;
+
+      const dispatch = (
+        cb: (res: { success?: boolean; message?: string; data?: unknown }) => void
+      ) => {
+        chrome.tabs.sendMessage(targetTabId, { command, payload }, (response) => {
+          if (chrome.runtime.lastError) {
+            // 콘텐츠 스크립트 미주입 탭: scripting.executeScript로 주입 후 자동 재시도
+            chrome.scripting.executeScript(
+              { target: { tabId: targetTabId }, files: ["content.js"] },
+              () => {
+                if (chrome.runtime.lastError) {
+                  cb({
+                    success: false,
+                    message: "페이지 스크립트 주입 불가 (보호 페이지)",
+                  });
+                  return;
+                }
+                chrome.tabs.sendMessage(targetTabId, { command, payload }, (retry) => {
+                  if (chrome.runtime.lastError) {
+                    cb({
+                      success: false,
+                      message: "페이지 스크립트 미연결 (페이지 새로고침 후 재시도)",
+                    });
+                    return;
+                  }
+                  cb(retry || { success: true });
+                });
+              }
+            );
+            return;
+          }
+          cb(response || { success: true });
+        });
+      };
+
+      dispatch((response) => {
+        resolve({
+          success: response.success !== false,
+          message: response.message || "명령이 정상 처리되었습니다.",
+          data: response.data,
+        });
+      });
+    });
+  });
+}
+
+/**
+ * 요소 선택 모드 시작을 현재 활성 탭의 콘텐츠 스크립트에 요청합니다.
+ * 마우스 오버 시 파란색 테두리 강조 → 클릭 시 "전송" 버튼 표시 모드가 동작합니다.
+ *
+ * @returns 요청 처리 결과 객체
+ */
+export function requestStartElementPicker(): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  return sendCommandToActiveTab("START_ELEMENT_PICKER");
+}
+
+/**
+ * 요소 선택 모드 종료를 현재 활성 탭의 콘텐츠 스크립트에 요청합니다.
+ *
+ * @returns 요청 처리 결과 객체
+ */
+export function requestStopElementPicker(): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  return sendCommandToActiveTab("STOP_ELEMENT_PICKER");
+}
+
+/**
+ * 현재 페이지의 iframe 존재 여부와 개수를 콘텐츠 스크립트에 질의합니다.
+ *
+ * @returns 프레임 조회 결과 (frameCount 포함)
+ */
+export function requestFrameInfo(): Promise<{
+  success: boolean;
+  message: string;
+  frameCount: number;
+}> {
+  return sendCommandToActiveTab("GET_FRAME_INFO").then((res) => ({
+    success: res.success,
+    message: res.message,
+    frameCount:
+      typeof res.data === "object" && res.data !== null
+        ? Number((res.data as { frameCount?: number }).frameCount ?? 0)
+        : 0,
+  }));
+}
+
+/**
+ * 현재 페이지의 첫 번째 iframe DOM 수집을 콘텐츠 스크립트에 요청합니다.
+ * 같은 오리진 프레임은 전체 DOM을, 크로스 오리진 프레임은 src 참조를 전송합니다.
+ *
+ * @returns 프레임 수집 처리 결과 객체
+ */
+export function requestCollectFrameDom(): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  return sendCommandToActiveTab("COLLECT_FRAME_DOM");
+}
+
+/**
+ * 현재 페이지의 이미지 추출 및 서버 전송을 콘텐츠 스크립트에 요청합니다.
+ * 인출 성공 이미지는 Base64로, 실패(크로스 오리진) 이미지는 src URL 참조로 전송됩니다.
+ *
+ * @returns 이미지 수집 결과 요약 객체
+ */
+export function requestCollectImages(): Promise<{
+  success: boolean;
+  message: string;
+  total?: number;
+  collected?: number;
+  failed?: number;
+}> {
+  return sendCommandToActiveTab("COLLECT_IMAGES").then((res) => {
+    const data =
+      typeof res.data === "object" && res.data !== null
+        ? (res.data as { total?: number; collected?: number; failed?: number; message?: string })
+        : undefined;
+    return {
+      success: res.success,
+      message: data?.message || res.message,
+      total: data?.total,
+      collected: data?.collected,
+      failed: data?.failed,
+    };
   });
 }
 

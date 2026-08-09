@@ -24,6 +24,24 @@
         └── videos/                # 파싱되어 다운로드된 동영상 폴더 (추후 확장)
 ```
 
+### 2.1 이미지 수집 전용 저장소 규격 (CRAWL_IMAGE)
+
+기본 탭의 이미지 수집 기능으로 수신된 이미지는 HTML 도메인/DB_ID 구조와 **분리된 전용 폴더**에 보관합니다.
+
+```
+<기본 저장 경로>/images/            # 이미지 수집 전용 루트 (R-00480 연동)
+└── <safeDomain>/                  # 이미지가 포함된 페이지 도메인 (예: naver_com/)
+    ├── <timestamp>-<index>.png    # 성공 이미지 (MIME 기반 확장자)
+    ├── <timestamp>-<index>.url    # 크로스 오리진 인출 실패 시 URL 참조 파일
+    └── ...
+```
+
+- **파일명 규격**: `<timestamp(ms)>-<4자리 순차 인덱스>.<ext>` — 같은 서버 프로세스 내 시퀀스로 타임스탬프 충돌을 방지합니다.
+- **성공 이미지**(payloadType `binary_base64`): MIME 타입→확장자 매핑(`image/png`→png, `image/jpeg`→jpg, `image/webp`→webp, `image/svg+xml`→svg 등). 미지원 MIME은 원본 파일명 확장자를 폴백으로 사용합니다.
+- **실패 이미지**(payloadType `json`): 크로스 오리진 등 인출 실패 시 원본 URL만 담은 `.url` 참조 텍스트 파일로 보관하며, 스킵하지 않습니다.
+- **도메인 분류**: 이미지가 속한 페이지(`pageUrl`)의 hostname을 기준으로 폴더를 구성합니다.
+- **DB 연동**: `crawl_logs`에 action=`CRAWL_IMAGE` 레코드가 적재되고, 저장된 파일 경로/크기가 `file_path`/`file_size`에 갱신됩니다.
+
 ---
 
 ## 3. 파일 저장소 서비스 모듈 규정 (`server/src/services/fileStorageService.ts`)
@@ -131,3 +149,5 @@ app.get("/api/admin/storage/status", (_req, res) => {
 - [ ] 노드/워커 저장 경로 미지정 시 `configs.data_path`가 기본 저장 경로로 적용되는가?
 - [ ] 도메인 특수문자가 정화되어 `<기본 저장 경로>\<safeDomain>\<db_id>\` 디렉터리가 에러 없이 자동 생성되는가?
 - [ ] SQLite DB에는 경량 텍스트 경로(`file_path`) 및 파일 크기(`file_size`)만 정확히 기입되는가?
+- [ ] 이미지가 `<기본 경로>\images\<safeDomain>\<timestamp>-<index>.<ext>` 규격으로 저장되는가?
+- [ ] 크로스 오리진 이미지가 스킵되지 않고 `.url` 참조 파일로 보관되는가?

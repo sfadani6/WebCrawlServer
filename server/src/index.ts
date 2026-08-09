@@ -45,6 +45,7 @@ import {
 import {
   saveCrawledContentToFile,
   savePluginMessageToFile,
+  saveCrawledImage,
 } from "./services/fileStorageService.js";
 import { executeWorkerPipeline } from "./services/workerEngineService.js";
 import {
@@ -1790,11 +1791,13 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       //   CRAWL_PARTIAL  : 페이지 일부/부분 데이터
       //   CRAWL_METADATA : 메타 정보만 수집
       //   CRAWL_BINARY   : 바이너리/이미지 파일 (payloadType: binary_base64)
+      //   CRAWL_IMAGE    : 페이지 이미지 수집 (성공 binary_base64 / 실패 json URL 참조)
       if (
         message.action === "CRAWL_DOCUMENT" ||
         message.action === "CRAWL_PARTIAL" ||
         message.action === "CRAWL_METADATA" ||
-        message.action === "CRAWL_BINARY"
+        message.action === "CRAWL_BINARY" ||
+        message.action === "CRAWL_IMAGE"
       ) {
         const payloadObj = (
           typeof message.payload === "object" && message.payload !== null
@@ -1809,6 +1812,16 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
           if (targetUrl) domain = new URL(targetUrl).hostname;
         } catch {
           // 도메인 파싱 실패 시 기본값 유지
+        }
+
+        // 이미지 수집(CRAWL_IMAGE)은 이미지가 속한 페이지(pageUrl) 도메인으로 분류
+        if (message.action === "CRAWL_IMAGE") {
+          const pageUrl = String(payloadObj.pageUrl || "");
+          try {
+            if (pageUrl) domain = new URL(pageUrl).hostname;
+          } catch {
+            // 페이지 URL 파싱 실패 시 기존 도메인 유지
+          }
         }
 
         // DB 로그 적재 및 레코드 ID 취득 (액션 구분 저장)
@@ -1844,6 +1857,27 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
           savedSize = saveRes.fileSize;
 
           // 저장된 파일 경로/크기를 기존 crawl_logs 레코드에 반영
+          updateCrawlLogFile(logId, savedPath, savedSize);
+        }
+
+        // 이미지 전송 액션(CRAWL_IMAGE)은 전용 이미지 저장소에 보관 (R-00208)
+        // 성공 페이로드(binary_base64)는 바이너리 이미지로, 실패 페이로드(json)는 URL 참조 파일로 저장
+        if (message.action === "CRAWL_IMAGE") {
+          const imageSaveRes = saveCrawledImage({
+            globalDefaultPath: getConfigDataPath() || undefined,
+            domain,
+            fileName:
+              typeof payloadObj.fileName === "string" ? payloadObj.fileName : "",
+            mimeType:
+              typeof payloadObj.mimeType === "string" ? payloadObj.mimeType : "",
+            payloadType: message.payloadType || "json",
+            data: typeof payloadObj.data === "string" ? payloadObj.data : "",
+            url: String(payloadObj.url || ""),
+            pageUrl: String(payloadObj.pageUrl || ""),
+            error: typeof payloadObj.error === "string" ? payloadObj.error : "",
+          });
+          savedPath = imageSaveRes.savedFilePath;
+          savedSize = imageSaveRes.fileSize;
           updateCrawlLogFile(logId, savedPath, savedSize);
         }
 

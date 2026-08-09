@@ -2,6 +2,38 @@
 
 ---
 
+## 2026-08-09 | 기본 탭 개편 + 터미널 모든 탭 하단 공통화 + 현재 페이지 URL 자동 갱신
+
+### 요청
+- "터미널을 모든 페이지 하단 맨 아래에 배치 (스크롤·외곽 아웃라인 개선)"
+- "기본 탭: DOM 전송(전체/요소선택/프레임), 이미지 수집, 액션 실행(미개발)"
+- "페이지 URL 변화 시 [현재 페이지] 자동 갱신 (활성 탭 감시)"
+
+### 완료된 작업 목록
+- `TerminalConsole.tsx` 신설: 기존 DebugTab 터미널을 공통 컴포넌트로 분리, sidepanel/popup 모두 탭 내용(flex-1) 아래·푸터 위 공통 배치, 하늘색 아웃라인(`outline: 1px solid rgba(56,189,248,0.35)`) + 개선 스크롤바. DebugTab은 디버그 송출 카드만 유지.
+- `BasicTab.tsx` 개편: 아코디언+카드 3섹션 — DOM 전송(라디오 전체/요소선택/프레임, 모드별 실행 버튼), 이미지 수집, 액션 실행(미개발 disabled). URL 카드 자동 갱신 표기.
+- 요소 선택: content.ts에 파란 테두리(`outline: 3px solid #3b82f6`) 오버 → 클릭 시 요소 위치 "전송" 플로팅 버튼 → outerHTML 전체를 `CRAWL_PARTIAL`로 전송 → ESC/완료 시 `ELEMENT_PICKER_ENDED` 통지.
+- 프레임: `GET_FRAME_INFO`로 iframe 개수 조회, 0개면 라디오/버튼 비활성. 같은 오리진은 outerHTML `CRAWL_DOCUMENT`, 크로스 오리진은 src URL 참조 `CRAWL_PARTIAL`.
+- 이미지: `COLLECT_IMAGES` — 최대 50개, `fetch(src,{credentials:"include"})` 성공 시 Base64 `CRAWL_IMAGE`(binary_base64), 실패 시 URL만 `CRAWL_IMAGE`(json, error)로 스킵 없음 보관.
+- `usePopupState.ts`: 신규 상태(isElementPicking/isFrameCollecting/hasFrame/frameCount/isImageCollecting) + `chrome.tabs.onActivated`/`onUpdated("complete")`로 활성 탭 URL·iframe 자동 감시. 기존 eslint 경고(`any` 2건, unused)도 정리.
+- `chromeService.ts`: 공통 헬퍼 `sendCommandToActiveTab`(미주입 탭 content 주입 재시도) + 요소/프레임/이미지 요청 4함수. `types/index.ts`에 `CrawlImagePayload`/`CrawlElementPayload` 추가.
+- 서버: `fileStorageService.saveCrawledImage()`(MIME→확장자 매핑, 실패 시 `.url` 참조 저장), `index.ts` CRAWL_IMAGE 분기(insertCrawlLog action=CRAWL_IMAGE + file_path/file_size 갱신, `payload.pageUrl` 도메인 기준 폴더 분류).
+- opera-plugin 동기화: 변경 10개 파일 복사(헤더 경로 주석만 plugins/opera-plugin 교체), 기능 동일.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/` types/index.ts, content.ts, services/chromeService.ts, components/TerminalConsole.tsx(신규), components/tabs/BasicTab.tsx, components/tabs/DebugTab.tsx, hooks/usePopupState.ts, sidepanel.tsx, popup.tsx, popup.css
+- `plugins/opera-plugin/` 동일 10개 파일 동기화
+- `server/src/services/fileStorageService.ts`, `server/src/index.ts`
+- `docs/rule/R-00430 plugin-crawling.md`, `docs/rule/R-00440 plugin-ui-ux.md`, `docs/rule/R-00480 plugin-automation-crawling.md`, `docs/rule/R-00208 local-file-storage-system.md`
+- `docs/askLogs/ask-20260809205823.md` (신규)
+
+### 검증 결과
+- basic-plugin·opera-plugin: `tsc --noEmit` 0건, `vite build` 성공, `eslint` 0건 (기존 경고 정리 포함).
+- server: tsc 빌드 성공, pm2 `WebCrawlServer` 재시작 후 online 유지(포트 9600 응답).
+- 요소 선택·이미지 저장·URL 자동 갱신은 브라우저 확장 재로드 후 사용자 최종 확인 필요.
+
+---
+
 ## 2026-08-09 | 오페라 전용 플러그인(`plugins/opera-plugin`) 신설 (sidebar_action 사이드바 지원)
 
 ### 요청

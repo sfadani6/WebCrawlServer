@@ -14,6 +14,11 @@ import {
   fetchSocketStatus,
   fetchCurrentTabUrl,
   requestCollectFullDom,
+  requestStartElementPicker,
+  requestStopElementPicker,
+  requestFrameInfo,
+  requestCollectFrameDom,
+  requestCollectImages,
   sendDebugMessage,
   sendSocketPacket,
   sendClientConfigUpdate,
@@ -83,9 +88,16 @@ export function usePopupState() {
   );
   const [debugStatus, setDebugStatus] = useState<string>("");
   // 수신된 웹소켓 패킷 로그 배열 (기존 수집 파이프라인 유지)
-  const [receivedLogs, setReceivedLogs] = useState<Array<any>>([]);
+  const [receivedLogs, setReceivedLogs] = useState<Array<Record<string, unknown>>>([]);
   const [browserInfo, setBrowserInfo] = useState<BrowserInfo | null>(null);
   const [processorInfo, setProcessorInfo] = useState<ProcessorInfo | null>(null);
+
+  // 기본 탭 요소 선택/프레임/이미지 수집 상태
+  const [isElementPicking, setIsElementPicking] = useState<boolean>(false);
+  const [isFrameCollecting, setIsFrameCollecting] = useState<boolean>(false);
+  const [hasFrame, setHasFrame] = useState<boolean>(false);
+  const [frameCount, setFrameCount] = useState<number>(0);
+  const [isImageCollecting, setIsImageCollecting] = useState<boolean>(false);
 
   // 터미널 콘솔 상태 (admin 네트워크 모니터링 콘솔 규격과 동일)
   const [terminalLogs, setTerminalLogs] = useState<PluginLogEntry[]>([]);
@@ -180,9 +192,105 @@ export function usePopupState() {
     await checkSocketStatus();
   }, [checkSocketStatus, addTerminalLog]);
 
+  /**
+   * 현재 활성 탭의 URL과 iframe 존재 정보를 다시 조회해 갱신합니다.
+   * 활성 탭 전환 또는 페이지 네비게이션 완료 시 호출됩니다.
+   *
+   * @returns Promise<void>
+   */
+  const refreshCurrentTabInfo = useCallback(async () => {
+    try {
+      const url = await fetchCurrentTabUrl();
+      setCurrentUrl(url);
+      // iframe 존재 여부 갱신 (프레임 라디오 활성화 판단용)
+      const frameRes = await requestFrameInfo();
+      setHasFrame(frameRes.frameCount > 0);
+      setFrameCount(frameRes.frameCount);
+    } catch {
+      // 활성 탭 조회 실패는 무시 (보호 페이지 등)
+    }
+  }, []);
+
+  /**
+   * 요소 선택 모드를 시작합니다.
+   * 콘텐츠 스크립트에 파란 테두리 선택 모드 시작을 요청하고 상태를 갱신합니다.
+   *
+   * @returns Promise<void>
+   */
+  const handleStartElementPicker = useCallback(async () => {
+    setStatusMessage("요소 선택 모드 시작 중...");
+    addTerminalLog("요소 선택 모드를 시작합니다. 페이지에서 원하는 요소를 클릭하세요.", "info");
+    const res = await requestStartElementPicker();
+    if (res.success) {
+      setIsElementPicking(true);
+      setStatusMessage("요소 선택 모드 활성화 - 페이지에서 요소를 클릭하세요");
+    } else {
+      setStatusMessage(res.message);
+      addTerminalLog(res.message, "error");
+    }
+  }, [addTerminalLog]);
+
+  /**
+   * 요소 선택 모드를 종료합니다.
+   *
+   * @returns Promise<void>
+   */
+  const handleStopElementPicker = useCallback(async () => {
+    setStatusMessage("요소 선택 모드 종료 중...");
+    addTerminalLog("요소 선택 모드를 종료합니다.", "info");
+    const res = await requestStopElementPicker();
+    if (res.success) {
+      setIsElementPicking(false);
+      setStatusMessage("요소 선택 모드가 종료되었습니다.");
+    } else {
+      setStatusMessage(res.message);
+      addTerminalLog(res.message, "error");
+    }
+  }, [addTerminalLog]);
+
+  /**
+   * 첫 번째 iframe DOM을 수집해 서버로 전송합니다.
+   *
+   * @returns Promise<void>
+   */
+  const handleCollectFrameDom = useCallback(async () => {
+    setIsFrameCollecting(true);
+    setStatusMessage("프레임 DOM 수집 중...");
+    addTerminalLog("프레임 DOM 수집을 요청합니다...", "info");
+    try {
+      const res = await requestCollectFrameDom();
+      setStatusMessage(res.message);
+      addTerminalLog(res.message, res.success ? "success" : "error");
+    } catch {
+      setStatusMessage("프레임 수집 중 오류가 발생했습니다.");
+      addTerminalLog("프레임 수집 중 오류가 발생했습니다.", "error");
+    }
+    setIsFrameCollecting(false);
+  }, [addTerminalLog]);
+
+  /**
+   * 현재 페이지의 이미지를 추출해 서버로 전송합니다.
+   *
+   * @returns Promise<void>
+   */
+  const handleCollectImages = useCallback(async () => {
+    setIsImageCollecting(true);
+    setStatusMessage("이미지 수집 중...");
+    addTerminalLog("페이지 이미지 추출 및 전송을 요청합니다...", "info");
+    try {
+      const res = await requestCollectImages();
+      setStatusMessage(res.message);
+      addTerminalLog(res.message, res.success ? "success" : "error");
+    } catch {
+      setStatusMessage("이미지 수집 중 오류가 발생했습니다.");
+      addTerminalLog("이미지 수집 중 오류가 발생했습니다.", "error");
+    }
+    setIsImageCollecting(false);
+  }, [addTerminalLog]);
+
   // 초기화 및 오프스크린 패킷 수신 리스너 등록
   useEffect(() => {
-    fetchCurrentTabUrl().then(setCurrentUrl);
+    refreshCurrentTabInfo();
     checkSocketStatus();
     setBrowserInfo(extractBrowserInfo());
     setProcessorInfo(extractProcessorInfo());
@@ -202,9 +310,24 @@ export function usePopupState() {
     addTerminalLog("=== WebCrawlServer 플러그인 터미널 콘솔 ===", "info");
     addTerminalLog("도움말은 'help' 명령을 입력하세요.", "info");
 
-    const listener = (message: any) => {
+    // 크롬 런타임 메시지 구조체 (러프 타입: type과 packet/payload만 사용)
+    type RuntimePacket = {
+      action?: unknown;
+      senderId?: unknown;
+      payload?: unknown;
+    };
+    type RuntimeMessage = {
+      type?: string;
+      packet?: RuntimePacket;
+      payload?: { message?: string };
+    };
+
+    const listener = (message: RuntimeMessage) => {
       if (message.type === "SOCKET_PACKET_RECEIVED" && message.packet) {
-        setReceivedLogs((prev) => [...prev, message.packet]);
+        setReceivedLogs((prev) => [
+          ...prev,
+          message.packet as Record<string, unknown>,
+        ]);
         // 수신 패킷을 터미널 콘솔에도 기록
         addTerminalLog(formatPacketLog(message.packet), getPacketLogType(message.packet));
       }
@@ -219,12 +342,36 @@ export function usePopupState() {
           addTerminalLog("별칭 저장 실패: 서버가 ACK를 거부했습니다.", "error");
         }
       }
+      // 콘텐츠 스크립트에서 요소 선택 완료/취소 알림 수신 시 모드 종료 처리
+      if (message.type === "ELEMENT_PICKER_ENDED" && message.payload) {
+        setIsElementPicking(false);
+        setStatusMessage(message.payload.message || "요소 선택이 종료되었습니다.");
+        addTerminalLog(message.payload.message || "요소 선택이 종료되었습니다.", "success");
+      }
     };
     chrome.runtime.onMessage.addListener(listener);
+
+    // 활성 탭 전환/네비게이션 감시 — 현재 페이지 URL 및 iframe 정보 자동 갱신
+    const onTabActivated = () => {
+      refreshCurrentTabInfo();
+    };
+    const onTabUpdated = (
+      _tabId: number,
+      changeInfo: { status?: string },
+    ) => {
+      if (changeInfo.status === "complete") {
+        refreshCurrentTabInfo();
+      }
+    };
+    chrome.tabs.onActivated.addListener(onTabActivated);
+    chrome.tabs.onUpdated.addListener(onTabUpdated);
+
     return () => {
       chrome.runtime.onMessage.removeListener(listener);
+      chrome.tabs.onActivated.removeListener(onTabActivated);
+      chrome.tabs.onUpdated.removeListener(onTabUpdated);
     };
-  }, [checkSocketStatus, addTerminalLog]);
+  }, [checkSocketStatus, addTerminalLog, refreshCurrentTabInfo]);
 
   /**
    * 사용자가 입력한 디버그 메시지를 JSON으로 파싱해 서버에 전송합니다.
@@ -261,7 +408,8 @@ export function usePopupState() {
 
       const parts = command.trim().split(/\s+/);
       const cmd = parts[0].toLowerCase();
-      const args = parts.slice(1);
+      // 이후 인자는 send 명령에서 사용하지 않고 파싱 단계에서 직접 처리함
+      void parts.slice(1);
 
       if (cmd === "help") {
         addTerminalLog("사용 가능한 명령어:", "info");
@@ -431,8 +579,17 @@ export function usePopupState() {
     alias,
     setAlias,
     configSaveStatus,
+    isElementPicking,
+    isFrameCollecting,
+    hasFrame,
+    frameCount,
+    isImageCollecting,
     handleSaveClientConfig,
     handleSendFullDom,
+    handleStartElementPicker,
+    handleStopElementPicker,
+    handleCollectFrameDom,
+    handleCollectImages,
     handleSendDebugMessage,
     handleTabChange,
     executePluginCommand,

@@ -1,7 +1,24 @@
 # 실행 계획 체크리스트 (docs/todo.md)
 
 ## 현재 작업
-- (없음 — ask-20260809100542 오페라 플러그인 사이클 완료)
+- (없음 — ask-20260809205823 기본 탭 개편 사이클 완료)
+
+## 완료된 작업 (ask-20260809205823)
+- [x] 기본 탭 개편: DOM 전송(라디오 전체/요소선택/프레임), 이미지 수집, 액션 실행(미개발 disabled) 아코디언+카드 구성 (BasicTab.tsx)
+- [x] 요소 선택 모드: content.ts 파란 테두리 오버 → 클릭 시 "전송" 플로팅 버튼 → outerHTML을 CRAWL_PARTIAL로 전송, ESC 종료 + ELEMENT_PICKER_ENDED 통지
+- [x] 프레임 수집: GET_FRAME_INFO(iframe 개수 조회, 미존재 시 비활성화) + COLLECT_FRAME_DOM(같은 오리진 fullDom/크로스 오리진 src 참조)
+- [x] 이미지 수집: COLLECT_IMAGES(fetch→base64 성공 시 CRAWL_IMAGE binary_base64, 크로스 오리진 실패 시 CRAWL_IMAGE json URL 참조, 최대 50개)
+- [x] 터미널 공통화: TerminalConsole.tsx 신설 — 모든 탭 하단 맨 아래 고정 배치 + 외곽 아웃라인/스크롤바 개선, DebugTab은 디버그 송출 카드만 유지
+- [x] 현재 페이지 URL 자동 갱신: chrome.tabs.onActivated + onUpdated(status complete) 리스너로 활성 탭 감시 (usePopupState refreshCurrentTabInfo)
+- [x] chromeService.ts 공통 명령 헬퍼(sendCommandToActiveTab) + 요소/프레임/이미지 요청 함수, types에 CrawlImagePayload/CrawlElementPayload 추가
+- [x] 서버: CRAWL_IMAGE 액션 분기 + saveCrawledImage(images/<domain>/<timestamp>-<index>.<ext>, 실패 .url 참조 저장, pageUrl 도메인 분류)
+- [x] opera-plugin 소스 동기화 (10개 파일, 헤더 경로 주석 교체)
+- [x] 검증: basic/opera tsc+eslint+빌드 통과, 서버 tsc+빌드+pm2 재시작 안정 확인
+- [x] 이력 기록: docs/askLogs/ask-20260809205823.md, docs/todo.history.md, docs/ask.md 초기화
+
+## 예정 작업 (ask-20260809205823)
+- [ ] 브라우저에서 수동 테스트: 요소 선택(파란 테두리/전송 버튼/outerHTML 전송), 프레임 비활성화, 이미지 저장, URL 자동 갱신
+- [ ] 액션 실행 기능 설계 및 구현 (미개발 상태 유지)
 
 ## 완료된 작업 (ask-20260809100542)
 - [x] plugins/opera-plugin 신설 (basic-plugin 전체 사본, node_modules/dist 제외)
@@ -11,7 +28,7 @@
 - [x] 검증: opera/basic 플러그인 빌드 성공, dist/manifest.json sidebar_action 존재 + sidePanel/side_panel 부재 확인
 - [x] 이력 기록: docs/askLogs/ask-20260809100542.md, docs/todo.history.md, docs/ask.md 초기화
 
-## 예정 작업
+## 예정 작업 (ask-20260809100542)
 - [ ] 오페라 실제 로드 테스트(opera://extensions/) 및 사이드바 표시 확인
 - [ ] 오페라에서 offscreen/기타 권한 미지원 확인 시 폴백 대응 (ADR-006 §3-5)
 

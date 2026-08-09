@@ -8,6 +8,7 @@ import { usePopupState } from './hooks/usePopupState';
 import { Header } from './components/Header';
 import { TabBar } from './components/TabBar';
 import { Footer } from './components/Footer';
+import { TerminalConsole } from './components/TerminalConsole';
 import { BasicTab } from './components/tabs/BasicTab';
 import { InfoTab } from './components/tabs/InfoTab';
 import { DebugTab } from './components/tabs/DebugTab';
@@ -16,6 +17,7 @@ import { SettingsTab } from './components/tabs/SettingsTab';
 /**
  * 브라우저 툴바 아이콘 클릭 시 즉시 켜지는 단일 메인 사이드바 대시보드 엔트리 컴포넌트입니다.
  * 크롬 포트 연결(chrome.runtime.connect)로 사이드바 창 생명주기를 오프스크린에 알립니다.
+ * 레이아웃: Header / TabBar / 탭 내용(flex-1) / 공통 터미널 콘솔(모든 탭 하단) / Footer
  * ADR-001: 사이드바 단일 UI & 오프스크린 무중단 소켓 아키텍처 준수
  */
 export default function SidePanel() {
@@ -34,8 +36,17 @@ export default function SidePanel() {
     alias,
     setAlias,
     configSaveStatus,
+    isElementPicking,
+    isFrameCollecting,
+    hasFrame,
+    frameCount,
+    isImageCollecting,
     handleSaveClientConfig,
     handleSendFullDom,
+    handleStartElementPicker,
+    handleStopElementPicker,
+    handleCollectFrameDom,
+    handleCollectImages,
     handleSendDebugMessage,
     handleTabChange,
     terminalLogs,
@@ -72,8 +83,8 @@ export default function SidePanel() {
         <TabBar activeTab={activeTab} onSelectTab={handleTabChange} />
       </div>
 
-      {/* 탭 콘텐츠 영역 */}
-      <div className="flex-1 overflow-y-auto my-2 pr-1">
+      {/* 탭 콘텐츠 영역 (터미널 콘솔 위 공간, flex-1로 가변 확장) */}
+      <div className="flex-1 overflow-y-auto my-2 pr-1 min-h-0">
         {/* 기본 수집 탭 */}
         {activeTab === 'basic' && (
           <BasicTab
@@ -82,6 +93,15 @@ export default function SidePanel() {
             isSending={isSending}
             statusMessage={statusMessage}
             onSendFullDom={handleSendFullDom}
+            isElementPicking={isElementPicking}
+            onStartElementPicker={handleStartElementPicker}
+            onStopElementPicker={handleStopElementPicker}
+            hasFrame={hasFrame}
+            frameCount={frameCount}
+            isFrameCollecting={isFrameCollecting}
+            onCollectFrameDom={handleCollectFrameDom}
+            isImageCollecting={isImageCollecting}
+            onCollectImages={handleCollectImages}
           />
         )}
 
@@ -97,17 +117,6 @@ export default function SidePanel() {
             debugStatus={debugStatus}
             onChangeDebugMessage={setDebugMessage}
             onSendDebugMessage={handleSendDebugMessage}
-            terminalLogs={terminalLogs}
-            autoScroll={autoScroll}
-            setAutoScroll={setAutoScroll}
-            commandInput={commandInput}
-            setCommandInput={setCommandInput}
-            consoleHeight={consoleHeight}
-            onRunCommand={executePluginCommand}
-            onClearTerminal={handleClearTerminal}
-            onConsoleResizeStart={handleConsoleResizeStart}
-            onConsoleResizeMove={handleConsoleResizeMove}
-            onConsoleResizeEnd={handleConsoleResizeEnd}
           />
         )}
 
@@ -120,6 +129,23 @@ export default function SidePanel() {
             onSave={() => handleSaveClientConfig(alias)}
           />
         )}
+      </div>
+
+      {/* 공통 터미널 콘솔 — 모든 탭 하단 맨 아래에 배치 */}
+      <div className="shrink-0">
+        <TerminalConsole
+          terminalLogs={terminalLogs}
+          autoScroll={autoScroll}
+          setAutoScroll={setAutoScroll}
+          commandInput={commandInput}
+          setCommandInput={setCommandInput}
+          consoleHeight={consoleHeight}
+          onRunCommand={executePluginCommand}
+          onClearTerminal={handleClearTerminal}
+          onConsoleResizeStart={handleConsoleResizeStart}
+          onConsoleResizeMove={handleConsoleResizeMove}
+          onConsoleResizeEnd={handleConsoleResizeEnd}
+        />
       </div>
 
       {/* 사이드바 하단 푸터 (클라이언트 UUID 표시) */}

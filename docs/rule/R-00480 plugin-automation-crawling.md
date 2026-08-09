@@ -136,7 +136,30 @@ chrome.runtime.onMessage.addListener((message) => {
 
 ---
 
-## 4. 다중 SNS 원스톱 자동 포스팅 규정 (Multi-Posting)
+## 4. 페이지 이미지 수집 규정 (CRAWL_IMAGE)
+
+기본 탭의 **이미지 수집** 버튼은 현재 페이지의 `img` 요소를 추출해 서버의 전용 이미지 저장소에 보관하는 기능입니다.
+
+### 4.1 이미지 추출 및 전송 플로우 (`content.ts`)
+
+1. **추출 범위**: `document.querySelectorAll("img")` 전체 중 최대 50개(`MAX_IMAGE_COLLECT_COUNT`)까지만 대상으로 하여 메시지 폭주를 방지합니다.
+2. **같은 오리진/CORS 허용 이미지**: `fetch(src, { credentials: "include" })` → `blob` → `ArrayBuffer` → Base64 변환 후 `CRAWL_IMAGE`(payloadType: `binary_base64`) 패킷 전송.
+3. **`data:` 스킴 이미지**: 이미 Base64 데이터이므로 별도 인출 없이 즉시 `CRAWL_IMAGE`(binary_base64) 전송.
+4. **크로스 오리진 인출 실패**: `fetch` 실패 시 **스킵하지 않고** `CRAWL_IMAGE`(payloadType: `json`, `error: "CORS_OR_FETCH_FAILED"`)로 원본 `url`만 전송합니다. 서버가 `.url` 참조 파일로 보관합니다.
+5. **파일명 규칙**: 소스 URL에서 `?`/`#` 이후를 제거한 마지막 경로 조각을 특수문자 정화하여 사용하며, 없으면 인덱스 기본명(`image_<n>.png`)을 사용합니다.
+6. **결과 요약**: `{ success, total, collected, failed, message }`를 사이드바로 반환하여 상태 메시지와 터미널 로그에 표시합니다.
+
+### 4.2 서버 저장 규정 (`server/src/services/fileStorageService.ts`)
+
+- 저장 경로 규격: `<기본 경로>/images/<도메인>/<timestamp>-<index>.<ext>` (R-00208 §2 이미지 저장소)
+- **성공 페이로드**(`binary_base64`): MIME 타입을 확장자로 매핑(`image/png`→png, `image/jpeg`→jpg 등) 후 Base64 디코딩하여 바이너리 저장. MIME 미지원 시 원본 파일명 확장자 폴백.
+- **실패 페이로드**(`json`): 원본 이미지 URL과 페이지 URL을 담은 `.url` 참조 파일로 보관 (스킵하지 않음).
+- 도메인 분류: 이미지가 포함된 페이지 URL(`pageUrl`)의 hostname 기준으로 폴더를 구성합니다.
+- DB에는 `crawl_logs` 레코드(action=`CRAWL_IMAGE`)로 적재되고 `file_path`/`file_size`가 갱신됩니다.
+
+---
+
+## 5. 다중 SNS 원스톱 자동 포스팅 규정 (Multi-Posting)
 
 사이드바 단일 UI에서 작성된 글을 페이스북, 트위터(X), 핀터레스트, 네이버/티스토리 블로그로 동시 포스팅하기 위한 표준 가이드라인입니다.
 
@@ -148,9 +171,11 @@ chrome.runtime.onMessage.addListener((message) => {
 
 ---
 
-## 5. 검증 체크리스트
+## 6. 검증 체크리스트
 
 - [ ] `fetch()` 인출 시 `credentials: "include"` 옵션이 지정되어 유저 로그인 쿠키가 정상 동봉되는가?
 - [ ] 이미지/CSS가 미로드된 상태에서 `DOMParser`를 통해 가상 DOM 데이터가 정확히 인출되는가?
 - [ ] 페이징 수집 엔진에서 페이지 클릭 후 `delayMs` 기반 랜덤 지연 시간이 정상 작동하는가?
 - [ ] 유저의 활성 탭 화면이 전환되거나 버벅이는 현상이 완전히 차단되었는가?
+- [ ] 이미지 수집 시 같은 오리진 이미지가 `binary_base64`로 저장되고 크로스 오리진 이미지가 `.url` 참조로 보관되는가?
+- [ ] 이미지 파일명이 `<timestamp>-<index>.<ext>` 규격을 준수하는가?

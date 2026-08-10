@@ -1,4 +1,4 @@
-// plugins/opera-plugin/src/content.ts
+// plugins/basic-plugin/src/content.ts
 
 import { XvideosMediaEntry } from "./types/index.js";
 
@@ -27,10 +27,73 @@ export interface PaginationCrawlPayload {
  */
 const XV_BEST_OF_RED_BASE_RE = /^(\/best-of-red\/[^/]+)(?:\/(\d+))?\/?$/;
 
-/** best-of-red 페이지 썸네일 이미지 로드 대기 상한 시간 (ms) */
-const XV_BEST_OF_RED_IMAGE_WAIT_MS = 4000;
+/** best-of-red 페이지 완전 로드 대기 상한 시간 (ms, 네트워크 안정 + DOM 안정 + 이미지 완료) */
+const XV_BEST_OF_RED_IMAGE_WAIT_MS = 20000;
 /** best-of-red 로드 검증 폴링 간격 (ms) */
-const XV_BEST_OF_RED_READY_POLL_MS = 200;
+const XV_BEST_OF_RED_READY_POLL_MS = 400;
+/** best-of-red 로드 안정 판정을 위한 연속 동일 관측 횟수 (폴링 간격 × 횟수 = 안정 윈도우) */
+const XV_BEST_OF_RED_STABLE_POLLS = 3;
+
+/**
+ * 페이지 AJAX/네트워크 인-플라이트 요청 카운터입니다.
+ * best-of-red 페이지의 비디오 블록은 lazy 로드(XHR/스크립트)로 지연 렌더링되므로,
+ * 로드 완료 판정 시점에 실제로 진행 중인 요청이 남아있는지 감시하는 데 사용합니다.
+ * XHR.open/fetch를 패치해 전송(시작)과 종료(완료)를 카운팅합니다.
+ * (콘텐츠 스크립트 주입 이전의 초기 요청은 카운트에 잡히지 않지만,
+ *  리소스 타이밍 증가 안정 판정과 함께 사용해 누락을 보완합니다.)
+ */
+let pageInflightCount = 0;
+
+/**
+ * 페이지의 XHR/fetch 인-플라이트 요청을 감시하도록 전역 네트워크 API를 패치합니다.
+ * 모듈 로드 시 1회 실행되며, 감시 자체가 페이지 로딩을 방해하지 않도록
+ * 원본 구현을 호출한 뒤 카운터만 증감합니다. (예외 발생 시 원본 동작에 영향 없음)
+ */
+function installNetworkActivityWatch(): void {
+  try {
+    const originalXhrOpen = window.XMLHttpRequest.prototype.open;
+    const originalXhrSend = window.XMLHttpRequest.prototype.send;
+    window.XMLHttpRequest.prototype.open = function (
+      this: XMLHttpRequest,
+      method: string,
+      url: string | URL,
+      ...rest: unknown[]
+    ) {
+      // 전송 시점에 요청 시작으로 카운트 (보안 경고용 세 번째 인자 등은 그대로 전달)
+      pageInflightCount += 1;
+      return originalXhrOpen.apply(this, [method, url, ...rest] as [
+        string,
+        string | URL,
+      ]);
+    };
+    window.XMLHttpRequest.prototype.send = function (
+      this: XMLHttpRequest,
+      body?: Document | XMLHttpRequestBodyInit | null,
+    ) {
+      try {
+        this.addEventListener("loadend", () => {
+          if (pageInflightCount > 0) pageInflightCount -= 1;
+        });
+      } catch {
+        // loadend 리스너 등록 실패 시 카운트는 open 시점만 유지 (큰 영향 없음)
+      }
+      return originalXhrSend.call(this, body);
+    };
+
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      pageInflightCount += 1;
+      return originalFetch(input as RequestInfo, init).finally(() => {
+        if (pageInflightCount > 0) pageInflightCount -= 1;
+      });
+    }) as typeof fetch;
+  } catch {
+    // 네트워크 감시 패치 실패 시 로드 검증은 리소스 타이밍 안정 판정만으로 동작합니다.
+  }
+}
+
+// 콘텐츠 스크립트 주입 즉시 네트워크 감시 패치 설치
+installNetworkActivityWatch();
 
 /** 요소 선택 모드 하이라이트 색상 (파란색 테두리) */
 const PICKER_HIGHLIGHT_COLOR = "#3b82f6";
@@ -614,13 +677,33 @@ function collectXvideosMediaEntries(): XvideosMediaEntry[] {
     if (!clickUrl || seenClickUrls.has(clickUrl)) continue;
     seenClickUrls.add(clickUrl);
 
-    // 제목 추출 (title 속성 우선)
-    const titleEl = block.querySelector<HTMLAnchorElement>(
-      ".thumb-under .title a[title]"
+    // 제목 추출: title 속성 우선, 없으면 .thumb-under .title 링크 텍스트 폴백
+    const titleAnchor = block.querySelector<HTMLAnchorElement>(
+      ".thumb-under .title a"
     );
     const title =
-      titleEl?.getAttribute("title") ||
+      titleAnchor?.getAttribute("title") ||
       block.querySelector<HTMLElement>("a[title]")?.getAttribute("title") ||
+      (titleAnchor?.textContent || "").trim() ||
+      "";
+
+    // data-video JSON 속성 파싱 (sfwThumbUrl/previewVideo 등 정확한 자산 URL 포함)
+    const dataVideo = parseXvThumbBlockDataVideo(block);
+
+    // 보조(무해) 썸네일: img data-sfwthumb 우선, data-video.sfwThumbUrl 폴백
+    const sfwUrl =
+      img.getAttribute("data-sfwthumb") ||
+      dataVideo.sfwThumbUrl ||
+      "";
+
+    // 프리뷰 mp4: .videopv video[src] 우선, data-video.previewVideo 폴백, data-pvv 마지막 폴백
+    const previewVideoEl = block.querySelector<HTMLVideoElement>(
+      ".videopv video"
+    );
+    const previewUrl =
+      (previewVideoEl?.currentSrc || previewVideoEl?.getAttribute("src") || "") ||
+      dataVideo.previewVideo ||
+      img.getAttribute("data-pvv") ||
       "";
 
     // 비디오 EID 파싱 (예: /video.kavfihb169e/... → kavfihb169e)
@@ -632,12 +715,39 @@ function collectXvideosMediaEntries(): XvideosMediaEntry[] {
       clickUrl,
       title,
       mainUrl,
-      sfwUrl: img.getAttribute("data-sfwthumb") || "",
-      previewUrl: img.getAttribute("data-pvv") || "",
+      sfwUrl,
+      previewUrl,
     });
   }
 
   return entries;
+}
+
+/**
+ * best-of-red 비디오 블록(.thumb-block[data-video])의 data-video JSON 속성을 파싱합니다.
+ * xvideos는 썸네일/보조썸네일/프리뷰 mp4 등의 정확한 자산 URL을 JSON으로 내장합니다.
+ *
+ * @param block - 비디오 블록 DOM 요소
+ * @returns 파싱된 자산 URL 필드 (파싱 실패 시 전부 빈 문자열)
+ */
+function parseXvThumbBlockDataVideo(block: HTMLElement): {
+  sfwThumbUrl: string;
+  previewVideo: string;
+} {
+  try {
+    const raw = block.getAttribute("data-video");
+    if (!raw) return { sfwThumbUrl: "", previewVideo: "" };
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      sfwThumbUrl:
+        typeof parsed.sfwThumbUrl === "string" ? parsed.sfwThumbUrl : "",
+      previewVideo:
+        typeof parsed.previewVideo === "string" ? parsed.previewVideo : "",
+    };
+  } catch {
+    // JSON 파싱 실패(HTML 엔티티 등)는 무시하고 빈 값 반환
+    return { sfwThumbUrl: "", previewVideo: "" };
+  }
 }
 
 /**
@@ -770,40 +880,95 @@ function detectXvBestOfRedMaxPage(currentPage: number): number {
 }
 
 /**
- * best-of-red 페이지 로드 완료를 검증합니다.
- * document.readyState가 complete가 될 때까지 기다린 뒤,
- * .thumb-block 썸네일 이미지들이 완전히 로드(complete)될 때까지 폴링합니다.
- * (이미지 로드는 상한 시간 XV_BEST_OF_RED_IMAGE_WAIT_MS를 넘기면 포기합니다.)
+ * best-of-red 페이지 완전 로드 여부를 검증합니다.
+ * "브라우저가 실제 모든 요소를 로드한 상태"를 보장하기 위해 아래 조건을 모두 충족할 때
+ * 로드 완료로 판정하며, 데드라인(XV_BEST_OF_RED_IMAGE_WAIT_MS) 내에 끝나지 않으면 false를 반환합니다.
  *
- * @returns 로드 완료 여부 (이미지 로드 상한 초과 시 false)
+ * 검증 조건:
+ * 1. document.readyState === "complete" (load 이벤트 대기, 누락 시 3초 폴백)
+ * 2. 네트워크 안정: 페이지 내 XHR/fetch 인-플라이트 카운터가 0이고,
+ *    performance 리소스 엔트리 수가 연속 XV_BEST_OF_RED_STABLE_POLLS회 증가하지 않음 (lazy 로드 종료 신호)
+ * 3. DOM 안정: .thumb-block(광고 제외) 개수가 연속 XV_BEST_OF_RED_STABLE_POLLS회 동일 (지연 렌더 완료 신호)
+ * 4. 이미지 완료: 대상 블록 내 img가 전부 complete && naturalWidth > 0
+ *
+ * @returns 완전 로드 여부 (데드라인 초과 시 false)
  */
 async function waitForXvBestOfRedPageReady(): Promise<boolean> {
-  // readyState complete 대기 (탭 이동 직후 프레임 진입 방어)
+  // 1) readyState complete 대기 (탭 이동 직후 프레임 진입 방어)
   if (document.readyState !== "complete") {
     await new Promise<void>((resolve) => {
-      window.addEventListener("load", () => resolve());
+      window.addEventListener("load", () => resolve(), { once: true });
       // 예비 폴백: 3초 내 load 이벤트가 없으면 진행 (로드 이벤트 누락 방어)
       setTimeout(() => resolve(), 3000);
     });
   }
 
-  // 썸네일 이미지 로드 검증 폴링
+  // 2) 네트워크·DOM·이미지 완료 통합 폴링
   const deadline = Date.now() + XV_BEST_OF_RED_IMAGE_WAIT_MS;
+  let prevBlockCount = -1;
+  let stableBlockCount = 0;
+
   while (Date.now() < deadline) {
-    const images = Array.from(
-      document.querySelectorAll<HTMLImageElement>(".thumb-block:not(.thumb-ad) img"),
+    const blocks = Array.from(
+      document.querySelectorAll<HTMLElement>(".thumb-block:not(.thumb-ad)"),
     );
+    const images = blocks
+      .map((block) => block.querySelector<HTMLImageElement>("img"))
+      .filter((img): img is HTMLImageElement => Boolean(img));
+
     // 이미지가 아직 DOM에 없는 경우에도 로드 대기 (동적 렌더 전)
     if (images.length === 0) {
       await sleep(XV_BEST_OF_RED_READY_POLL_MS);
       continue;
     }
-    if (images.every((img) => img.complete && img.naturalWidth > 0)) {
+
+    // 2-1) 네트워크 안정 판정 (인-플라이트 0 + 리소스 타이밍 증가 없음)
+    const netIdle =
+      pageInflightCount === 0 && networkResourcesStable();
+
+    // 2-2) DOM 안정 판정 (블록 개수 연속 동일)
+    if (blocks.length === prevBlockCount) {
+      stableBlockCount += 1;
+    } else {
+      prevBlockCount = blocks.length;
+      stableBlockCount = 0;
+    }
+    const domStable = stableBlockCount >= XV_BEST_OF_RED_STABLE_POLLS;
+
+    // 2-3) 이미지 완료 판정 (플레이스홀더 no-img는 완료 대상에서 제외)
+    const realImages = images.filter(
+      (img) => !/no-img(\.|$)/.test(img.getAttribute("src") || ""),
+    );
+    const imagesReady =
+      realImages.length > 0 &&
+      realImages.every((img) => img.complete && img.naturalWidth > 0);
+
+    // 모든 조건 충족 시 완전 로드 판정
+    if (netIdle && domStable && imagesReady) {
       return true;
     }
     await sleep(XV_BEST_OF_RED_READY_POLL_MS);
   }
   return false;
+}
+
+/**
+ * 페이지의 리소스 타이밍 엔트리가 최근 안정적으로 증가하지 않는지 판정합니다.
+ * lazy 로드가 모두 끝나면 새 리소스가 발생하지 않으므로 엔트리 수가 멈춥니다.
+ *
+ * @returns 리소스 수 안정 여부 (연속 XV_BEST_OF_RED_STABLE_POLLS회 동일 시 true)
+ */
+let lastResourceStableCount = 0;
+let lastResourceCountValue = -1;
+function networkResourcesStable(): boolean {
+  const count = performance.getEntriesByType("resource").length;
+  if (count === lastResourceCountValue) {
+    lastResourceStableCount += 1;
+  } else {
+    lastResourceCountValue = count;
+    lastResourceStableCount = 0;
+  }
+  return lastResourceStableCount >= XV_BEST_OF_RED_STABLE_POLLS;
 }
 
 /**
@@ -945,7 +1110,8 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         basePath: parsed.basePath,
         currentPage: parsed.currentPage,
         maxPage,
-        totalPages: maxPage - parsed.currentPage + 1,
+        // 처리 대상은 항상 0(베이스 URL)부터 maxPage까지 전체 순회합니다.
+        totalPages: maxPage + 1,
         url: window.location.href,
       },
     });

@@ -2037,6 +2037,12 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
                 typeof payloadObj.title === "string" ? payloadObj.title : "",
               baseName:
                 typeof payloadObj.baseName === "string" ? payloadObj.baseName : "",
+              pathSegments: Array.isArray(payloadObj.pathSegments)
+                ? (payloadObj.pathSegments as Array<unknown>).filter(
+                    (seg): seg is string =>
+                      typeof seg === "string" && seg.length > 0
+                  )
+                : undefined,
               txtContent:
                 typeof payloadObj.txtContent === "string"
                   ? payloadObj.txtContent
@@ -2143,6 +2149,31 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
             savedPath = partialSaveRes.savedFilePath;
             savedSize = partialSaveRes.fileSize;
             updateCrawlLogFile(logId, savedPath, savedSize);
+
+            // 저장 완료 ACK: 실제 파일 저장이 끝난 뒤 requestId 기반으로 플러그인에 응답
+            // (best-of-red 액션 실행기가 다음 페이지로 이동하기 전 저장 확인용)
+            const partialAckPacket: WebSocketMessage = {
+              senderId: "server",
+              targetId: clientId,
+              action: "CRAWL_PARTIAL_SAVED",
+              payloadType: "json",
+              payload: {
+                success: true,
+                requestId:
+                  typeof payloadObj.requestId === "string"
+                    ? payloadObj.requestId
+                    : "",
+                savedFilePath: partialSaveRes.savedFilePath,
+                fileSize: partialSaveRes.fileSize,
+                entriesCount: Array.isArray(payloadObj.data)
+                  ? (payloadObj.data as unknown[]).length
+                  : 0,
+              },
+              meta: { timestamp: Date.now() },
+            };
+            if (session && session.socket.readyState === WebSocket.OPEN) {
+              session.socket.send(JSON.stringify(partialAckPacket));
+            }
 
             logPluginComm(
               clientId,

@@ -1,4 +1,4 @@
-// plugins/opera-plugin/src/components/ActionRunnerView.tsx
+// plugins/basic-plugin/src/components/ActionRunnerView.tsx
 
 import { useBestOfRedRunner } from "../hooks/useBestOfRedRunner.js";
 import { XvBestOfRedInitData } from "../types/index.js";
@@ -41,7 +41,7 @@ export function ActionRunnerView({
   runner: ActionRunnerApi;
   tabId: number;
 }) {
-  const { status, logs, initInfo, progress, isRunning, start, stop } = runner;
+  const { status, logs, initInfo, progress, summary, isRunning, start, stop } = runner;
 
   return (
     <div className="w-full min-h-screen bg-[#0d131f] text-slate-100 flex flex-col p-4 box-border select-text font-sans">
@@ -81,10 +81,28 @@ export function ActionRunnerView({
             </span>
           </div>
         )}
-        {status === "completed" && (
-          <div className="text-[11px] text-emerald-300/90 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1">
-            전체 수집이 완료되었습니다. 저장 경로: images/xvideos.com/
-            {initInfo ? initInfo.basePath.replace(/^\//, "") : "best-of-red"}/...
+        {status === "completed" && summary && (
+          <div className="text-[11px] bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1.5 space-y-0.5">
+            <div className="text-emerald-300/90 font-semibold">
+              전체 순회가 완료되었습니다.
+            </div>
+            <div className="text-slate-300">
+              성공 페이지 {summary.okPages}개 / 실패 페이지 {summary.failedPages}개
+              {summary.failedPageList.length > 0 && (
+                <span className="text-amber-300">
+                  {" "}
+                  (실패 페이지: {summary.failedPageList.join(", ")})
+                </span>
+              )}
+            </div>
+            <div className="text-slate-400">
+              JSON 저장 {summary.savedJsonCount}개 · 미디어 저장 {summary.savedMediaCount}
+              건 성공 / {summary.failedMediaCount}건 실패
+            </div>
+            <div className="text-slate-500">
+              저장 루트: images/xvideos.com/
+              {initInfo ? initInfo.basePath.replace(/^\//, "") : "best-of-red"}/&lt;페이지&gt;/
+            </div>
           </div>
         )}
       </div>

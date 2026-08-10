@@ -1,7 +1,20 @@
 # 실행 계획 체크리스트 (docs/todo.md)
 
 ## 현재 작업
-- ask-20260810201945: best-of-red 실측 버그 2건(총 페이지 과소 감지·수집 메타 표시 오류) + 저장 경로(`images/` 제거) 수정
+- ask-20260810225335: best-of-red 안정 우선 재설계 — 0페이지부터 전체 순회 + 실제 미디어 다운로드 + 저장 ACK 확인 후 이동
+
+## 완료된 작업 (ask-20260810225335)
+- [x] content.ts: `installNetworkActivityWatch()` 신규(XHR/fetch 패치로 인플라이트 추적) + `waitForXvBestOfRedPageReady()` 재작성(네트워크 안정+DOM 안정+이미지 완료 통합 폴링, 400ms, 20초 데드라인) + `collectXvideosMediaEntries()` 보강(title 폴백·data-video 파싱·sfw/preview 우선순위) + INIT `totalPages = maxPage + 1`
+- [x] types/index.ts: `XvBestOfRedMediaResult`/`XvBestOfRedSavedFileInfo` 신규 + `CrawlMediaBundlePayload.pathSegments` 추가
+- [x] chromeService.ts: `sendSocketPacket` ACK 반환 확장(savedFilePath/fileSize/entriesCount) + `requestFetchPageMediaBundles()` 신규
+- [x] offscreen.ts: `partialSaveWaiters`+CRAWL_PARTIAL_SAVED ACK 해소, SEND_SOCKET_PACKET CRAWL_PARTIAL(requestId) ACK 보류(30초), `handleFetchPageMediaBundles()`(동시성 3·entryFiles 매핑·pathSegments 번들), FETCH_PAGE_MEDIA_BUNDLES 핸들러
+- [x] useBestOfRedRunner.ts 전면 개편: `pageList 0..maxPage` 순회·수집 3회 재시도·미디어 다운로드 단계·JSON 저장 ACK 확인 후 이동·`XvBestOfRedRunSummary` + ActionRunnerView.tsx 완료 배너 집계
+- [x] server: `saveCrawledMediaBundle()` `pathSegments` 계층 저장 + index.ts CRAWL_IMAGE 번들 pathSegments 전달 + CRAWL_PARTIAL 저장 후 `CRAWL_PARTIAL_SAVED` ACK(requestId/savedFilePath/fileSize/entriesCount)
+- [x] opera-plugin 동기화 6종 + 양 플러그인 빌드 성공(각 56 모듈) + server tsc 빌드 통과 + pm2 재시작(포트 9600 HTTP 200) + `npx eslint .` 신규 문제 0건
+- [x] 문서: R-00430 §5.5+§6, R-00480 §3.1, R-00420 §4.5, R-00208 §2.2/§2.3/§3.1/§3.2/§5, R-00440 §2.4+체크리스트, askLog 신규(ask-20260810225335), ask.md 초기화
+
+## 예정 작업 (ask-20260810225335)
+- [ ] 브라우저 실측: 액션 실행 xvideos.com 모듈 → 액션 실행기 팝업(900×760) → **0페이지부터** maxPage까지 전체 순회, 페이지별 로드 검증(네트워크 안정)→수집→썸네일+preview 실제 다운로드(ACK)→JSON 저장(ACK) 로그 순차 출력 → `<도메인>/best-of-red/<월>/<N>/`에 page-N.json+미디어 물리 저장 확인, 0건 페이지 빈 JSON, 완료 배너 실패 집계, 팝업 닫기·[중지] 중단 확인
 
 ## 완료된 작업 (ask-20260810201945)
 - [x] content.ts `detectXvBestOfRedMaxPage`: 아웃라이어 가드(차이 ≥ 20) 제거 → `.pagination a[data-page]` `Math.max` 신뢰(0..16+111 → 111), 페이지네이션 없으면 currentPage 폴백

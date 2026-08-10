@@ -1,4 +1,4 @@
-// plugins/opera-plugin/src/offscreen.ts
+// plugins/basic-plugin/src/offscreen.ts
 
 import { PLUGIN_CONFIG, getWebSocketUrl } from "./config/pluginConfig.js";
 import {
@@ -7,6 +7,8 @@ import {
   MediaAssetPayload,
   StorageLocationResponsePayload,
   XvideosMediaEntry,
+  XvBestOfRedMediaResult,
+  XvBestOfRedSavedFileInfo,
 } from "./types/index.js";
 
 /**
@@ -21,6 +23,21 @@ let socket: WebSocket | null = null;
 const mediaAckWaiters = new Map<
   string,
   (ack: Record<string, unknown>) => void
+>();
+
+/**
+ * 서버 페이지 저장 완료 ACK(CRAWL_PARTIAL_SAVED) 대기자 맵 (requestId → 해소 함수).
+ * best-of-red 액션 실행기가 "실제 파일 저장 확인 후 다음 페이지 이동"을 보장하기 위해
+ * SEND_SOCKET_PACKET(CRAWL_PARTIAL) 응답을 ACK 수신까지 보류합니다.
+ */
+const partialSaveWaiters = new Map<
+  string,
+  (ack: {
+    success: boolean;
+    savedFilePath?: string;
+    fileSize?: number;
+    entriesCount?: number;
+  }) => void
 >();
 
 /** 저장 위치 응답(STORAGE_LOCATION_RESPONSE) 대기자 (단일 보류 허용) */
@@ -196,6 +213,89 @@ async function handleFetchMediaBundle(
 }
 
 /**
+ * best-of-red 페이지의 모든 비디오 엔트리 자산(메인/보조 썸네일 + 프리뷰 mp4)을
+ * 동시성 제한(3)으로 fetch 인출해 엔트리별 CRAWL_IMAGE 번들로 서버에 저장하고
+ * 각각의 CRAWL_MEDIA_SAVED ACK를 확인한 뒤 집계 결과를 반환합니다.
+ * 안정 우선 정책에 따라 한 번에 3개까지만 병렬로 인출·전송합니다.
+ *
+ * @param page - 페이지 인덱스
+ * @param entries - 페이지에서 수집된 비디오 엔트리 목록
+ * @param pathSegments - 저장 계층 경로 (예: ["best-of-red","2026-06","16"])
+ * @returns 페이지 미디어 저장 집계 결과
+ */
+async function handleFetchPageMediaBundles(
+  page: number,
+  entries: XvideosMediaEntry[],
+  pathSegments: string[],
+): Promise<XvBestOfRedMediaResult> {
+  const savedFiles: string[] = [];
+  const failedEntries: Array<{ eid: string; reason: string }> = [];
+  const entryFiles: XvBestOfRedSavedFileInfo[] = [];
+  let savedCount = 0;
+  let failedCount = 0;
+
+  // 동시성 제한 (안정 우선: 최대 3개 동시 인출·전송)
+  const CONCURRENCY = 3;
+  let index = 0;
+  const workers = Array.from(
+    { length: Math.min(CONCURRENCY, entries.length) },
+    async () => {
+      while (index < entries.length) {
+        const current = index;
+        index += 1;
+        const entry = entries[current];
+        const bundleId = `bofr-${page}-${current}-${entry.eid || "x"}`;
+        const baseName = `page-${page}-${entry.eid || current}`;
+        try {
+          const result = await handleFetchMediaBundle(bundleId, entry, {
+            baseName,
+            category: "best-of-red",
+            clickUrl: entry.clickUrl,
+            title: entry.title,
+            pathSegments,
+            timestamp: Date.now(),
+          });
+          const ack = result.ack as Record<string, unknown> | undefined;
+          if (result.success && ack && Array.isArray(ack.savedFiles)) {
+            savedCount += 1;
+            const files = ack.savedFiles as string[];
+            savedFiles.push(...files);
+
+            // 엔트리별 저장 파일 매핑 구성 (page-N.json 메타 기록용)
+            const info: XvBestOfRedSavedFileInfo = { eid: entry.eid };
+            for (const f of files) {
+              if (/_thumb\.[a-z0-9]+$/i.test(f)) info.thumb = f;
+              else if (/_sfw\.[a-z0-9]+$/i.test(f)) info.sfw = f;
+              else if (/_preview\.[a-z0-9]+$/i.test(f)) info.preview = f;
+            }
+            entryFiles.push(info);
+          } else {
+            failedCount += 1;
+            failedEntries.push({
+              eid: entry.eid,
+              reason: result.error || "SAVE_FAILED",
+            });
+          }
+        } catch (err) {
+          failedCount += 1;
+          failedEntries.push({ eid: entry.eid, reason: String(err) });
+        }
+      }
+    },
+  );
+  await Promise.all(workers);
+
+  return {
+    success: failedCount === 0,
+    savedCount,
+    failedCount,
+    savedFiles,
+    entryFiles,
+    failedEntries,
+  };
+}
+
+/**
  * 크롬 로컬 스토리지에서 수집 노드 고유 UUID를 인출합니다.
  * chrome.storage 미지원 환경 및 초기화 미완료 시 localStorage Fallback을 제공합니다.
  *
@@ -355,6 +455,41 @@ async function connectOffscreenSocket(): Promise<void> {
         }
       }
 
+      // 페이지 단위 JSON 저장 완료 ACK(CRAWL_PARTIAL_SAVED) 수신 시 대기 중인 promise 해소
+      // (best-of-red 액션 실행기의 실제 파일 저장 확인용)
+      if (
+        packet.action === "CRAWL_PARTIAL_SAVED" &&
+        packet.payload &&
+        typeof packet.payload === "object"
+      ) {
+        const ackPayload = packet.payload as Record<string, unknown>;
+        const requestId =
+          typeof ackPayload.requestId === "string"
+            ? ackPayload.requestId
+            : "";
+        if (requestId && partialSaveWaiters.has(requestId)) {
+          const resolveAck = partialSaveWaiters.get(requestId);
+          partialSaveWaiters.delete(requestId);
+          if (resolveAck) {
+            resolveAck({
+              success: ackPayload.success !== false,
+              savedFilePath:
+                typeof ackPayload.savedFilePath === "string"
+                  ? ackPayload.savedFilePath
+                  : undefined,
+              fileSize:
+                typeof ackPayload.fileSize === "number"
+                  ? ackPayload.fileSize
+                  : undefined,
+              entriesCount:
+                typeof ackPayload.entriesCount === "number"
+                  ? ackPayload.entriesCount
+                  : undefined,
+            });
+          }
+        }
+      }
+
       // 저장 위치 응답(STORAGE_LOCATION_RESPONSE) 수신 시 대기 중인 promise 해소
       if (
         packet.action === "STORAGE_LOCATION_RESPONSE" &&
@@ -431,10 +566,52 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           meta: message.packet.meta || { timestamp: Date.now() },
         };
         socket.send(JSON.stringify(fullPacket));
-        try {
-          sendResponse({ success: true });
-        } catch {
-          // 채널 파괴 방어
+
+        // CRAWL_PARTIAL에 requestId가 있으면 서버의 CRAWL_PARTIAL_SAVED ACK까지
+        // 응답을 보류해 실제 물리 파일 저장을 확인한 뒤 결과를 반환합니다.
+        // (best-of-red 액션 실행기: "서버 저장 완료 확인 후 다음 페이지 이동" 보장)
+        const partialPayload =
+          message.packet.payload && typeof message.packet.payload === "object"
+            ? (message.packet.payload as Record<string, unknown>)
+            : null;
+        const requestId =
+          fullPacket.action === "CRAWL_PARTIAL" &&
+          partialPayload &&
+          typeof partialPayload.requestId === "string"
+            ? (partialPayload.requestId as string)
+            : "";
+
+        if (requestId) {
+          const timer = setTimeout(() => {
+            partialSaveWaiters.delete(requestId);
+            try {
+              sendResponse({
+                success: false,
+                error: "PARTIAL_SAVE_TIMEOUT",
+              });
+            } catch {
+              // 채널 파괴 방어
+            }
+          }, 30000);
+          partialSaveWaiters.set(requestId, (ack) => {
+            clearTimeout(timer);
+            try {
+              sendResponse({
+                success: ack.success,
+                savedFilePath: ack.savedFilePath,
+                fileSize: ack.fileSize,
+                entriesCount: ack.entriesCount,
+              });
+            } catch {
+              // 채널 파괴 방어
+            }
+          });
+        } else {
+          try {
+            sendResponse({ success: true });
+          } catch {
+            // 채널 파괴 방어
+          }
         }
       } else {
         connectOffscreenSocket();
@@ -509,6 +686,44 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch(() => {
         try {
           sendResponse({ success: false, error: "FETCH_MEDIA_BUNDLE_ERROR" });
+        } catch {
+          // 채널 파괴 방어
+        }
+      });
+    return true;
+  }
+
+  // best-of-red 페이지 미디어 전체 인출·저장: 페이지의 모든 엔트리 자산을
+  // 동시성 제한으로 서버에 번들 저장하고 집계 결과를 반환합니다.
+  if (message.type === "FETCH_PAGE_MEDIA_BUNDLES" && message.payload) {
+    const payload = message.payload as {
+      page: number;
+      entries: XvideosMediaEntry[];
+      pathSegments: string[];
+    };
+    handleFetchPageMediaBundles(
+      typeof payload.page === "number" ? payload.page : 0,
+      Array.isArray(payload.entries) ? payload.entries : [],
+      Array.isArray(payload.pathSegments) ? payload.pathSegments : [],
+    )
+      .then((result) => {
+        try {
+          sendResponse(result);
+        } catch {
+          // 채널 파괴 방어
+        }
+      })
+      .catch(() => {
+        try {
+          sendResponse({
+            success: false,
+            savedCount: 0,
+            failedCount: Array.isArray(payload.entries)
+              ? payload.entries.length
+              : 0,
+            savedFiles: [],
+            failedEntries: [{ eid: "", reason: "FETCH_PAGE_MEDIA_ERROR" }],
+          });
         } catch {
           // 채널 파괴 방어
         }

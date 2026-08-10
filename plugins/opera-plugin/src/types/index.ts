@@ -1,4 +1,4 @@
-// plugins/opera-plugin/src/types/index.ts
+// plugins/basic-plugin/src/types/index.ts
 
 /** 패킷 페이로드 물리 데이터 포맷 구별자 */
 export type PayloadType = "json" | "binary_base64" | "raw_text" | "chunk_stream";
@@ -181,6 +181,8 @@ export interface CrawlMediaBundlePayload {
   title?: string;
   /** 플러그인이 생성한 txt 메타 원문 (서버가 그대로 저장) */
   txtContent?: string;
+  /** 계층 저장 경로 세그먼트 (예: best-of-red 액션: ["best-of-red","2026-06","16"]) — 지정 시 해당 폴더에 저장 */
+  pathSegments?: string[];
   /** 자산 목록 (최대 3종: thumb/sfw/preview) */
   assets?: MediaAssetPayload[];
   /** 수집 시점 타임스탬프 */
@@ -349,9 +351,9 @@ export interface XvBestOfRedInitData {
   basePath: string;
   /** 현재 페이지 인덱스 (0 = 베이스 URL) */
   currentPage: number;
-  /** 마지막 페이지 인덱스 (페이지네이션 연속 블록에서 감지) */
+  /** 마지막 페이지 인덱스 (페이지네이션 최대 data-page 신뢰) */
   maxPage: number;
-  /** 처리 대상 총 페이지 수 (maxPage - currentPage + 1) */
+  /** 처리 대상 총 페이지 수 (항상 0부터 전체 순회하므로 maxPage + 1) */
   totalPages: number;
   /** 현재 페이지 전체 URL */
   url: string;
@@ -359,7 +361,7 @@ export interface XvBestOfRedInitData {
 
 /** xvideos best-of-red 페이지 수집 응답 구조체 (COLLECT_BEST_OF_RED_PAGE) */
 export interface XvBestOfRedPageData {
-  /** 로드 완료 검증 여부 (readyState complete + 썸네일 이미지 로드) */
+  /** 로드 완료 검증 여부 (네트워크 안정 + DOM 안정 + 썸네일 이미지 로드) */
   ready: boolean;
   /** 수집 시점 페이지 인덱스 */
   page: number;
@@ -371,4 +373,32 @@ export interface XvBestOfRedPageData {
   data: XvideosMediaEntry[];
   /** 결과 메시지 */
   message: string;
+}
+
+/** xvideos best-of-red 페이지 미디어 번들 저장 결과 구조체 (FETCH_PAGE_MEDIA_BUNDLES 응답) */
+export interface XvBestOfRedMediaResult {
+  /** 전체 성공 여부 (실패 엔트리가 0개일 때만 true) */
+  success: boolean;
+  /** 성공 처리 엔트리 수 */
+  savedCount: number;
+  /** 실패 처리 엔트리 수 */
+  failedCount: number;
+  /** 서버가 저장한 파일 절대 경로 목록 (전 엔트리 합계) */
+  savedFiles: string[];
+  /** 엔트리별 저장 파일 매핑 (page-N.json 메타 기록용) */
+  entryFiles: XvBestOfRedSavedFileInfo[];
+  /** 실패 엔트리 정보 목록 (EID/사유) */
+  failedEntries: Array<{ eid: string; reason: string }>;
+}
+
+/** xvideos best-of-red 페이지 저장 결과 구조체 (엔트리별 로컬 저장 파일 경로) */
+export interface XvBestOfRedSavedFileInfo {
+  /** 엔트리 EID */
+  eid: string;
+  /** 메인 썸네일 저장 파일 절대 경로 (미저장 시 빈 문자열) */
+  thumb?: string;
+  /** 보조 썸네일 저장 파일 절대 경로 (미저장 시 빈 문자열) */
+  sfw?: string;
+  /** 프리뷰 mp4 저장 파일 절대 경로 (미저장 시 빈 문자열) */
+  preview?: string;
 }

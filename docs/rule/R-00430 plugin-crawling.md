@@ -173,15 +173,18 @@ xvideos.com 페이지에서 `.thumb-block` 비디오 블록(목록/검색 페이
 
 ### 5.5 xvideos best-of-red 자동 이동 액션 (`COLLECT_BEST_OF_RED_INIT` / `COLLECT_BEST_OF_RED_PAGE`)
 
-`xvideos.com/best-of-red/<월>/` 월간 페이지를 **액션 실행기 전용 팝업 창**이 1페이지씩 순차 이동하며, 각 페이지의 비디오 메타(제목/clickUrl/썸네일 2종/프리뷰)를 수집·물리 저장하는 액션 모듈입니다. 베이스 탭의 **"액션 실행"** 섹션 하위 `xvideos.com` 모듈에서 실행합니다. 이전 §5.4의 `collectXvideosMediaEntries()` 파싱 규칙을 그대로 재사용합니다.
+`xvideos.com/best-of-red/<월>/` 월간 페이지를 **액션 실행기 전용 팝업 창**이 1페이지씩 순차 이동하며, 각 페이지의 비디오 메타(제목/clickUrl/썸네일 2종/프리뷰 mp4)를 수집·실제 다운로드·물리 저장하는 액션 모듈입니다. 베이스 탭의 **"액션 실행"** 섹션 하위 `xvideos.com` 모듈에서 실행합니다. 이전 §5.4의 `collectXvideosMediaEntries()` 파싱 규칙을 그대로 재사용합니다.
 
 - **트리거**: 베이스 탭 "액션 실행" 섹션의 `xvideos.com` → **"best-of-red 자동 이동"** → `usePopupState.handleOpenXvBestOfRedAction()`이 `chrome.windows.create({ url: "action-runner.html?module=best-of-red&tabId=N", type: "popup", width: 900, height: 760 })`로 **액션 실행기 팝업 창**을 엽니다. 콘텐츠 스크립트의 `COLLECT_BEST_OF_RED_INIT`는 현재 URL이 `/best-of-red/<세그먼트>/`(정규식 `XV_BEST_OF_RED_BASE_RE`)와 일치하지 않으면 `{ success: false }`를 응답합니다.
 - **페이지 범위 감지(init)**: `.pagination a[data-page]` 값 집합의 **최댓값(`Math.max`)을 그대로 마지막 페이지로 신뢰**합니다(아웃라이어 간주·대체 로직 없음, 예: `0..16,111` → 111). 윈도우 페이지네이션(일부 페이지만 노출)에서도 마지막 페이지 링크가 있으면 해당 값을 감지하며, `.pagination`이 없으면 현재 페이지를 마지막 페이지로 폴백합니다.
-- **이동 방식(팝업 주도)**: 진행 상태는 **팝업 창(`actionRunner.tsx` + `useBestOfRedRunner`)이 보유**합니다. 무작위 이동 없이 현재 페이지부터 `+1`씩 순차 이동하며, `chrome.tabs.update(tabId, { url })` 후 `chrome.tabs.onUpdated`의 `status === "complete"` + 경로 일치까지 대기합니다. 팝업 창을 닫으면 실행이 중단됩니다.
-- **로드 완료 검증**: 콘텐츠 스크립트 `COLLECT_BEST_OF_RED_PAGE` 핸들러의 `waitForXvBestOfRedPageReady()`가 `readyState === "complete"`(load 이벤트 최대 3초 대기) + `.thumb-block:not(.thumb-ad) img` 전부 `complete && naturalWidth > 0`(최대 4초 폴링)인지 검증한 뒤에만 수집합니다. 이미지 로딩이 끝나지 않으면 `ready: false`로 반환합니다.
+- **이동 방식(팝업 주도·안정 우선)**: 진행 상태는 **팝업 창(`actionRunner.tsx` + `useBestOfRedRunner`)이 보유**합니다. 무작위 이동 없이 **0페이지(베이스)부터 `maxPage`까지 `+1`씩 전체 순회**(`totalPages = maxPage + 1`)하며, **페이지당 수집·미디어 다운로드·JSON 저장이 모두 확인된 뒤에만** 다음 페이지로 이동합니다. 팝업 창을 닫으면 실행이 중단됩니다.
+- **로드 완료 검증(네트워크+DOM+이미지)**: `waitForXvBestOfRedPageReady()`가 ① `readyState === "complete"` ② **네트워크 안정**(`installNetworkActivityWatch()`가 XHR/fetch 패치로 추적한 `pageInflightCount === 0` + `networkResourcesStable()` 리소스 엔트리가 연속 3회 동일) ③ **DOM 안정**(비디오 블록 수 연속 3회 동일) ④ **이미지 완료**(`.thumb-block:not(.thumb-ad)` 내 no-img 제외 `complete && naturalWidth > 0`)를 모두 만족할 때까지 400ms 폴링(최대 20초)합니다. 검증 실패 시 `ready: false`로 반환하며, 실행기는 최대 3회 재시도(1초 간격) 후에도 실패하면 해당 페이지를 실패 집계합니다.
+- **수집 보강**: `data-video` JSON 파싱(`parseXvThumbBlockDataVideo()`)으로 `sfwThumbUrl`/`previewVideo`를 우선 사용하고, `data-sfwthumb`/`.videopv video src`/`data-pvv`로 폴백합니다. title은 `title` 속성 → 텍스트 폴백 순으로 수집합니다.
 - **페이지 URL 규칙**: 페이지 0은 베이스 URL(`/best-of-red/<월>`), N은 `/best-of-red/<월>/N`입니다. 베이스 URL의 후행 슬래시 유무는 무관하게 인식합니다(정규식 `XV_BEST_OF_RED_BASE_RE`).
-- **전송·저장 규격**: 각 페이지마다 `CRAWL_PARTIAL`(payloadType: `json`)로 `{ page, url, title, data: entries[], pathSegments: ["best-of-red","<월>","<N>"], fileName: "page-<N>.json", timestamp }`를 전송합니다(오프스크린 소켓 포워딩, R-00420 §4.5 참조). 서버는 `pathSegments`가 있으면 `saveCrawlPartialToFile()`로 `<기본 저장 경로>/<도메인>/<pathSegments...>/page-<N>.json`에 물리 저장합니다(`images/` 없이 도메인 직하, R-00208 §3 참조). 광고 블록은 `.thumb-block:not(.thumb-ad)` 셀렉터로 제외합니다.
-- **진행 로그**: 팝업 창의 "행동 로그" 콘솔에 페이지별 `[n/총] N페이지 이동 중 → 브라우저 로딩 완료 → 데이터 수집 중 → 데이터 수집 완료 → 서버 저장 완료(best-of-red/<월>/<N>/page-N.json)` 로그를 순서대로 출력합니다. 진행률 바(현재/총)와 감지된 총 페이지 수를 함께 표시하며 [중지] 버튼으로 중단할 수 있습니다.
+- **미디어 실제 다운로드·저장**: 페이지 수집 성공 시 `requestFetchPageMediaBundles({ page, entries, pathSegments })`로 오프스크린에 페이지 전체 미디어 인출을 요청합니다. 오프스크린은 **동시성 3 제한**으로 엔트리별 3자산(메인/보조 썸네일 + 프리뷰 mp4)을 fetch → `CRAWL_IMAGE` 번들(`pathSegments` 포함)로 서버에 전송 → `CRAWL_MEDIA_SAVED` ACK(실제 저장 파일 목록)까지 대기한 뒤 집계(성공/실패 엔트리·엔트리별 파일 경로)를 반환합니다(R-00420 §4.5, R-00208 §3.2). 실패 엔트리는 페이지 실패로 집계됩니다.
+- **JSON 전송·저장 규격(저장 ACK 확인)**: 각 페이지마다 `CRAWL_PARTIAL`(payloadType: `json`)로 `{ page, url, title, data: entries[], fileMap: entryFiles[], pathSegments: ["best-of-red","<월>","<N>"], fileName: "page-<N>.json", requestId, timestamp }`를 전송합니다. **requestId가 포함되므로 오프스크린은 서버의 `CRAWL_PARTIAL_SAVED` ACK(실제 저장 파일 경로/크기)까지 대기**한 뒤 결과를 반환하며, ACK 확인 없이는 다음 페이지로 이동하지 않습니다. 수집 항목이 0건이어도 **빈 JSON(`data: []`)을 저장**합니다(실측에서 0건 페이지가 존재).
+- **진행 로그**: 팝업 창의 "행동 로그" 콘솔에 페이지별 `[n/총] N페이지 이동 중 → 브라우저 로딩 완료 → 데이터 수집 중(시도 m/3) → 데이터 수집 완료(m건) → 미디어 저장 완료(성공/실패) → JSON 서버 저장 완료(실제 파일 경로)` 로그를 순서대로 출력합니다. 진행률 바(현재/총)와 감지된 총 페이지 수를 함께 표시하며 [중지] 버튼으로 중단할 수 있습니다.
+- **완료 배너**: 실행 완료 시 성공/실패 페이지 수(실패 페이지 인덱스 목록), JSON 저장 수, 미디어 저장 성공/실패 수, 저장 루트(`xvideos.com/best-of-red/<월>/<N>/`)를 요약 표시합니다.
 
 ---
 
@@ -206,6 +209,7 @@ xvideos.com 페이지에서 `.thumb-block` 비디오 블록(목록/검색 페이
 - [ ] 항목별 프로그레스 바가 진행 단계(30/55/80/95%)를 실시간 갱신하고 완료/실패 시 100%로 표시되는가?
 - [ ] 목록 진행 시 항목별 txt+썸네일2종+preview.mp4가 `images/xvideos.com/normal/`에 저장되고 상태 배지가 완료/실패로 갱신되는가?
 - [ ] 베이스 탭 "액션 실행" 섹션의 xvideos.com 모듈에서 "best-of-red 자동 이동" 버튼이 서버 온라인 시 활성화되고, 액션 실행기 팝업 창(900×760)이 열리는가?
-- [ ] best-of-red 자동 이동 시 액션 실행기 팝업이 현재 페이지부터 마지막 페이지까지 +1씩 순차 이동하며 각 페이지의 비디오 메타(`CRAWL_PARTIAL`)가 서버에 `<도메인>/best-of-red/<월>/<N>/page-N.json`(`images/` 없음)으로 물리 저장되는가?
-- [ ] 이미지 로딩 완료 검증(`waitForXvBestOfRedPageReady`) 실패 시 해당 페이지가 스킵되고 다음 페이지로 계속 진행되는가?
+- [ ] best-of-red 자동 이동 시 액션 실행기 팝업이 **0페이지부터 마지막 페이지까지 +1씩 전체 순회**하며 각 페이지의 비디오 메타(`CRAWL_PARTIAL`)가 서버에 `<도메인>/best-of-red/<월>/<N>/page-N.json`(`images/` 없음)으로 물리 저장되는가?
+- [ ] 로드 검증(네트워크 안정 + DOM 안정 + 이미지 완료) 실패 페이지가 최대 3회 재시도 후 실패 집계되고, **미디어 저장/JSON 저장 ACK 확인 없이는 다음 페이지로 이동하지 않는가**?
+- [ ] 수집 항목이 0건인 페이지에도 **빈 JSON(`data: []`)**이 저장되며, 완료 배너에 실패 페이지/미디어 성공·실패 집계가 표시되는가?
 - [ ] 액션 실행기 팝업 창을 닫으면 자동 이동이 중단되고, [중지] 버튼으로도 중단할 수 있는가?

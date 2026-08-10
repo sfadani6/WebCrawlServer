@@ -2,6 +2,46 @@
 
 ---
 
+## 2026-08-10 | best-of-red 안정 우선 재설계 — 0페이지부터 전체 순회 + 실제 미디어 다운로드 + 저장 ACK 확인 후 이동
+
+### 요청
+- 16페이지가 아닌 **0페이지부터** 전체 순회할 것(`pageList = 0..maxPage`).
+- 각 페이지의 `.thumb-block` 이미지(메인/보조 썸네일)와 `.videopv video` **프리뷰 mp4를 실제로 다운로드**해 저장할 것(JSON URL만 아님).
+- HTML 문서만 로드되고 이동하지 말고, **네트워크/XHR 감시로 로드 완료를 검증**하고 페이지 정보 수집·파일 다운로드를 완벽하게 한 뒤 **재검증 후 다음 페이지로 이동**할 것.
+- 총 이동할 페이징 정보를 **배열로 저장**해 하나씩 이동하며 수집·다운로드 완료 확인 후 이동하는 안정된 플로우 구성.
+- (사용자 확정) 썸네일+preview 실제 다운로드 저장, 0건이어도 **빈 JSON 저장**.
+
+### 확정된 상세 규격
+- **페이지 범위**: `totalPages = maxPage + 1`, 페이지 0 = 베이스 URL(`/best-of-red/<월>`).
+- **페이지당 안정 플로우(ACK 확인 후 다음 이동)**: 이동+로드 대기 → 수집(로드 검증, 최대 3회 재시도) → 미디어 실제 다운로드(`FETCH_PAGE_MEDIA_BUNDLES`, 오프스크린 동시성 3, `CRAWL_MEDIA_SAVED` ACK) → JSON 저장(`CRAWL_PARTIAL`+requestId → `CRAWL_PARTIAL_SAVED` ACK) → 600ms 후 다음 페이지.
+- **로드 검증**: readyState complete + 네트워크 안정(XHR/fetch 인플라이트 0 + 리소스 엔트리 3회 동일) + DOM 안정(블록 수 3회) + 이미지 완료(no-img 제외), 400ms 폴링, 20초 데드라인.
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/src/content.ts`: `installNetworkActivityWatch()`(XHR/fetch 패치 인플라이트), `waitForXvBestOfRedPageReady()` 재작성(네트워크+DOM+이미지 통합), `collectXvideosMediaEntries()` 보강(data-video 파싱·title/sfw/preview 폴백), INIT `totalPages = maxPage + 1`.
+- `plugins/basic-plugin/src/types/index.ts`: `XvBestOfRedMediaResult`/`XvBestOfRedSavedFileInfo` 신규, `CrawlMediaBundlePayload.pathSegments` 추가.
+- `plugins/basic-plugin/src/services/chromeService.ts`: `sendSocketPacket` ACK 반환 확장, `requestFetchPageMediaBundles()` 신규.
+- `plugins/basic-plugin/src/offscreen.ts`: `partialSaveWaiters` + CRAWL_PARTIAL_SAVED ACK 해소, SEND_SOCKET_PACKET CRAWL_PARTIAL(requestId) ACK 보류(30초), `handleFetchPageMediaBundles()`(동시성 3, entryFiles 매핑, pathSegments 번들), FETCH_PAGE_MEDIA_BUNDLES 핸들러.
+- `plugins/basic-plugin/src/hooks/useBestOfRedRunner.ts` 전면 개편: 0..maxPage 순회·3회 재시도·미디어 단계·JSON ACK 확인 후 이동·`XvBestOfRedRunSummary` + `ActionRunnerView.tsx` 완료 배너.
+- `server/src/services/fileStorageService.ts`: `saveCrawledMediaBundle()` `pathSegments` 계층 저장. `server/src/index.ts`: CRAWL_IMAGE 번들 pathSegments 전달 + CRAWL_PARTIAL `CRAWL_PARTIAL_SAVED` ACK.
+- opera-plugin 동기화 6종 + 양 플러그인 빌드 성공(각 56 모듈) + server tsc 빌드 통과 + pm2 재시작(포트 9600 HTTP 200) + `npx eslint .` 신규 문제 0건.
+- 문서: R-00430 §5.5+§6, R-00480 §3.1, R-00420 §4.5, R-00208 §2.2/§2.3/§3.1/§3.2/§5, R-00440 §2.4+체크리스트, askLog 신규(ask-20260810225335), ask.md 초기화.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/content.ts`, `plugins/basic-plugin/src/types/index.ts`, `plugins/basic-plugin/src/services/chromeService.ts`, `plugins/basic-plugin/src/offscreen.ts`, `plugins/basic-plugin/src/hooks/useBestOfRedRunner.ts`, `plugins/basic-plugin/src/components/ActionRunnerView.tsx`
+- `plugins/opera-plugin/src/` 동일 6종
+- `server/src/services/fileStorageService.ts`, `server/src/index.ts`
+- `docs/rule/R-00430 plugin-crawling.md`, `docs/rule/R-00480 plugin-automation-crawling.md`, `docs/rule/R-00420 plugin-communication.md`, `docs/rule/R-00208 local-file-storage-system.md`, `docs/rule/R-00440 plugin-ui-ux.md`
+- `docs/askLogs/ask-20260810225335.md`(신규), `docs/todo.md`
+
+### 검증 결과
+- 양 플러그인 `npm run build` 성공(각 56 모듈), server tsc 빌드 통과 → pm2 재시작(포트 9600 HTTP 200).
+- `npx eslint .` 변경 파일 신규 문제 0건(기존 admin 오류·경고만 존재), opera-plugin 동기화 diff 0 확인.
+
+### 보류 항목
+- 브라우저 실측: 액션 실행기 팝업 → 0페이지부터 maxPage 전체 순회, 페이지별 로드 검증→수집→미디어 실제 다운로드(ACK)→JSON 저장(ACK) 로그, `<도메인>/best-of-red/<월>/<N>/` 물리 저장, 0건 빈 JSON, 완료 배너 실패 집계, [중지]/팝업 닫힘 중단 확인.
+
+---
+
 ## 2026-08-10 | best-of-red 실측 버그 2건 + 저장 경로(`images/` 제거) 수정
 
 ### 요청

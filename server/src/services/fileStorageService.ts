@@ -426,6 +426,8 @@ export interface SaveCrawledMediaBundleOptions {
   baseName: string;
   /** 플러그인이 생성한 txt 메타 원문 */
   txtContent: string;
+  /** 계층 저장 경로 세그먼트 (예: ["best-of-red","2026-06","16"]) — 지정 시 카테고리 하위에 추가 폴더 생성 */
+  pathSegments?: string[];
   /** 자산 목록 (최대 3종: thumb/sfw/preview) */
   assets: CrawledMediaAssetOptions[];
 }
@@ -442,7 +444,8 @@ export interface SaveCrawledMediaBundleResult extends SaveContentResult {
  * xvideos 미디어 번들(썸네일/보조썸네일/프리뷰 mp4 + 플러그인 생성 txt 메타)을
  * 전용 폴더에 물리 파일로 보관합니다. (R-00208 이미지 저장소 규격 확장)
  *
- * 저장 경로 규격: <기본경로>/images/<도메인>/<카테고리>/<timestamp>-<index>.<ext>
+ * 저장 경로 규격: <기본경로>/images/<도메인>/<카테고리>[/<pathSegments>]/<timestamp>-<index>.<ext>
+ * - pathSegments: best-of-red 액션 등에서 계층 폴더(예: best-of-red/2026-06/16)를 추가 생성합니다.
  * - txt: 플러그인이 생성한 메타 원문(click_url/title/자산 URL/저장 파일 목록)을 그대로 저장
  * - 자산: Base64 디코딩 후 MIME 확장자로 <baseName>_<kind>.<ext> 바이너리 저장
  * - 다운로드 실패 자산(data 미존재)은 바이너리를 스킵하며, 실패 내역은 txt에 기록됩니다.
@@ -459,7 +462,12 @@ export function saveCrawledMediaBundle(
   // 2. 도메인/카테고리 특수문자 정화 후 이미지 전용 디렉터리 구성
   const safeDomain = sanitizeFolderName(options.domain);
   const safeCategory = sanitizeFolderName(options.category || "normal");
-  const targetDir = resolve(rootPath, "images", safeDomain, safeCategory);
+  // pathSegments가 지정되면 카테고리 하위에 계층 폴더를 추가로 생성합니다.
+  // (예: best-of-red 액션 → images/xvideos.com/best-of-red/2026-06/16/)
+  const segments = (options.pathSegments || [])
+    .map((seg) => sanitizeFolderName(String(seg)))
+    .filter((seg) => seg.length > 0 && seg !== "." && seg !== "..");
+  const targetDir = resolve(rootPath, "images", safeDomain, safeCategory, ...segments);
 
   // 3. 대상 디렉터리 없을 경우 재귀적으로 자동 생성
   if (!existsSync(targetDir)) {

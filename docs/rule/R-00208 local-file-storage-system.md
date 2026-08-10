@@ -73,6 +73,7 @@
 ```
 
 - **요청 흐름**: 플러그인이 `GET_STORAGE_LOCATION`으로 저장 위치(절대/상대)를 조회한 뒤(→ `STORAGE_LOCATION_RESPONSE`), 오프스크린이 3종 자산(CORS 우회 + 오페라 VPN)을 fetch하여 base64 번들 + `txtContent`를 `CRAWL_IMAGE`(payloadType `json`)로 전송합니다.
+- **계층 경로 확장(best-of-red 연동)**: `CRAWL_IMAGE` 번들 payload에 `pathSegments?: string[]`가 포함되면 `saveCrawledMediaBundle()`이 카테고리 하위에 세그먼트 폴더를 추가 생성해 `<기본 저장 경로>/images/<safeDomain>/<category>/<pathSegments...>/<baseName>_<kind>.<ext>`로 저장합니다. (best-of-red 액션: `images/xvideos.com/best-of-red/<월>/<N>/page-<N>-<eid>_thumb.<ext>` 등)
 - **저장 분기**: `payloadObj.assets`가 배열이면 기존 단일 이미지 저장 대신 번들 저장 경로를 탑니다. `txtContent`가 있으면 `<timestamp>-<index>.txt`로 원문 그대로 저장합니다. 각 자산은 `name`에서 파생한 하위 폴더/확장자(앱 대비)에 저장하며, `data`가 빈 문자열(인출 실패)인 자산은 건너뜁니다.
 - **ACK**: 저장 완료 시 `CRAWL_MEDIA_SAVED` ACK(`bundleId`/`savedDir`/`savedFiles`)를 전송하고, 플러그인은 매칭 `bundleId` 항목의 상태를 완료/실패로 갱신합니다(60초 타임아웃).
 
@@ -88,8 +89,9 @@
             └── page-16.json               # fileName (페이지 단위 메타 JSON)
 ```
 
-- **전송 규격**: `CRAWL_PARTIAL` payload에 `pathSegments: string[]`와 `fileName?: string`을 포함합니다(best-of-red 액션: `["best-of-red","<월>","<N>"]` + `page-<N>.json`). `fileName`이 없으면 `<timestamp>-<seq>.json` 기본명을 사용합니다.
+- **전송 규격**: `CRAWL_PARTIAL` payload에 `pathSegments: string[]`, `fileName?: string`, **`requestId?: string`**을 포함합니다(best-of-red 액션: `["best-of-red","<월>","<N>"]` + `page-<N>.json` + requestId). `fileName`이 없으면 `<timestamp>-<seq>.json` 기본명을 사용합니다.
 - **저장 분기**: 서버 `index.ts`의 `CRAWL_PARTIAL` 분기에서 `Array.isArray(payload.pathSegments) && 길이 > 0`이면 `saveCrawlPartialToFile()`로 저장하고, 아니면 기존 흐름(기본 저장 규격)을 따릅니다.
+- **저장 ACK**: 저장 완료 후 서버는 **`CRAWL_PARTIAL_SAVED`**(`requestId`/`savedFilePath`/`fileSize`/`entriesCount`) ACK를 플러그인에 응답합니다. 액션 실행기는 `requestId`를 담은 `CRAWL_PARTIAL` 전송 시 이 ACK(실제 파일 저장 확인)까지 대기한 뒤에만 다음 페이지로 이동합니다(오프스크린 `partialSaveWaiters` 30초 타임아웃).
 - **정화 규칙**: `pathSegments`의 각 요소와 `fileName`은 `sanitizeFolderName()`으로 경로 금지 특수문자를 정화하며, 디렉터리 탐색(경로 탈출)은 세그먼트 단위 정화로 차단됩니다.
 - **DB 연동**: `crawl_logs`에 action=`CRAWL_PARTIAL` 레코드의 `file_path`/`file_size`가 실제 저장 파일 경로·크기로 갱신됩니다.
 
@@ -199,7 +201,7 @@ export function saveCrawledMediaBundle(
 ): SaveCrawledMediaBundleResult;
 ```
 
-- **경로 규칙**: `<globalDefaultPath|...>\images\<safeDomain>\<category>\<baseName>` 기반. 자산은 `<baseName>_thumb/sfw.<ext>` 등 `name`에서 파생한 하위 폴더에 저장하고, `mimeToExtension`(`video/mp4`→mp4, `video/webm`→webm 등) 매핑 또는 자산명 확장자로 확장자를 결정합니다.
+- **경로 규칙**: `<globalDefaultPath|...>\images\<safeDomain>\<category>[<pathSegments...>]\<baseName>` 기반. `pathSegments?: string[]`가 지정되면 카테고리 하위에 세그먼트 폴더를 추가 생성합니다(best-of-red 액션: `images/xvideos.com/best-of-red/<월>/<N>/`). 자산은 `<baseName>_thumb/sfw.<ext>` 등 `name`에서 파생한 하위 폴더에 저장하고, `mimeToExtension`(`video/mp4`→mp4, `video/webm`→webm 등) 매핑 또는 자산명 확장자로 확장자를 결정합니다.
 - **메타 txt**: `txtContent`가 있으면 `<baseName>.txt`로 저장하고 `savedFiles`에 포함합니다.
 - **ACK 연계**: `server/src/index.ts`의 `CRAWL_IMAGE` 분기에서 `Array.isArray(payloadObj.assets)` 감지 시 번들 저장을 수행하고 `CRAWL_MEDIA_SAVED`(`bundleId`/`savedDir`/`savedFiles`) ACK를 전송합니다.
 
@@ -226,7 +228,7 @@ export function saveCrawlPartialToFile(
 ```
 
 - **경로 규칙**: `<globalDefaultPath|...>\<safeDomain>\<pathSegments를 정화한 폴더들>\<정화된 fileName>`(`images/` 없이 도메인 직하). 각 세그먼트를 `sanitizeFolderName()`으로 정화해 중첩 폴더로 생성하고, 마지막에 JSON(`JSON.stringify(payload, null, 2)`)을 저장합니다.
-- **연계 분기**: `server/src/index.ts`의 `CRAWL_PARTIAL` 분기에서 `Array.isArray(payloadObj.pathSegments) && payloadObj.pathSegments.length > 0`이면 호출하고, `updateCrawlLogFile(logId, savedPath, savedSize)`로 `crawl_logs.file_path`/`file_size`를 갱신합니다.
+- **연계 분기**: `server/src/index.ts`의 `CRAWL_PARTIAL` 분기에서 `Array.isArray(payloadObj.pathSegments) && payloadObj.pathSegments.length > 0`이면 호출하고, `updateCrawlLogFile(logId, savedPath, savedSize)`로 `crawl_logs.file_path`/`file_size`를 갱신한 뒤, **`requestId`가 있으면 `CRAWL_PARTIAL_SAVED` ACK(실제 파일 경로/크기/엔트리 수)를 클라이언트에 응답**합니다.
 
 ---
 
@@ -269,4 +271,5 @@ app.get("/api/admin/storage/status", (_req, res) => {
 - [ ] 크로스 오리진 이미지가 스킵되지 않고 `.txt` 참조 파일(page_url/image_url/click_url/title)로 보관되는가?
 - [ ] `GET_STORAGE_LOCATION`→`STORAGE_LOCATION_RESPONSE`로 플러그인이 저장 위치(절대/상대)를 조회하는가?
 - [ ] 미디어 번들(`assets` 배열)이 `saveCrawledMediaBundle()`로 txt+썸네일+preview.mp4 일괄 저장되고 `CRAWL_MEDIA_SAVED` ACK가 반환되는가?
-- [ ] `CRAWL_PARTIAL`의 `pathSegments`가 있으면 `<도메인>/best-of-red/<월>/<N>/page-N.json`(`images/` 없음)으로 분리 저장되고 `file_path`/`file_size`가 갱신되는가?
+- [ ] `CRAWL_PARTIAL`의 `pathSegments`가 있으면 `<도메인>/best-of-red/<월>/<N>/page-N.json`(`images/` 없음)으로 분리 저장되고 `file_path`/`file_size`가 갱신되며, `requestId`가 있으면 `CRAWL_PARTIAL_SAVED` ACK가 응답되는가?
+- [ ] 미디어 번들(`assets` 배열)에 `pathSegments`가 있으면 `images/<도메인>/<category>/<pathSegments...>/` 계층 폴더에 저장되는가?

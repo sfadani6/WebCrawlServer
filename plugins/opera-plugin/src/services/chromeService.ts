@@ -1,4 +1,4 @@
-// plugins/opera-plugin/src/services/chromeService.ts
+// plugins/basic-plugin/src/services/chromeService.ts
 
 import {
   BrowserInfo,
@@ -10,21 +10,32 @@ import {
   StorageLocationResponsePayload,
   XvBestOfRedInitData,
   XvBestOfRedPageData,
+  XvBestOfRedMediaResult,
 } from "../types/index.js";
 
 /**
  * 범용 웹소켓 패킷을 오프스크린 소켓을 거쳐 서버로 송출합니다.
  * SEND_SOCKET_PACKET 메시지 타입으로 백그라운드에 중계합니다.
  *
+ * CRAWL_PARTIAL에 requestId가 포함된 경우 오프스크린이 서버의
+ * CRAWL_PARTIAL_SAVED ACK(실제 파일 저장 완료)까지 대기한 뒤 응답합니다.
+ * ACK 성공 시 savedFilePath/fileSize/entriesCount가 함께 반환됩니다.
+ *
  * @param packet - 서버로 전송할 패킷 구성 (action, targetId, payloadType, payload)
- * @returns 전송 처리 결과 객체
+ * @returns 전송 처리 결과 객체 (ACK 수신 시 실제 저장 경로/크기 포함)
  */
 export function sendSocketPacket(packet: {
   action: string;
   targetId?: string;
   payloadType?: PayloadType;
   payload?: unknown;
-}): Promise<{ success: boolean; message: string }> {
+}): Promise<{
+  success: boolean;
+  message: string;
+  savedFilePath?: string;
+  fileSize?: number;
+  entriesCount?: number;
+}> {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(
       {
@@ -46,12 +57,24 @@ export function sendSocketPacket(packet: {
         } else if (res && !res.success) {
           resolve({
             success: false,
-            message: "전송 실패: 서버 소켓 미연결 상태입니다.",
+            message: res.error
+              ? `전송 실패: ${res.error}`
+              : "전송 실패: 서버 소켓 미연결 상태입니다.",
           });
         } else {
           resolve({
             success: true,
             message: "패킷이 성공적으로 서버로 송출되었습니다.",
+            savedFilePath:
+              res && typeof res.savedFilePath === "string"
+                ? res.savedFilePath
+                : undefined,
+            fileSize:
+              res && typeof res.fileSize === "number" ? res.fileSize : undefined,
+            entriesCount:
+              res && typeof res.entriesCount === "number"
+                ? res.entriesCount
+                : undefined,
           });
         }
       }
@@ -499,6 +522,54 @@ export function requestXvBestOfRedPage(tabId: number): Promise<{
       message: res.message || (data && data.message) || "",
       data,
     };
+  });
+}
+
+/**
+ * best-of-red 페이지의 비디오 엔트리 전체(메인/보조 썸네일 + 프리뷰 mp4)를
+ * 오프스크린이 fetch로 인출해 서버에 번들 저장하고 완료 여부를 반환합니다.
+ * (FETCH_PAGE_MEDIA_BUNDLES 메시지 → 오프스크린이 엔트리별 CRAWL_IMAGE 번들 전송)
+ *
+ * @param payload - 페이지 미디어 인출 요청 페이로드 (page/entries/pathSegments)
+ * @returns 페이지 미디어 저장 결과 (성공/실패 엔트리 수, 저장 파일 목록)
+ */
+export function requestFetchPageMediaBundles(payload: {
+  page: number;
+  entries: XvideosMediaEntry[];
+  pathSegments: string[];
+}): Promise<XvBestOfRedMediaResult> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      {
+        type: "FETCH_PAGE_MEDIA_BUNDLES",
+        payload,
+      },
+      (res) => {
+        if (chrome.runtime.lastError) {
+          resolve({
+            success: false,
+            savedCount: 0,
+            failedCount: payload.entries.length,
+            savedFiles: [],
+            failedEntries: [
+              { eid: "", reason: "백그라운드 엔진 오프라인" },
+            ],
+          });
+          return;
+        }
+        if (!res) {
+          resolve({
+            success: false,
+            savedCount: 0,
+            failedCount: payload.entries.length,
+            savedFiles: [],
+            failedEntries: [{ eid: "", reason: "응답 없음" }],
+          });
+          return;
+        }
+        resolve(res as XvBestOfRedMediaResult);
+      }
+    );
   });
 }
 

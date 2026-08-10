@@ -79,11 +79,11 @@
 - **창 생성 흐름**: `handleOpenXvBestOfRedAction()` → `chrome.tabs.query({ url: "*://*.xvideos.com/*" })`로 대상 탭 탐색(best-of-red URL 우선 → 활성 탭 → 첫 탭) → `chrome.windows.create({ url: chrome.runtime.getURL("action-runner.html?module=best-of-red&tabId=…"), type: "popup", width: 900, height: 760, focused: true })`. xvideos 탭이 없으면 팝업이 초기 오류 안내를 표시합니다.
 - **액션 실행기 레이아웃** (`ActionRunnerView.tsx`, `xvideos-manager.html`과 동일한 `manager-scrollable` 전역 스크롤 규격):
   - 헤더: 액션명(`best-of-red 자동 이동`) + 대상 탭 URL(축약) + 실행 상태 배지(`idle`/`init`/`running`/`completed`/`stopped`/`error` 구분 색상) + [닫기] 버튼(`window.close()`)
-  - 초기 정보 카드: 감지된 베이스 경로/총 페이지 수/현재 페이지/마지막 페이지
+  - 초기 정보 카드: 감지된 베이스 경로/총 페이지 수(시작 0 ~ 마지막 maxPage)/현재 페이지/마지막 페이지
   - **진행률 바**: 현재 페이지 ÷ 총 페이지(`%` 표기) + [시작] / [중지] 버튼(`btn-primary`/`btn-secondary`)
-  - **행동 로그 콘솔**: 페이지별 이동·로드·수집·서버 저장 로그(레벨별 색상, 최대 300건 유지)
-  - 완료 배너: 총 처리 페이지 수와 저장 경로(`xvideos.com/best-of-red/<월>/<N>/page-N.json`) 안내
-- **상태 관리**: `useBestOfRedRunner` 훅(`src/hooks/useBestOfRedRunner.ts`)이 상태 머신(`idle/init/running/completed/stopped/error`), 로그(키 `action_log_<seq>`, 300건 상한), 진행도, 시작/중지(`stopRequested` ref)를 전담합니다. `actionRunner.tsx`는 쿼리 파라미터(`module`/`tabId`)를 파싱하고 탭 유효성 검증·폴백 탐색을 담당합니다.
+  - **행동 로그 콘솔**: 페이지별 이동·로드·수집(시도 n/3)·미디어 저장·서버 저장 로그(레벨별 색상, 최대 300건 유지)
+  - 완료 배너: 성공/실패 페이지 수(실패 페이지 목록), JSON 저장 수, 미디어 저장 성공/실패 집계, 저장 루트(`xvideos.com/best-of-red/<월>/<N>/`) 요약 표시
+- **상태 관리**: `useBestOfRedRunner` 훅(`src/hooks/useBestOfRedRunner.ts`)이 상태 머신(`idle/init/running/completed/stopped/error`), 로그(키 `action_log_<seq>`, 300건 상한), 진행도, 완료 요약(`summary`), 시작/중지(`stopRequested` ref)를 전담합니다. `actionRunner.tsx`는 쿼리 파라미터(`module`/`tabId`)를 파싱하고 탭 유효성 검증·폴백 탐색을 담당합니다.
 
 ---
 
@@ -129,6 +129,6 @@
 - [ ] 터미널 콘솔이 모든 탭 하단 맨 아래에 동일하게 고정 표시되는가?
 - [ ] 활성 탭 전환/페이지 이동 시 `[현재 페이지]` URL이 자동으로 갱신되는가?
 - [ ] 기본 탭의 DOM 전송 라디오(전체/요소선택/프레임) 및 이미지 수집/액션 실행(xvideos.com 모듈) 섹션이 정상 표시되는가?
-- [ ] xvideos.com 페이지에서 액션 실행의 "best-of-red 자동 이동" 버튼이 활성화되고, 액션 실행기 팝업 창(900×760)이 열리며 진행 로그·진행률 바가 갱신되는가?
+- [ ] xvideos.com 페이지에서 액션 실행의 "best-of-red 자동 이동" 버튼이 활성화되고, 액션 실행기 팝업 창(900×760)이 열리며 진행 로그·진행률 바·완료 배너(실패 페이지/미디어 집계)가 갱신되는가?
 - [ ] 주요 노드 ID, 로그, URL 문자가 마우스 드래그로 복사되는가?
 - [ ] 서버 패킷 수신 시 상태 배지 및 모달 창이 실시간으로 반응하는가?

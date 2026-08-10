@@ -29,6 +29,7 @@ export default defineConfig({
         sidepanel: resolve(__dirname, "sidepanel.html"),
         offscreen: resolve(__dirname, "offscreen.html"),
         xvideosManager: resolve(__dirname, "xvideos-manager.html"),
+        actionRunner: resolve(__dirname, "action-runner.html"),
         background: resolve(__dirname, "src/background.ts"),
         content: resolve(__dirname, "src/content.ts"),
       },

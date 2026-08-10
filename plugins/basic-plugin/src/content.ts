@@ -21,6 +21,17 @@ export interface PaginationCrawlPayload {
   delayMs: number;
 }
 
+/**
+ * best-of-red URL 인식 정규식입니다.
+ * 베이스 경로(/best-of-red/<월>, 후행 슬래시 유무 무관)와 선택 페이지 인덱스(/best-of-red/<월>/N)를 캡처합니다.
+ */
+const XV_BEST_OF_RED_BASE_RE = /^(\/best-of-red\/[^/]+)(?:\/(\d+))?\/?$/;
+
+/** best-of-red 페이지 썸네일 이미지 로드 대기 상한 시간 (ms) */
+const XV_BEST_OF_RED_IMAGE_WAIT_MS = 4000;
+/** best-of-red 로드 검증 폴링 간격 (ms) */
+const XV_BEST_OF_RED_READY_POLL_MS = 200;
+
 /** 요소 선택 모드 하이라이트 색상 (파란색 테두리) */
 const PICKER_HIGHLIGHT_COLOR = "#3b82f6";
 
@@ -576,7 +587,11 @@ function collectXvideosMediaEntries(): XvideosMediaEntry[] {
   const entries: XvideosMediaEntry[] = [];
   const seenClickUrls = new Set<string>();
 
-  const blocks = document.querySelectorAll<HTMLElement>(".thumb-block");
+  // 광고 블록(thumb-ad)은 img 없이 CSS 배경/영상 요소로 구성되어 있어 제외 대상이며,
+  // 명시적으로 제외해 수집 품질을 보장합니다.
+  const blocks = document.querySelectorAll<HTMLElement>(
+    ".thumb-block:not(.thumb-ad)",
+  );
   for (const block of blocks) {
     const img = block.querySelector<HTMLImageElement>("img");
     if (!img) continue;
@@ -683,6 +698,112 @@ function collectXvideosVideoPageEntry(): XvideosMediaEntry | null {
     sfwUrl: "",
     previewUrl: "",
   };
+}
+
+/**
+ * 지정한 시간(ms) 동안 비동기 대기합니다. 로드 검증 폴링과 페이지 이동 간 대기에 사용됩니다.
+ *
+ * @param ms 대기 시간 (ms)
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * best-of-red 페이지 인덱스에 대응하는 이동 URL을 생성합니다.
+ * 0은 베이스 URL(예: /best-of-red/2026-06), N은 베이스/N(예: /best-of-red/2026-06/16)입니다.
+ *
+ * @param basePath 베이스 경로 (예: "/best-of-red/2026-06", 후행 슬래시 없음)
+ * @param pageIndex 이동할 페이지 인덱스
+ * @returns 이동할 페이지 URL
+ */
+function buildXvBestOfRedPageUrl(basePath: string, pageIndex: number): string {
+  return pageIndex === 0 ? basePath : `${basePath}/${pageIndex}`;
+}
+
+/**
+ * 현재 URL에서 best-of-red 베이스 경로와 페이지 인덱스를 파싱합니다.
+ * best-of-red 페이지가 아니면 null을 반환합니다.
+ *
+ * 파싱 규칙:
+ * - 베이스 경로: /best-of-red/<한 세그먼트> 형태 (후행 슬래시 유무 무관, 예: /best-of-red/2026-06)
+ * - 페이지 인덱스: 베이스 경로 뒤 /N (없으면 0)
+ *
+ * @returns 베이스 경로·현재 페이지 인덱스 또는 null
+ */
+function parseXvBestOfRedUrl(): { basePath: string; currentPage: number } | null {
+  const match = window.location.pathname.match(XV_BEST_OF_RED_BASE_RE);
+  if (!match) return null;
+  return {
+    basePath: match[1],
+    currentPage: match[2] ? parseInt(match[2], 10) : 0,
+  };
+}
+
+/**
+ * 페이지네이션(.pagination a[data-page])에서 마지막 페이지 인덱스를 감지합니다.
+ *
+ * 감지 규칙:
+ * - data-page 값 중 **최댓값**을 마지막 페이지로 신뢰합니다. xvideos 페이지네이션은
+ *   항상 마지막 페이지 링크(예: data-page="111", 라벨 "112")를 함께 렌더링하므로
+ *   윈도우(일부 페이지만 노출) 방식이라도 그 값이 실제 끝 페이지입니다.
+ *   (이전의 "차이 20 이상 → 아웃라이어" 가드는 진짜 마지막 링크를 버려서
+ *   총 페이지 수를 과소 감지했으므로 제거합니다. 예: 0~16 + 111 → 111)
+ * - 페이지네이션이 없으면 현재 페이지를 반환해 현재 페이지만 처리합니다.
+ *
+ * @param currentPage 현재 페이지 인덱스
+ * @returns 마지막 페이지 인덱스
+ */
+function detectXvBestOfRedMaxPage(currentPage: number): number {
+  const anchors = document.querySelectorAll<HTMLAnchorElement>(
+    ".pagination a[data-page]",
+  );
+  const pages = new Set<number>();
+  for (const anchor of anchors) {
+    const value = parseInt(anchor.getAttribute("data-page") || "", 10);
+    if (Number.isInteger(value) && value >= 0) pages.add(value);
+  }
+  if (pages.size === 0) return currentPage;
+
+  // 최대 data-page 값 = 실제 마지막 페이지 (마지막 페이지 링크 신뢰)
+  return Math.max(...pages);
+}
+
+/**
+ * best-of-red 페이지 로드 완료를 검증합니다.
+ * document.readyState가 complete가 될 때까지 기다린 뒤,
+ * .thumb-block 썸네일 이미지들이 완전히 로드(complete)될 때까지 폴링합니다.
+ * (이미지 로드는 상한 시간 XV_BEST_OF_RED_IMAGE_WAIT_MS를 넘기면 포기합니다.)
+ *
+ * @returns 로드 완료 여부 (이미지 로드 상한 초과 시 false)
+ */
+async function waitForXvBestOfRedPageReady(): Promise<boolean> {
+  // readyState complete 대기 (탭 이동 직후 프레임 진입 방어)
+  if (document.readyState !== "complete") {
+    await new Promise<void>((resolve) => {
+      window.addEventListener("load", () => resolve());
+      // 예비 폴백: 3초 내 load 이벤트가 없으면 진행 (로드 이벤트 누락 방어)
+      setTimeout(() => resolve(), 3000);
+    });
+  }
+
+  // 썸네일 이미지 로드 검증 폴링
+  const deadline = Date.now() + XV_BEST_OF_RED_IMAGE_WAIT_MS;
+  while (Date.now() < deadline) {
+    const images = Array.from(
+      document.querySelectorAll<HTMLImageElement>(".thumb-block:not(.thumb-ad) img"),
+    );
+    // 이미지가 아직 DOM에 없는 경우에도 로드 대기 (동적 렌더 전)
+    if (images.length === 0) {
+      await sleep(XV_BEST_OF_RED_READY_POLL_MS);
+      continue;
+    }
+    if (images.every((img) => img.complete && img.naturalWidth > 0)) {
+      return true;
+    }
+    await sleep(XV_BEST_OF_RED_READY_POLL_MS);
+  }
+  return false;
 }
 
 /**
@@ -804,6 +925,64 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       message,
     });
     return false;
+  }
+
+  // [7-2] xvideos best-of-red 초기 정보 조회 지시 (액션 실행기 팝업용)
+  // 페이지네이션 연속 블록에서 총 페이지 수를 감지해 베이스 경로·현재 페이지 인덱스와 함께 반환합니다.
+  if (request.command === "COLLECT_BEST_OF_RED_INIT") {
+    const parsed = parseXvBestOfRedUrl();
+    if (!parsed) {
+      sendResponse({
+        success: false,
+        message: "best-of-red 페이지에서만 실행할 수 있습니다.",
+      });
+      return false;
+    }
+    const maxPage = detectXvBestOfRedMaxPage(parsed.currentPage);
+    sendResponse({
+      success: true,
+      data: {
+        basePath: parsed.basePath,
+        currentPage: parsed.currentPage,
+        maxPage,
+        totalPages: maxPage - parsed.currentPage + 1,
+        url: window.location.href,
+      },
+    });
+    return false;
+  }
+
+  // [7-3] xvideos best-of-red 페이지 수집 지시 (액션 실행기 팝업용)
+  // 페이지 로드 완료(readyState complete + 썸네일 이미지 로드)를 검증한 뒤
+  // 비디오 블록 메타를 수집해 data 하위에 중첩해 반환합니다. 서버 전송은 팝업(오프스크린 경유)이 담당합니다.
+  if (request.command === "COLLECT_BEST_OF_RED_PAGE") {
+    waitForXvBestOfRedPageReady().then((ready) => {
+      const parsed = parseXvBestOfRedUrl();
+      if (!parsed) {
+        sendResponse({
+          success: false,
+          message: "best-of-red 페이지가 아닙니다.",
+        });
+        return;
+      }
+      const entries = ready ? collectXvideosMediaEntries() : [];
+      const message = ready
+        ? `페이지 로드 완료 · 비디오 블록 ${entries.length}건 수집`
+        : "로드 완료 검증 시간 초과 (수집 결과 미포함)";
+      sendResponse({
+        success: true,
+        message,
+        data: {
+          ready,
+          page: parsed.currentPage,
+          url: window.location.href,
+          title: document.title,
+          data: entries,
+          message,
+        },
+      });
+    });
+    return true;
   }
 
   // [8] 페이지 이미지 추출 및 전송 지시 (비동기 → return true)

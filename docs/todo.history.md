@@ -2,6 +2,126 @@
 
 ---
 
+## 2026-08-10 | best-of-red 실측 버그 2건 + 저장 경로(`images/` 제거) 수정
+
+### 요청
+- best-of-red 자동 이동 실측에서 총 페이지가 과소 감지됨(`data-page="111"` 라벨 "112"까지 있는데 "전체 수집 완료 (17페이지, 총 17페이지)" 조기 종료).
+- 진행 로그가 `데이터 수집 완료: undefined`·`서버 저장 완료: ... (0건)`으로 오표시됨.
+- 저장 경로가 로그 표기와 달리 실제 저장 폴더에 없음. **기본 저장 폴더 → 도메인 폴더 → `best-of-red/2026-06/16/`** 아래 페이지별 저장을 요구(`images/` 없음).
+
+### 확정된 상세 규격
+- **마지막 페이지 111까지 전부 수집**: `.pagination` 최대 `data-page` 값을 그대로 신뢰(아웃라이어 대체 없음).
+- **저장 경로**: `<기본경로>/xvideos.com/best-of-red/2026-06/16/page-16.json`.
+
+### 원인 진단
+1. `detectXvBestOfRedMaxPage`가 최댓값 111과 다음 값 16의 차이 ≥ 20을 아웃라이어로 간주해 16으로 대체 → 조기 종료.
+2. 콘텐츠 스크립트가 페이지 메타를 응답 최상위로 반환, `requestXvBestOfRedPage`가 `res.data`(entries 배열)를 페이지 객체로 오인(`typeof [] === "object"`).
+3. 서버 분기 코드가 pm2 실행 프로세스에 미반영 + `saveCrawlPartialToFile` 경로가 `images/` 포함.
+   참고: `sendSocketPacket`은 오프스크린 수신 즉시 `success:true`이므로 "서버 저장 완료" 로그는 실제 저장을 보장하지 않는다.
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/src/content.ts`: `detectXvBestOfRedMaxPage` 아웃라이어 가드 제거(`Math.max` 신뢰), [7-3] `COLLECT_BEST_OF_RED_PAGE` 응답 `data` 중첩.
+- `server/src/services/fileStorageService.ts`: `saveCrawlPartialToFile` 경로 `resolve(rootPath, safeDomain, ...safeSegments)`로 `images/` 제거. `server/src/index.ts` 분기 주석 동기화.
+- `plugins/opera-plugin/src/content.ts` 동기화(diff 0), 양 플러그인 재빌드 성공(각 56 모듈), server tsc 빌드 통과, pm2 재시작(포트 9600 HTTP 200), `npx eslint .` 신규 문제 0건.
+- 문서: R-00430 §5.5+§6, R-00480 §3.1, R-00420 §4.5, R-00208 §2.3+§3.2+§5, R-00440 §2.4 — 감지 규칙("최대 data-page 신뢰")·저장 경로("`images/` 제거") 갱신, askLog 신규, ask.md 초기화.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/content.ts`, `plugins/opera-plugin/src/content.ts`
+- `server/src/services/fileStorageService.ts`, `server/src/index.ts`
+- `docs/rule/R-00430 plugin-crawling.md`, `docs/rule/R-00480 plugin-automation-crawling.md`, `docs/rule/R-00420 plugin-communication.md`, `docs/rule/R-00208 local-file-storage-system.md`, `docs/rule/R-00440 plugin-ui-ux.md`
+- `docs/askLogs/ask-20260810201945.md`(신규)
+
+### 검증 결과
+- 양 플러그인 `npm run build` 성공(각 56 모듈, content.js 11.18 kB / actionRunner.js 7.71 kB).
+- server tsc 빌드 통과 → pm2 재시작(새 pid 67528) → `GET /api/admin/storage/status` HTTP 200.
+- `npx eslint .` 변경 파일 신규 문제 0건, opera-plugin 동기화 diff 0 확인.
+
+### 보류 항목
+- 브라우저 실측: 0→111(총 112페이지) 순차 이동·행동 로그, `xvideos.com/best-of-red/2026-06/<N>/page-<N>.json` 물리 저장(`images/` 없음) 확인.
+
+---
+
+## 2026-08-10 | xvideos best-of-red 자동 이동 재설계 — 액션 실행기 팝업 주도 순차 이동
+
+### 요청
+- best-of-red 자동 이동이 **16페이지까지 진행하지 않는** 원인을 파악해 재설계한다. 페이지 전체를 수집한 뒤 **페이지 수대로 순차 이동**하고, 이미지 등이 모두 로드된 뒤 이동하도록 **로드 완료 상태를 검증**해야 한다.
+- "best-of-red 자동 이동" 버튼을 이미지 수집이 아닌 **"액션 실행"**(정식 명칭) 하위 `xvideos.com` **액션 모듈**로 이동하고, 클릭 시 "다운로드 매니저 열기"처럼 **스크롤되는 팝업 창**에 **행동 로그**가 콘솔처럼 출력되어야 한다.
+- 저장 경로: `https://www.xvideos.com/best-of-red/2026-06/16` → `best-of-red/2026-06/16` 아래 저장.
+
+### 확정된 상세 규격
+- **팝업 종료 시 중단 OK**: 진행 상태는 액션 실행기 전용 팝업 창(`action-runner.html?module=best-of-red&tabId=N`, 900×760)이 보유하며, 팝업을 닫으면 중단된다.
+- **파일명 규칙**: 페이지별 저장 파일명 `page-<N>.json`.
+- **원인 진단·대응**: 구 `detectXvBestOfRedMaxPage`는 현재 페이지부터 +1 연속 블록 끝값만 사용해 윈도우 페이지네이션에서 마지막 페이지를 놓칠 수 있었음 → ① 최댓값(차이 ≥ 20 아웃라이어 대체)과 ② 연속 블록 끝값 중 **큰 값** 채택. 무작위 이동 제거, +1 순차 이동, `chrome.tabs.onUpdated` complete+경로 일치(30초 타임아웃) 대기, 콘텐츠 스크립트 `waitForXvBestOfRedPageReady()`(readyState complete + 썸네일 이미지 로딩 완료, 4초 상한) 검증 후 수집.
+- **저장 규격**: `CRAWL_PARTIAL` payload에 `pathSegments: ["best-of-red","<월>","<N>"]`+`fileName: "page-<N>.json"` → 서버 `saveCrawlPartialToFile()`로 `images/<도메인>/best-of-red/<월>/<N>/page-<N>.json` 물리 저장.
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/src/content.ts`: 구 세션 엔진(세션 영속화/엔진/`START_XVIDEOS_BEST_OF_RED`) 제거, `COLLECT_BEST_OF_RED_INIT`/`COLLECT_BEST_OF_RED_PAGE` 핸들러, `waitForXvBestOfRedPageReady()`, `detectXvBestOfRedMaxPage()` 강화.
+- `plugins/basic-plugin/src/hooks/useBestOfRedRunner.ts`(신규): 상태머신(idle/init/running/completed/stopped/error), +1 순차 이동, `waitForTabComplete`, `CRAWL_PARTIAL pathSegments` 전송, 로그 300건 상한.
+- `plugins/basic-plugin/src/actionRunner.tsx`+`src/components/ActionRunnerView.tsx`+`action-runner.html`(신규): 모듈/탭 쿼리 파싱, 상태 배지·진행률 바·행동 로그 콘솔·시작/중지·완료 배너.
+- `plugins/basic-plugin/vite.config.ts`: `actionRunner` 엔트리 추가.
+- `plugins/basic-plugin/src/services/chromeService.ts`: `requestXvBestOfRedInit/Page` 추가(`requestStartXvideosBestOfRed` 제거).
+- `plugins/basic-plugin/src/hooks/usePopupState.ts`: `handleOpenXvBestOfRedAction`(xvideos 탭 탐색→windows.create) 신규.
+- `plugins/basic-plugin/src/components/tabs/BasicTab.tsx`: "액션 실행" 섹션 정식화(xvideos.com 액션모듈 카드·best-of-red 자동 이동 버튼) + popup/sidepanel/types 반영.
+- `server/src/services/fileStorageService.ts`: `saveCrawlPartialToFile()` + `server/src/index.ts` CRAWL_PARTIAL `pathSegments` 분기.
+- `plugins/opera-plugin/` 동일 12종 동기화(복사 + 헤더 주석 교체).
+- 문서: R-00430 §5.5+§6, R-00480 §3.1, R-00440 §2.3+§2.4+§5, R-00420 §4.5+§5, R-00208 §2.3+§3.2+§5 갱신, askLog 신규.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/content.ts`, `src/hooks/useBestOfRedRunner.ts`(신규), `src/actionRunner.tsx`(신규), `src/components/ActionRunnerView.tsx`(신규), `action-runner.html`(신규), `src/services/chromeService.ts`, `src/hooks/usePopupState.ts`, `src/components/tabs/BasicTab.tsx`, `src/popup.tsx`, `src/sidepanel.tsx`, `src/types/index.ts`, `vite.config.ts`
+- `plugins/opera-plugin/` 동일 12종 (동기화)
+- `server/src/services/fileStorageService.ts`, `server/src/index.ts`
+- `docs/rule/R-00430 plugin-crawling.md`, `docs/rule/R-00480 plugin-automation-crawling.md`, `docs/rule/R-00440 plugin-ui-ux.md`, `docs/rule/R-00420 plugin-communication.md`, `docs/rule/R-00208 local-file-storage-system.md`
+- `docs/askLogs/ask-20260810175719.md`(신규)
+
+### 검증 결과
+- server `npm run build`(tsc) 통과.
+- basic-plugin/opera-plugin `npm run build` 성공(각 56 모듈, `action-runner.html`+`actionRunner.js` 포함).
+- dist/content.js에서 구 세션 엔진 문자열(`xvBofR`/`maybeResumeXvBestOfRed`/`START_XVIDEOS_BEST_OF_RED`) 완전 제거 확인, `COLLECT_BEST_OF_RED_INIT`/`waitForXvBestOfRedPageReady` 포함 확인.
+- `npx eslint .`: 변경 파일 신규 문제 0건(기존 admin/ 파일 에러와 server/index.ts 기존 경고만 존재).
+- opera-plugin 동기화 12종 일치(헤더 경로만 교체) 확인.
+
+### 보류 항목
+- 브라우저 실측: 액션 실행 xvideos.com 모듈 → 액션 실행기 팝업(900×760) 열림 → 총 페이지 감지 → 페이지별 이동/로딩 완료/수집/서버 저장 로그 → `page-<N>.json` 물리 저장, 팝업 닫기·[중지] 중단 확인.
+
+---
+
+
+
+## 2026-08-10 | xvideos best-of-red 자동 페이징 이동 수집
+
+### 요청
+- `https://www.xvideos.com/best-of-red/<월>/` 주소에서 액션 실행 버튼을 누르면 **0페이지부터 16페이지까지 자동으로 이동하며 각 페이지의 비디오 메타를 수집**한다.
+
+### 확정된 상세 규격
+- 사이드바/팝업 xvideos 그룹에 **"best-of-red 자동 이동"** 버튼을 추가하고, 현재 페이지부터 페이지네이션(`.pagination a[data-page]` 연속 블록)의 마지막 페이지까지 **URL 직접 이동**하며 `.thumb-block` 비디오 메타를 기존 `collectXvideosMediaEntries()` 규칙으로 수집해 `CRAWL_PARTIAL`(json)로 서버에 누적 전송한다.
+- 페이지 이동으로 콘텐츠 스크립트 컨텍스트가 파괴·재주입되므로 진행 상태를 `sessionStorage` 키 `xvBofR`에 영속화하고, 재주입 시 `maybeResumeXvBestOfRed()`가 세션을 이어받는다. 완료 시 세션 정리, 예상 URL 불일치(사용자 이탈) 시 중단한다.
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/src/content.ts`: best-of-red 상수/타입(`XvBestOfRedState` 등) + 세션 저장/정리·URL 파싱·maxPage 감지·패킷 전송·엔진·재개·시작 함수, `START_XVIDEOS_BEST_OF_RED` [7-2] 메시지 분기(동기 응답), 최하단 `maybeResumeXvBestOfRed()` 호출, `collectXvideosMediaEntries()` 셀렉터 `.thumb-block:not(.thumb-ad)` 보강.
+- `plugins/basic-plugin/src/services/chromeService.ts`: `requestStartXvideosBestOfRed()` — `sendCommandToActiveTab("START_XVIDEOS_BEST_OF_RED")` 래퍼.
+- `plugins/basic-plugin/src/hooks/usePopupState.ts`: `handleRunXvBestOfRed()` 핸들러 + return 반영.
+- `plugins/basic-plugin/src/components/tabs/BasicTab.tsx`: `onRunXvBestOfRed` prop + `isXvBestOfRedUrl()` 판별 + xvideos 그룹 best-of-red 자동 이동 버튼(best-of-red 페이지에서만 활성화).
+- `plugins/basic-plugin/src/popup.tsx`/`src/sidepanel.tsx`: `onRunXvBestOfRed` props 배선.
+- `plugins/opera-plugin/` 동일 6종 동기화(복사 + 헤더 주석 교체).
+- 문서: R-00430 §5.5+§6, R-00480 §3.1, R-00440 §2.3, R-00420 §4.5 갱신.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/content.ts`, `src/services/chromeService.ts`, `src/hooks/usePopupState.ts`, `src/components/tabs/BasicTab.tsx`, `src/popup.tsx`, `src/sidepanel.tsx`
+- `plugins/opera-plugin/` 동일 6종 (동기화)
+- `docs/rule/R-00430 plugin-crawling.md`, `docs/rule/R-00480 plugin-automation-crawling.md`, `docs/rule/R-00440 plugin-ui-ux.md`, `docs/rule/R-00420 plugin-communication.md`
+- `docs/askLogs/ask-20260810163514.md`(신규)
+
+### 검증 결과
+- basic-plugin/opera-plugin `npm run build` 성공(각 52 모듈).
+- 동기화 6종 일치(헤더 경로만 교체) 확인.
+- `eslint` 전체 수정 파일 12종 통과(exit 0).
+- dist/content.js에 `START_XVIDEOS_BEST_OF_RED`/`xvBofR` 포함 확인.
+
+### 잔여 사항
+- 브라우저 실측: best-of-red 월간 페이지에서 버튼 활성화 → 클릭 시 현재~마지막 페이지 자동 이동 → 각 페이지 비디오 메타 서버 누적 저장, 완료 시 세션 정리·이탈 시 중단 확인.
+
+---
+
 ## 2026-08-10 | xvideos 단일 영상 페이지(플레이어) 포스터 이미지·타이틀 추출
 
 ### 요청

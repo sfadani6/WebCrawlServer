@@ -8,6 +8,8 @@ import {
   XvideosMediaEntry,
   CrawlMediaBundlePayload,
   StorageLocationResponsePayload,
+  XvBestOfRedInitData,
+  XvBestOfRedPageData,
 } from "../types/index.js";
 
 /**
@@ -445,6 +447,57 @@ export function requestCollectXvideosMediaFromTab(tabId: number): Promise<{
       message: data?.message || res.message,
       entries: Array.isArray(data?.entries) ? (data.entries as XvideosMediaEntry[]) : [],
       pageUrl: data?.pageUrl || "",
+    };
+  });
+}
+
+/**
+ * 대상 xvideos best-of-red 탭의 초기 정보(베이스 경로·현재/마지막 페이지·총 페이지 수)를 조회합니다.
+ * 페이지네이션(data-page) 연속 블록에서 마지막 페이지를 콘텐츠 스크립트가 감지합니다.
+ *
+ * @param tabId - 대상 xvideos 탭 ID
+ * @returns 초기 정보 응답 객체 (success/message/data)
+ */
+export function requestXvBestOfRedInit(tabId: number): Promise<{
+  success: boolean;
+  message: string;
+  data: XvBestOfRedInitData | null;
+}> {
+  return sendCommandToTab(tabId, "COLLECT_BEST_OF_RED_INIT").then((res) => {
+    const data =
+      typeof res.data === "object" && res.data !== null
+        ? (res.data as XvBestOfRedInitData)
+        : null;
+    return {
+      success: res.success,
+      message: res.message || "",
+      data,
+    };
+  });
+}
+
+/**
+ * 대상 xvideos best-of-red 탭의 현재 페이지 비디오 블록 메타를 수집합니다.
+ * 콘텐츠 스크립트가 로드 완료(readyState complete + 썸네일 이미지 로드)를 검증한 뒤 수집하며,
+ * 검증이 끝나기 전에는 수집을 미루므로 페이지의 로딩이 완전히 끝난 상태를 보장합니다.
+ *
+ * @param tabId - 대상 xvideos 탭 ID
+ * @returns 페이지 수집 응답 객체 (success/message/data)
+ */
+export function requestXvBestOfRedPage(tabId: number): Promise<{
+  success: boolean;
+  message: string;
+  data: XvBestOfRedPageData | null;
+}> {
+  return sendCommandToTab(tabId, "COLLECT_BEST_OF_RED_PAGE").then((res) => {
+    const data =
+      typeof res.data === "object" && res.data !== null
+        ? (res.data as XvBestOfRedPageData)
+        : null;
+    return {
+      success: res.success,
+      message: res.message || (data && data.message) || "",
+      data,
     };
   });
 }

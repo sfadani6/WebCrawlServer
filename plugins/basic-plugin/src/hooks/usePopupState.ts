@@ -355,6 +355,54 @@ export function usePopupState() {
     }
   }, [addTerminalLog]);
 
+  /**
+   * xvideos best-of-red 액션 실행기 전용 팝업 창을 엽니다.
+   * 대상 best-of-red 탭(tabId)을 쿼리로 전달해 팝업이 페이지를 순차 이동하며
+   * 페이지별 로드 완료 검증 → 비디오 블록 수집 → 서버 저장을 독립 수행하고,
+   * 진행 로그(이동 중/로딩 완료/수집/완료)를 콘솔 형태로 출력합니다.
+   *
+   * @returns Promise<void>
+   */
+  const handleOpenXvBestOfRedAction = useCallback(async () => {
+    setStatusMessage("best-of-red 액션 실행기 창을 엽니다...");
+    addTerminalLog(
+      "best-of-red 액션 실행기 창을 엽니다... (탭 검색 중)",
+      "info",
+    );
+    try {
+      // 열려 있는 best-of-red 탭 검색 (활성 탭 우선, 없으면 첫 번째 탭)
+      const tabs = await chrome.tabs.query({ url: "*://*.xvideos.com/*" });
+      const bestTab =
+        tabs.find((t) => t.url && t.url.includes("/best-of-red/")) ||
+        tabs.find((t) => t.active);
+      const target = bestTab || tabs.find((t) => typeof t.id === "number");
+      const tabId = target && typeof target.id === "number" ? target.id : null;
+      if (tabId === null) {
+        setStatusMessage("xvideos.com best-of-red 탭을 찾을 수 없습니다.");
+        addTerminalLog(
+          "xvideos.com best-of-red 페이지를 연 상태에서 다시 시도하세요.",
+          "warning",
+        );
+        return;
+      }
+      const runnerUrl = chrome.runtime.getURL(
+        `action-runner.html?module=best-of-red&tabId=${tabId}`,
+      );
+      await chrome.windows.create({
+        url: runnerUrl,
+        type: "popup",
+        width: 900,
+        height: 760,
+        focused: true,
+      });
+      setStatusMessage("best-of-red 액션 실행기 창을 열었습니다.");
+      addTerminalLog("best-of-red 액션 실행기 창을 열었습니다.", "success");
+    } catch {
+      setStatusMessage("액션 실행기 창을 여는 중 오류가 발생했습니다.");
+      addTerminalLog("액션 실행기 창을 여는 중 오류가 발생했습니다.", "error");
+    }
+  }, [addTerminalLog]);
+
   // 초기화 및 오프스크린 패킷 수신 리스너 등록
   useEffect(() => {
     refreshCurrentTabInfo();
@@ -659,6 +707,7 @@ export function usePopupState() {
     handleCollectImages,
     handleCollectSiteInfo,
     handleOpenXvideosManager,
+    handleOpenXvBestOfRedAction,
     handleSendDebugMessage,
     handleTabChange,
     executePluginCommand,

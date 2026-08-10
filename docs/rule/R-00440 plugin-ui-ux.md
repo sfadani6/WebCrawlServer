@@ -44,7 +44,7 @@
   - 현재 페이지 URL 카드 (활성 탭 감시로 자동 갱신)
   - **DOM 전송** 아코디언: 라디오 `전체`/`요소선택`/`프레임` 선택 → 모드별 실행 버튼 (전체=fullDom 전송, 요소선택=파란 테두리 선택 모드, 프레임=iframe DOM 전송, iframe 미존재 시 비활성화)
   - **이미지 수집** 아코디언: 현재 페이지 이미지를 추출해 서버 전송
-  - **액션 실행** 아코디언 (미개발, disabled — 설계 후 구현 예정)
+  - **액션 실행** 아코디언: 사이트별 액션 모듈을 표시합니다. 현재 `xvideos.com` 모듈이 구현되어 있으며, 기본 탭의 각 사이트 그룹 이미지 수집 버튼 블록 하단에 해당 모듈의 실행 버튼이 함께 표시됩니다(아래 2.4 § 참조)
 - **`정보` 탭**:
   - 브라우저 환경 정보 (플랫폼, 언어, User-Agent) 및 프로세서 정보 (CPU 코어 수, 디바이스 메모리)
 - **`디버깅` 탭**:
@@ -55,7 +55,7 @@
 
 ### 2.3 xvideos 다운로드 매니저 전용 팝업 창 (`xvideosManager.tsx`)
 
-패널 폭 협소 문제를 해소하기 위해 xvideos 다운로드 매니저는 사이드바 내부가 아닌 **전용 팝업 창(`chrome.windows.create({ type: "popup" })`, 900×760)**으로 분리 표시합니다. 사이드바/팝업의 xvideos 그룹은 "다운로드 매니저 열기" 버튼만 유지하며, 매니저 창은 대상 xvideos 탭(`?tabId=`)을 쿼리로 전달받아 독립 동작합니다.
+패널 폭 협소 문제를 해소하기 위해 xvideos 다운로드 매니저는 사이드바 내부가 아닌 **전용 팝업 창(`chrome.windows.create({ type: "popup" })`, 900×760)**으로 분리 표시합니다. 사이드바/팝업의 xvideos 그룹은 "다운로드 매니저 열기" 버튼을 제공하며, 매니저 창은 대상 xvideos 탭(`?tabId=`)을 쿼리로 전달받아 독립 동작합니다.
 
 - **창 생성 흐름**: 사이드바 `handleOpenXvideosManager` → `chrome.tabs.query({ url: "*://*.xvideos.com/*" })`로 대상 xvideos 탭 탐색(활성 탭 우선, 없으면 첫 탭) → `chrome.windows.create({ url: chrome.runtime.getURL("xvideos-manager.html?tabId=…"), type: "popup", width: 900, height: 760, focused: true })`. `windows` 권한이 manifest permissions에 필요합니다.
 - **진입 검증**: 매니저 페이지가 `chrome.tabs.get(tabId)`로 탭 유효성을 확인하고, 실패 시 `chrome.tabs.query`로 폴백하며, xvideos 탭이 없으면 초기 오류 안내("xvideos.com 탭을 찾을 수 없습니다...")를 표시합니다.
@@ -70,6 +70,20 @@
   - 하단 로그 터미널: 작업 진행 로그(레벨별 색상)
 - **상태 관리**: `useXvideosDownloadManager` 훅(`src/hooks/useXvideosDownloadManager.ts`)이 목록/순차 진행/초기화/로그(200건 상한)를 전담하며, 오프스크린의 `FETCH_MEDIA_BUNDLE_PROGRESS` 브로드캐스트를 `chrome.runtime.onMessage`로 수신해 항목 `progress`를 실시간 갱신합니다. 기존 `mediaAckWaiters`(60초)/`storageLocationWaiter`(15초) 파이프라인과 동일 컨텍스트에서 동작합니다.
 - **자동 목록 생성**: 최초 진입 시 대상 탭으로 `COLLECT_XVIDEOS_MEDIA`를 1회 요청해 목록을 자동 구성합니다.
+
+### 2.4 액션 실행 모듈 및 액션 실행기 팝업 창 (`actionRunner.tsx` / `ActionRunnerView.tsx`)
+
+자동 이동·연속 수집 같은 **오래 걸리는 액션**은 사이드바가 아닌 **액션 실행기 전용 팝업 창(`chrome.windows.create({ type: "popup" })`, 900×760)**으로 분리 실행합니다. 진행 상태를 팝업이 보유하므로 **팝업 창을 닫으면 실행이 중단**되며, 서버·탭 상태에 부담을 주지 않습니다.
+
+- **실행 버튼 위치**: 기본 탭 하단의 **"액션 실행"** 섹션(§2.2 레이아웃) 하위에 사이트별 액션 모듈 카드를 배치합니다. 현재 구현된 `xvideos.com` 모듈은 **"best-of-red 자동 이동"** 버튼을 제공하며, `matchedSite === "xvideos.com" && isServerOnline`일 때만 활성화됩니다. (버튼 활성화는 `/best-of-red/` 월간 페이지 여부와 무관하며, 액션 실행기 팝업이 xvideos 탭을 직접 탐색합니다)
+- **창 생성 흐름**: `handleOpenXvBestOfRedAction()` → `chrome.tabs.query({ url: "*://*.xvideos.com/*" })`로 대상 탭 탐색(best-of-red URL 우선 → 활성 탭 → 첫 탭) → `chrome.windows.create({ url: chrome.runtime.getURL("action-runner.html?module=best-of-red&tabId=…"), type: "popup", width: 900, height: 760, focused: true })`. xvideos 탭이 없으면 팝업이 초기 오류 안내를 표시합니다.
+- **액션 실행기 레이아웃** (`ActionRunnerView.tsx`, `xvideos-manager.html`과 동일한 `manager-scrollable` 전역 스크롤 규격):
+  - 헤더: 액션명(`best-of-red 자동 이동`) + 대상 탭 URL(축약) + 실행 상태 배지(`idle`/`init`/`running`/`completed`/`stopped`/`error` 구분 색상) + [닫기] 버튼(`window.close()`)
+  - 초기 정보 카드: 감지된 베이스 경로/총 페이지 수/현재 페이지/마지막 페이지
+  - **진행률 바**: 현재 페이지 ÷ 총 페이지(`%` 표기) + [시작] / [중지] 버튼(`btn-primary`/`btn-secondary`)
+  - **행동 로그 콘솔**: 페이지별 이동·로드·수집·서버 저장 로그(레벨별 색상, 최대 300건 유지)
+  - 완료 배너: 총 처리 페이지 수와 저장 경로(`xvideos.com/best-of-red/<월>/<N>/page-N.json`) 안내
+- **상태 관리**: `useBestOfRedRunner` 훅(`src/hooks/useBestOfRedRunner.ts`)이 상태 머신(`idle/init/running/completed/stopped/error`), 로그(키 `action_log_<seq>`, 300건 상한), 진행도, 시작/중지(`stopRequested` ref)를 전담합니다. `actionRunner.tsx`는 쿼리 파라미터(`module`/`tabId`)를 파싱하고 탭 유효성 검증·폴백 탐색을 담당합니다.
 
 ---
 
@@ -114,6 +128,7 @@
 - [ ] 탭 스위칭(`기본`, `정보`, `디버깅`, `설정`) 시 화면 전환이 부드럽게 이루어지는가?
 - [ ] 터미널 콘솔이 모든 탭 하단 맨 아래에 동일하게 고정 표시되는가?
 - [ ] 활성 탭 전환/페이지 이동 시 `[현재 페이지]` URL이 자동으로 갱신되는가?
-- [ ] 기본 탭의 DOM 전송 라디오(전체/요소선택/프레임) 및 이미지 수집/액션 실행(disabled) 섹션이 정상 표시되는가?
+- [ ] 기본 탭의 DOM 전송 라디오(전체/요소선택/프레임) 및 이미지 수집/액션 실행(xvideos.com 모듈) 섹션이 정상 표시되는가?
+- [ ] xvideos.com 페이지에서 액션 실행의 "best-of-red 자동 이동" 버튼이 활성화되고, 액션 실행기 팝업 창(900×760)이 열리며 진행 로그·진행률 바가 갱신되는가?
 - [ ] 주요 노드 ID, 로그, URL 문자가 마우스 드래그로 복사되는가?
 - [ ] 서버 패킷 수신 시 상태 배지 및 모달 창이 실시간으로 반응하는가?

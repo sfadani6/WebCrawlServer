@@ -39,6 +39,8 @@ interface BasicTabProps {
   onCollectSiteInfo: () => void;
   /** xvideos 다운로드 매니저 팝업 창 열기 콜백 */
   onOpenXvideosManager: () => void;
+  /** xvideos best-of-red 액션 실행기 팝업 창 열기 콜백 */
+  onOpenXvBestOfRedAction: () => void;
 }
 
 /** 이미지 수집 카테고리 표시 이름 매핑 */
@@ -74,7 +76,7 @@ function matchSiteDomain(currentUrl: string): string | null {
 
 /**
  * 기본 수집 탭 컴포넌트입니다.
- * DOM 전송(전체/요소선택/프레임), 이미지 수집, 액션 실행(미개발) 섹션을
+ * DOM 전송(전체/요소선택/프레임), 이미지 수집, 액션 실행 섹션을
  * 아코디언+카드 형태로 제공합니다. 현재 페이지 URL은 활성 탭을 실시간 감시해 자동 갱신됩니다.
  */
 export function BasicTab({
@@ -94,6 +96,7 @@ export function BasicTab({
   onCollectImages,
   onCollectSiteInfo,
   onOpenXvideosManager,
+  onOpenXvBestOfRedAction,
 }: BasicTabProps) {
   // 섹션 아코디언 열림/닫힘 상태 (기본 DOM 전송 섹션 열림)
   const [openSection, setOpenSection] = useState<string>("dom");
@@ -347,7 +350,8 @@ export function BasicTab({
                   {site === "xvideos.com" && isMatched && (
                     <p className="mt-3 border-t border-slate-700/60 pt-3 text-[10px] text-slate-500 leading-relaxed">
                       "다운로드 매니저 열기" 버튼으로 새 팝업 창을 열어 넓은
-                      목록에서 순차 다운로드를 진행합니다.
+                      목록에서 순차 다운로드를 진행합니다. best-of-red 자동 이동은
+                      아래 "액션 실행" 섹션의 xvideos.com 액션 모듈에서 실행합니다.
                     </p>
                   )}
                 </div>
@@ -357,16 +361,13 @@ export function BasicTab({
         )}
       </div>
 
-      {/* [3] 액션 실행 아코디언 섹션 (미개발) */}
+      {/* [3] 액션 실행 아코디언 섹션 (액션 모듈 실행 영역) */}
       <div className="section-card">
         <button
           onClick={() => toggleSection("actions")}
-          className="section-header opacity-80"
+          className="section-header"
         >
           <span className="flex-1 text-left font-semibold">액션 실행</span>
-          <span className="text-[10px] text-slate-500 border border-slate-600 rounded px-1.5 py-0.5">
-            미개발
-          </span>
           <span className="text-slate-400 text-sm leading-none">
             {openSection === "actions" ? "▼" : "▶"}
           </span>
@@ -375,16 +376,45 @@ export function BasicTab({
         {openSection === "actions" && (
           <div className="section-body">
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              페이지 자동화 액션(다중 포스팅, 자동 크롤링 등)을 실행하는 영역입니다.
-              현재 설계 단계이며, 완성 후 활성화됩니다.
+              사이트별 페이지 자동화 액션 모듈을 실행하는 영역입니다. 각 액션은
+              전용 팝업 창에서 진행 로그(이동/로딩 완료/수집/저장)를 콘솔처럼
+              출력하며 실행됩니다.
             </p>
-            <button
-              disabled
-              className="btn-primary mt-3 opacity-60 cursor-not-allowed"
-              title="액션 실행은 아직 개발되지 않았습니다."
-            >
-              <span>액션 실행 (개발 예정)</span>
-            </button>
+
+            {/* xvideos.com 액션 모듈 */}
+            <div className="mt-3 rounded-lg border border-slate-700/60 bg-[#121a26] p-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
+                <h3 className="text-[11px] font-bold text-slate-200 shrink-0">
+                  xvideos.com
+                </h3>
+                <span className="text-[10px] text-slate-500 truncate min-w-0">
+                  {matchedSite === "xvideos.com"
+                    ? "현재 페이지와 일치"
+                    : "xvideos.com 페이지에서 활성화"}
+                </span>
+              </div>
+
+              <button
+                onClick={onOpenXvBestOfRedAction}
+                disabled={
+                  matchedSite !== "xvideos.com" || !isServerOnline
+                }
+                title={
+                  matchedSite === "xvideos.com"
+                    ? "best-of-red 월간 페이지부터 마지막 페이지까지 순차 이동하며 각 페이지 비디오 메타를 수집·저장 (전용 팝업 창)"
+                    : "xvideos.com 페이지에서 사용할 수 있습니다"
+                }
+                className="btn-secondary w-full mt-2"
+              >
+                best-of-red 자동 이동
+              </button>
+              <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+                best-of-red 페이지 수를 감지해 1페이지씩 순차 이동합니다. 각
+                페이지는 이미지 로딩이 완전히 끝난 뒤 수집하고 저장 경로는
+                best-of-red/월/페이지 규칙으로 분리됩니다.
+              </p>
+            </div>
           </div>
         )}
       </div>

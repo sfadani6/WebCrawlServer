@@ -48,6 +48,7 @@ import {
   saveCrawledImage,
   saveSiteInfoToFile,
   saveCrawledMediaBundle,
+  saveCrawlPartialToFile,
   SaveCrawledMediaBundleOptions,
 } from "./services/fileStorageService.js";
 import { executeWorkerPipeline } from "./services/workerEngineService.js";
@@ -2119,6 +2120,36 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
           savedPath = infoSaveRes.savedFilePath;
           savedSize = infoSaveRes.fileSize;
           updateCrawlLogFile(logId, savedPath, savedSize);
+        }
+
+        // 부분 데이터 수집(CRAWL_PARTIAL) 중 pathSegments를 함께 전달한 경우
+        // 페이지 단위 수집 데이터를 계층 경로 JSON 파일로 물리 보관합니다. (R-00208 확장)
+        // 예: xvideos best-of-red → <기본경로>/xvideos.com/best-of-red/2026-06/16/page-16.json
+        if (message.action === "CRAWL_PARTIAL" && Array.isArray(payloadObj.pathSegments)) {
+          const rawSegments = payloadObj.pathSegments as Array<unknown>;
+          if (rawSegments.length > 0) {
+            const partialSaveRes = saveCrawlPartialToFile({
+              globalDefaultPath: getConfigDataPath() || undefined,
+              domain,
+              pathSegments: rawSegments
+                .filter((seg): seg is string => typeof seg === "string" && seg.length > 0)
+                .map((seg) => seg),
+              fileName:
+                typeof payloadObj.fileName === "string"
+                  ? payloadObj.fileName
+                  : "",
+              payload: payloadObj,
+            });
+            savedPath = partialSaveRes.savedFilePath;
+            savedSize = partialSaveRes.fileSize;
+            updateCrawlLogFile(logId, savedPath, savedSize);
+
+            logPluginComm(
+              clientId,
+              "CRAWL_PARTIAL",
+              `페이지 단위 수집 저장 완료: ${partialSaveRes.savedFilePath} (${partialSaveRes.fileSize} bytes)`,
+            );
+          }
         }
 
         // 전체 문서(fullPage/CRAWL_DOCUMENT)일 때만 디폴트 워커 파이프라인 단행 (R-00207)

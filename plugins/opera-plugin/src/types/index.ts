@@ -342,3 +342,33 @@ export interface ProcessorInfo {
   /** 최대 터치 포인트 수 */
   maxTouchPoints: number;
 }
+
+/** xvideos best-of-red 초기 정보 응답 구조체 (COLLECT_BEST_OF_RED_INIT) */
+export interface XvBestOfRedInitData {
+  /** best-of-red 베이스 경로 (예: "/best-of-red/2026-06", 후행 슬래시 없음) */
+  basePath: string;
+  /** 현재 페이지 인덱스 (0 = 베이스 URL) */
+  currentPage: number;
+  /** 마지막 페이지 인덱스 (페이지네이션 연속 블록에서 감지) */
+  maxPage: number;
+  /** 처리 대상 총 페이지 수 (maxPage - currentPage + 1) */
+  totalPages: number;
+  /** 현재 페이지 전체 URL */
+  url: string;
+}
+
+/** xvideos best-of-red 페이지 수집 응답 구조체 (COLLECT_BEST_OF_RED_PAGE) */
+export interface XvBestOfRedPageData {
+  /** 로드 완료 검증 여부 (readyState complete + 썸네일 이미지 로드) */
+  ready: boolean;
+  /** 수집 시점 페이지 인덱스 */
+  page: number;
+  /** 수집 시점 페이지 전체 URL */
+  url: string;
+  /** 수집 시점 페이지 타이틀 */
+  title: string;
+  /** 수집된 비디오 블록 메타 목록 (로드 검증 실패 시 빈 배열) */
+  data: XvideosMediaEntry[];
+  /** 결과 메시지 */
+  message: string;
+}

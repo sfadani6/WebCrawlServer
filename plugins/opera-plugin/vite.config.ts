@@ -11,7 +11,7 @@ import { resolve } from "node:path";
 export default defineConfig({
   plugins: [react()],
   // vite 의존성 최적화 캐시를 프로젝트 루트 node_modules/.vite로 공유 배치한다.
-  // 기본 cacheDir는 실행 디렉토리 기준 `node_modules/.vite`라 워크스페이스(plugins/opera-plugin) 하위에
+  // 기본 cacheDir는 실행 디렉토리 기준 `node_modules/.vite`라 워크스페이스(plugins/basic-plugin) 하위에
   // node_modules 폴더가 생성되는 문제가 있으므로, node_modules는 루트에만 존재하도록 강제한다.
   cacheDir: resolve(__dirname, "../../node_modules/.vite"),
   define: {
@@ -29,6 +29,7 @@ export default defineConfig({
         sidepanel: resolve(__dirname, "sidepanel.html"),
         offscreen: resolve(__dirname, "offscreen.html"),
         xvideosManager: resolve(__dirname, "xvideos-manager.html"),
+        actionRunner: resolve(__dirname, "action-runner.html"),
         background: resolve(__dirname, "src/background.ts"),
         content: resolve(__dirname, "src/content.ts"),
       },

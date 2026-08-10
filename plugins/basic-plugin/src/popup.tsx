@@ -44,6 +44,7 @@ export default function Popup() {
     handleCollectImages,
     handleCollectSiteInfo,
     handleOpenXvideosManager,
+    handleOpenXvBestOfRedAction,
     handleSendDebugMessage,
     handleTabChange,
     terminalLogs,
@@ -93,6 +94,7 @@ export default function Popup() {
             onCollectImages={(category) => handleCollectImages(category)}
             onCollectSiteInfo={handleCollectSiteInfo}
             onOpenXvideosManager={handleOpenXvideosManager}
+            onOpenXvBestOfRedAction={handleOpenXvBestOfRedAction}
           />
         )}
 

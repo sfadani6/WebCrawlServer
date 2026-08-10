@@ -76,6 +76,23 @@
 - **저장 분기**: `payloadObj.assets`가 배열이면 기존 단일 이미지 저장 대신 번들 저장 경로를 탑니다. `txtContent`가 있으면 `<timestamp>-<index>.txt`로 원문 그대로 저장합니다. 각 자산은 `name`에서 파생한 하위 폴더/확장자(앱 대비)에 저장하며, `data`가 빈 문자열(인출 실패)인 자산은 건너뜁니다.
 - **ACK**: 저장 완료 시 `CRAWL_MEDIA_SAVED` ACK(`bundleId`/`savedDir`/`savedFiles`)를 전송하고, 플러그인은 매칭 `bundleId` 항목의 상태를 완료/실패로 갱신합니다(60초 타임아웃).
 
+### 2.3 페이지 단위 수집 분리 저장 규격 (CRAWL_PARTIAL `pathSegments`)
+
+액션 실행기가 페이지 단위로 수집한 JSON 메타(best-of-red 자동 이동 등)는 payload의 `pathSegments`/`fileName`을 따라 **카테고리·월·페이지 폴더로 분리 저장**합니다. `pathSegments`가 없는 기존 `CRAWL_PARTIAL`은 기존 기본 저장 규격을 그대로 유지합니다.
+
+```
+<기본 저장 경로>/<safeDomain>/              # 페이지 단위 분리 저장 루트 (R-00480 연동, images/ 제외)
+└── best-of-red/                           # pathSegments[0] (카테고리, 정화됨)
+    └── 2026-06/                           # pathSegments[1] (월)
+        └── 16/                            # pathSegments[2] (페이지 번호)
+            └── page-16.json               # fileName (페이지 단위 메타 JSON)
+```
+
+- **전송 규격**: `CRAWL_PARTIAL` payload에 `pathSegments: string[]`와 `fileName?: string`을 포함합니다(best-of-red 액션: `["best-of-red","<월>","<N>"]` + `page-<N>.json`). `fileName`이 없으면 `<timestamp>-<seq>.json` 기본명을 사용합니다.
+- **저장 분기**: 서버 `index.ts`의 `CRAWL_PARTIAL` 분기에서 `Array.isArray(payload.pathSegments) && 길이 > 0`이면 `saveCrawlPartialToFile()`로 저장하고, 아니면 기존 흐름(기본 저장 규격)을 따릅니다.
+- **정화 규칙**: `pathSegments`의 각 요소와 `fileName`은 `sanitizeFolderName()`으로 경로 금지 특수문자를 정화하며, 디렉터리 탐색(경로 탈출)은 세그먼트 단위 정화로 차단됩니다.
+- **DB 연동**: `crawl_logs`에 action=`CRAWL_PARTIAL` 레코드의 `file_path`/`file_size`가 실제 저장 파일 경로·크기로 갱신됩니다.
+
 ---
 
 ## 3. 파일 저장소 서비스 모듈 규정 (`server/src/services/fileStorageService.ts`)
@@ -186,6 +203,31 @@ export function saveCrawledMediaBundle(
 - **메타 txt**: `txtContent`가 있으면 `<baseName>.txt`로 저장하고 `savedFiles`에 포함합니다.
 - **ACK 연계**: `server/src/index.ts`의 `CRAWL_IMAGE` 분기에서 `Array.isArray(payloadObj.assets)` 감지 시 번들 저장을 수행하고 `CRAWL_MEDIA_SAVED`(`bundleId`/`savedDir`/`savedFiles`) ACK를 전송합니다.
 
+### 3.2 페이지 단위 JSON 분리 저장 (`saveCrawlPartialToFile`)
+
+`CRAWL_PARTIAL`의 `pathSegments`를 따라 페이지 단위 JSON 메타를 물리 저장하고 경로/크기를 반환합니다.
+
+```typescript
+// server/src/services/fileStorageService.ts
+
+export interface SaveCrawlPartialOptions {
+  customNodePath?: string;     // 노드 전용 지정 경로
+  workerStoragePath?: string;  // 워커 전용 지정 경로
+  globalDefaultPath?: string;  // 글로벌 기본 경로 (configs.data_path 우선, 없으면 "./storage")
+  domain: string;              // 루트 도메인 (예: "xvideos.com")
+  pathSegments: string[];      // 하위 폴더 세그먼트 (예: ["best-of-red","2026-06","16"])
+  fileName?: string;           // 저장 파일명 (예: "page-16.json", 기본 "<timestamp>-<seq>.json")
+  payload: unknown;            // 저장할 페이로드 원문 (JSON prettify 직렬화)
+}
+
+export function saveCrawlPartialToFile(
+  options: SaveCrawlPartialOptions
+): SaveContentResult;
+```
+
+- **경로 규칙**: `<globalDefaultPath|...>\<safeDomain>\<pathSegments를 정화한 폴더들>\<정화된 fileName>`(`images/` 없이 도메인 직하). 각 세그먼트를 `sanitizeFolderName()`으로 정화해 중첩 폴더로 생성하고, 마지막에 JSON(`JSON.stringify(payload, null, 2)`)을 저장합니다.
+- **연계 분기**: `server/src/index.ts`의 `CRAWL_PARTIAL` 분기에서 `Array.isArray(payloadObj.pathSegments) && payloadObj.pathSegments.length > 0`이면 호출하고, `updateCrawlLogFile(logId, savedPath, savedSize)`로 `crawl_logs.file_path`/`file_size`를 갱신합니다.
+
 ---
 
 ## 4. 디스크 용량 모니터링 REST API 규정 (`GET /api/admin/storage/status`)
@@ -227,3 +269,4 @@ app.get("/api/admin/storage/status", (_req, res) => {
 - [ ] 크로스 오리진 이미지가 스킵되지 않고 `.txt` 참조 파일(page_url/image_url/click_url/title)로 보관되는가?
 - [ ] `GET_STORAGE_LOCATION`→`STORAGE_LOCATION_RESPONSE`로 플러그인이 저장 위치(절대/상대)를 조회하는가?
 - [ ] 미디어 번들(`assets` 배열)이 `saveCrawledMediaBundle()`로 txt+썸네일+preview.mp4 일괄 저장되고 `CRAWL_MEDIA_SAVED` ACK가 반환되는가?
+- [ ] `CRAWL_PARTIAL`의 `pathSegments`가 있으면 `<도메인>/best-of-red/<월>/<N>/page-N.json`(`images/` 없음)으로 분리 저장되고 `file_path`/`file_size`가 갱신되는가?

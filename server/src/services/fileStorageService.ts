@@ -284,6 +284,74 @@ export function saveCrawledImage(
   };
 }
 
+/** CRAWL_PARTIAL 페이지 단위 수집 데이터 저장 옵션 구조체 */
+export interface SaveCrawlPartialOptions {
+  /** 글로벌 기본 저장 경로 (기본값: "./storage") */
+  globalDefaultPath?: string;
+  /** 수집 도메인 (예: "xvideos.com") */
+  domain: string;
+  /** 저장소 하위 계층 경로 세그먼트 목록 (예: ["best-of-red","2026-06","16"]) */
+  pathSegments?: string[];
+  /** 저장할 파일명 (예: "page-16.json", 미지정 시 timestamp 기반) */
+  fileName?: string;
+  /** 저장할 JSON 직렬화 대상 데이터 */
+  payload: unknown;
+}
+
+/**
+ * CRAWL_PARTIAL 등 페이지 단위 수집 데이터를 계층 경로 JSON 파일로 물리 보관합니다.
+ * (R-00208 이미지 저장소 규격의 카테고리 계층 확장)
+ *
+ * 저장 경로 규격: <기본경로>/<도메인>/<pathSegments...>/<fileName>
+ * (예: E:/up/WebCrawlServer/xvideos.com/best-of-red/2026-06/16/page-16.json)
+ * - pathSegments 각 요소는 sanitizeFolderName으로 정화되어 경로 인젝션을 방지합니다.
+ * - 파일명 미지정 시 <timestamp>-<index>.json 규격을 따릅니다.
+ *
+ * @param options - CRAWL_PARTIAL 저장 옵션 객체
+ * @returns 저장된 파일 경로 및 크기 정보
+ */
+export function saveCrawlPartialToFile(
+  options: SaveCrawlPartialOptions
+): SaveContentResult {
+  // 1. 저장소 최상위 루트 경로 결정
+  const rootPath = options.globalDefaultPath || "./storage";
+
+  // 2. 도메인/경로 세그먼트 특수문자 정화 후 계층 디렉터리 구성
+  //    (예: ./storage/xvideos.com/best-of-red/2026-06/16/)
+  const safeDomain = sanitizeFolderName(options.domain);
+  const safeSegments = (options.pathSegments || []).map((seg) =>
+    sanitizeFolderName(seg)
+  );
+  const targetDir = resolve(rootPath, safeDomain, ...safeSegments);
+
+  // 3. 대상 디렉터리 없을 경우 재귀적으로 자동 생성
+  if (!existsSync(targetDir)) {
+    mkdirSync(targetDir, { recursive: true });
+  }
+
+  // 4. 파일명 결정 (미지정 시 timestamp-시퀀스 규격)
+  let fileName = options.fileName;
+  if (!fileName || fileName.trim().length === 0) {
+    imageSaveSeq += 1;
+    const seq = String(imageSaveSeq % 10000).padStart(4, "0");
+    fileName = `${Date.now()}-${seq}.json`;
+  }
+  const safeName = sanitizeFolderName(fileName);
+
+  // 5. JSON 직렬화 후 물리 파일 쓰기
+  const targetFilePath = resolve(targetDir, safeName);
+  const buffer = Buffer.from(
+    JSON.stringify(options.payload ?? null, null, 2),
+    "utf-8"
+  );
+  writeFileSync(targetFilePath, buffer);
+
+  return {
+    savedFilePath: targetFilePath,
+    fileSize: buffer.length,
+  };
+}
+
 /** 사이트 정보 수집 저장 옵션 구조체 (SITE_INFO 액션) */
 export interface SaveSiteInfoOptions {
   /** 글로벌 기본 저장 경로 (기본값: "./storage") */

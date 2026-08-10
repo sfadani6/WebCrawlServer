@@ -49,6 +49,7 @@ export default function SidePanel() {
     handleCollectImages,
     handleCollectSiteInfo,
     handleOpenXvideosManager,
+    handleOpenXvBestOfRedAction,
     handleSendDebugMessage,
     handleTabChange,
     terminalLogs,
@@ -106,6 +107,7 @@ export default function SidePanel() {
             onCollectImages={(category) => handleCollectImages(category)}
             onCollectSiteInfo={handleCollectSiteInfo}
             onOpenXvideosManager={handleOpenXvideosManager}
+            onOpenXvBestOfRedAction={handleOpenXvBestOfRedAction}
           />
         )}
 

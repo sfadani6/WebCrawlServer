@@ -28,6 +28,7 @@ export default defineConfig({
         // 프로젝트 루트의 HTML 엔트리 지정 (Vite HTML 번들링 변환 단행)
         sidepanel: resolve(__dirname, "sidepanel.html"),
         offscreen: resolve(__dirname, "offscreen.html"),
+        xvideosManager: resolve(__dirname, "xvideos-manager.html"),
         background: resolve(__dirname, "src/background.ts"),
         content: resolve(__dirname, "src/content.ts"),
       },

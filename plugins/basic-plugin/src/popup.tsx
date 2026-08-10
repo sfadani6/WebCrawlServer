@@ -42,6 +42,8 @@ export default function Popup() {
     handleStopElementPicker,
     handleCollectFrameDom,
     handleCollectImages,
+    handleCollectSiteInfo,
+    handleOpenXvideosManager,
     handleSendDebugMessage,
     handleTabChange,
     terminalLogs,
@@ -88,7 +90,9 @@ export default function Popup() {
             isFrameCollecting={isFrameCollecting}
             onCollectFrameDom={handleCollectFrameDom}
             isImageCollecting={isImageCollecting}
-            onCollectImages={handleCollectImages}
+            onCollectImages={(category) => handleCollectImages(category)}
+            onCollectSiteInfo={handleCollectSiteInfo}
+            onOpenXvideosManager={handleOpenXvideosManager}
           />
         )}
 

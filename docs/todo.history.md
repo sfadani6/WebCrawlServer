@@ -2,6 +2,336 @@
 
 ---
 
+## 2026-08-10 | xvideos 단일 영상 페이지(플레이어) 포스터 이미지·타이틀 추출
+
+### 요청
+- xvideos.com 미디어 다운로드에서 단일 영상 페이지(플레이어)의 포스터 이미지(`.video-bg-pic .video-pic img`)와 타이틀(`.video-title`)을 추출하고, **이미지 1개만** 다운로드한다.
+
+### 확정된 상세 규격
+- 단일 영상 페이지에서 **포스터 이미지 1종 + 타이틀**을 목록 1건으로 구성한다. 영상 자체(blob 스트리밍)는 다운로드하지 않는다.
+- `sfwUrl`/`previewUrl`는 빈 문자열로 두고, 기존 흐름(오프스크린 빈 자산 스킵 → 서버 빈 자산 건너뜀 → 이미지 1종 + txt만 저장)을 그대로 재사용한다.
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/src/content.ts`: `isXvideosVideoPage()`(URL `/video` 접두사 또는 `#html5video`/`.video-bg-pic` DOM 존재) + `collectXvideosVideoPageEntry()`(포스터 `.video-bg-pic .video-pic img`/타이틀 `.video-title`/현재 URL/EID) 추가, `COLLECT_XVIDEOS_MEDIA` 핸들러에 단일 영상 페이지 폴백(응답 message에 소스 명시).
+- `plugins/basic-plugin/src/types/index.ts`: `XvideosMediaEntry` JSDoc에 "단일 영상 페이지에서는 빈 문자열" 명시.
+- `plugins/basic-plugin/src/components/XvideosManagerView.tsx`: 빈 목록 안내 문구에 단일 영상 페이지(포스터 1종) 파싱 안내 추가.
+- `plugins/opera-plugin/` 동일 3종 동기화(복사 + 헤더 주석 교체).
+- 문서: R-00430 §5.4(단일 영상 페이지 폴백 규격), R-00420 §4.5(명령 규격) 갱신.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/content.ts`, `src/types/index.ts`, `src/components/XvideosManagerView.tsx`
+- `plugins/opera-plugin/` 동일 3종 (동기화)
+- `docs/rule/R-00430 plugin-crawling.md`, `docs/rule/R-00420 plugin-communication.md`
+- `docs/askLogs/ask-20260810071013.md`(신규)
+
+### 검증 결과
+- basic-plugin/opera-plugin `npm run build` 성공.
+- 동기화 3종 일치(헤더 경로만 교체) 확인.
+- dist/content.js에 `video-bg-pic` 셀렉터 문자열 포함 확인(미니파이드).
+
+### 잔여 사항
+- 브라우저 실측: 영상 재생 페이지에서 매니저 열기 → 현재 영상 1건 목록 생성 → 다운로드 진행 → 포스터 이미지 1종 + txt만 저장 확인.
+
+---
+
+## 2026-08-10 | xvideos 다운로드 매니저 새창 페이지 전체 스크롤
+
+### 요청
+- "xvideos 다운로드 매니저 새창이 스크롤 될게 해달라고 아래 데이터를 확인 할수가 없어."
+
+### 확정된 상세 규격
+- 매니저 창을 **페이지 레벨로 통째로 스크롤** — 목록·버튼·로그를 포함한 아래 데이터까지 항상 확인 가능하게 한다.
+- 원인: `popup.css` 전역 `html, body { overflow: hidden }`이 매니저 페이지에도 적용되어 페이지 스크롤이 원천 차단됨.
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/xvideos-manager.html`: `<html lang="ko">` → `<html lang="ko" class="manager-scrollable">` (Vite 빌드 시 클래스 유지, dist 반영 확인).
+- `plugins/basic-plugin/src/popup.css`: `html.manager-scrollable { overflow-y: auto }` + 웹킷/파이어폭스 가시 스크롤바(thumb `#475569`·hover `#64748b`, track `#0a0e17`) 추가 — 클래스 선택자가 전역 `html` 규칙보다 높은 특이성으로 우선 적용.
+- `plugins/basic-plugin/src/components/XvideosManagerView.tsx`: 루트 `w-full h-screen … overflow-hidden` → `w-full min-h-screen …`(overflow-hidden 제거), 목록 컨테이너에서 `flex-1 min-h-0 overflow-y-auto` 제거 → 자연 높이로 펼쳐지고 창 스크롤로 전 항목 도달.
+- `plugins/basic-plugin/src/xvideosManager.tsx`: 로딩/에러 뷰의 `h-screen` → `min-h-screen` 통일.
+- `plugins/opera-plugin/` 동일 4종 동기화(복사 + 헤더 주석 교체).
+- 문서: R-00440 §2.3(페이지 전체 스크롤 규격), R-00430 §5.4 갱신.
+
+### 변경된 파일
+- `plugins/basic-plugin/xvideos-manager.html`, `src/popup.css`, `src/components/XvideosManagerView.tsx`, `src/xvideosManager.tsx`
+- `plugins/opera-plugin/` 동일 4종 (동기화)
+- `docs/rule/R-00440 plugin-ui-ux.md`, `docs/rule/R-00430 plugin-crawling.md`
+- `docs/askLogs/ask-20260810065244.md`(신규)
+
+### 검증 결과
+- basic-plugin/opera-plugin `npm run build` 성공(각 52 모듈).
+- dist `xvideos-manager.html`에 `class="manager-scrollable"` 유지 확인(양 플러그인).
+- 동기화 검증: opera-plugin 4종이 헤더 경로만 제외하고 basic-plugin과 동일.
+
+### 잔여 사항
+- 브라우저 실측 확인: 매니저 새창에서 페이지 전체(목록→버튼→로그)가 스크롤되고 아래 데이터가 확인되는지, 가시 스크롤바 표시 여부 확인.
+
+---
+
+## 2026-08-10 | xvideos 다운로드 매니저 개선 — 목록 스크롤바·이미지 URL 주소 표시·항목별 프로그레스 바
+
+### 요청
+- "플러그인에서 xvideos.com 미디어 목록 하게 되면 다운로드목록 창이 나오는데 스크롤 바가 없어. 스크롤 바가 생기게 해주고."
+- "이미지 리스트가 안 보여."
+- "하나씩 다운로드 진행되고 완료된다는 프로그래스 바도 있어야 되지 않겠어? 각 개체마다."
+- 추가 설명: "이미지 리스트란 이미지 다운로드 받을 이미지 주소야. 이미지 썸네일을 미리 보는 건 아니야."
+
+### 확정된 상세 규격 (사용자 승인)
+- 스크롤바: 목록 컨테이너에 커스텀 가시 스크롤바(`.manager-list-scroll`, thumb `#475569`·hover `#64748b`, track `#0a0e17`) 적용 — `color-scheme: dark` 기본 다크 스크롤바가 어두운 배경과 구분 안 되는 문제 해소.
+- 이미지 리스트: 썸네일 미리보기가 아니라 **다운로드 대상 이미지 URL 주소 3종**(`image_url`/`sfw_image_url`/`preview_video_url`)을 항목별로 `break-all`+선택 복사 가능하게 표시.
+- 프로그레스 바: 오프스크린 단계 이벤트 기반 실제 % — 시작 0% 스카이 쉬머(`progress-bar-indeterminate`) → 메인 30/보조 55/프리뷰 80/서버 전송 95 → 완료·실패 100%.
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/src/offscreen.ts`: `broadcastFetchProgress(bundleId, progress)` 헬퍼 신설(`chrome.runtime.sendMessage` + `.catch()` 가드), `handleFetchMediaBundle`에서 메인 인출 30/보조 55/프리뷰 80/서버 전송 95 단계마다 `FETCH_MEDIA_BUNDLE_PROGRESS` 브로드캐스트.
+- `plugins/basic-plugin/src/types/index.ts`: `XvideosDownloadItem`에 `progress: number`(0~100) 추가, 신규 `FetchMediaBundleProgressPayload` 타입 정의.
+- `plugins/basic-plugin/src/hooks/useXvideosDownloadManager.ts`: 항목 생성 시 `progress: 0`, 진행 시작 시 리셋, `chrome.runtime.onMessage` 리스너(FETCH_MEDIA_BUNDLE_PROGRESS를 bundleId로 매칭해 progress 갱신, 0~100 클램프), done/failed 시 progress 100 확정.
+- `plugins/basic-plugin/src/components/XvideosManagerView.tsx`: 목록 컨테이너에 `.manager-list-scroll`, `DownloadListItem`에 이미지 URL 3줄(라벨+break-all)과 항목별 프로그레스 바(진행 0% 쉬머 인디케이터/이후 실제 % 스카이 바/완료 에메랄드 100/실패 레드 100, 우측 % 숫자) 추가.
+- `plugins/basic-plugin/src/popup.css`: `.manager-list-scroll` 웹킷/파이어폭스 스크롤바 + `.progress-bar-indeterminate`/`@keyframes manager-progress-shimmer` 애니메이션 추가.
+- `plugins/opera-plugin/` 동일 5종 동기화(복사 + 헤더 주석 교체).
+- 문서: R-00440 §2.3(URL 주소 표시·프로그레스 바·스크롤바), R-00420 §4.5(FETCH_MEDIA_BUNDLE_PROGRESS 규격)·§5, R-00430 §5.4·§6 갱신.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/offscreen.ts`, `src/types/index.ts`, `src/hooks/useXvideosDownloadManager.ts`, `src/components/XvideosManagerView.tsx`, `src/popup.css`
+- `plugins/opera-plugin/` 동일 5종 (동기화)
+- `docs/rule/R-00440 plugin-ui-ux.md`, `docs/rule/R-00420 plugin-communication.md`, `docs/rule/R-00430 plugin-crawling.md`
+- `docs/askLogs/ask-20260810064441.md`(신규)
+
+### 검증 결과
+- basic-plugin/opera-plugin `npm run build` 성공(각 52 모듈, offscreen.js 5.33 kB·xvideosManager.js 10.42 kB로 진행 이벤트·URL·바 반영).
+- 동기화 검증: opera-plugin 5종이 헤더 경로만 제외하고 basic-plugin과 동일.
+
+### 잔여 사항
+- 브라우저 실측 확인: 매니저 창 목록 스크롤바 표시, 항목별 이미지 URL 주소 3줄 표시, 진행 시 프로그레스 바(쉬머→%→완료) 및 저장 배지 갱신 확인.
+
+---
+
+## 2026-08-10 | xvideos 다운로드 매니저 전용 팝업 창 분리 — 사이드바 버튼만 유지·2열 그리드 목록
+
+### 요청
+- "xvideos.com 미디어 목록 하게 되면 패널 아래로 주르륵 나오는데 창 범위를 벗어난다. 오픈 창으로 새롭게 나오던지 아니면 브라우저에 블랭크 가상 페이지를 만들고 거기서 출력하고 진행 버튼을 만들던지 해야지 패널 안으로 리스트가 나오면 화면이 좁아서 안 된다."
+
+### 확정된 상세 규격 (사용자 승인)
+- 사이드바 xvideos 그룹은 **"다운로드 매니저 열기" 버튼만** 유지하고, 목록·진행·초기화 UI는 **전용 팝업 창(`chrome.windows.create`, type: "popup", 900×760)**으로 분리한다.
+- 매니저 창은 대상 xvideos 탭(`?tabId=`)을 쿼리로 전달받아 `requestCollectXvideosMediaFromTab(tabId)`로 목록을 생성하며, 오프스크린 기존 파이프라인(`mediaAckWaiters` 60초 / `storageLocationWaiter` 15초)을 무수정 재사용한다.
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/vite.config.ts`: `rollupOptions.input`에 `xvideosManager: resolve(__dirname, "xvideos-manager.html")` 엔트리 추가(기존 sidepanel/offscreen/background/content 유지 → 엔트리 5종).
+- `plugins/basic-plugin/xvideos-manager.html` 신규: root div + Noto Sans CDN + `./src/xvideosManager.tsx` 로드.
+- `plugins/basic-plugin/src/hooks/useXvideosDownloadManager.ts` 신규: 모듈 함수 `extFromUrl`/`buildXvideosTxtContent`(usePopupState에서 이관) + `useXvideosDownloadManager()` 훅 — state(`downloadList`/`isRunning`/`pageUrl`/`storageDir`/`relDir`/`statusMessage`/`logs`), `addLog`(200건 상한), `buildList(tabId)`(목록 생성+중복 제거+저장 위치 조회), `startQueue()`(순차 진행, done/failed 집계), `reset()`, 타입 `XvideosManagerLog`/`XvideosManagerLogLevel`.
+- `plugins/basic-plugin/src/services/chromeService.ts`: `sendCommandToActiveTab` 일반화 `sendCommandToTab(tabId, command, payload)` 신설(콘텐츠 스크립트 미주입 탭은 content.js 주입 후 자동 재시도), 기존 active-tab 함수는 이를 호출하도록 리팩터, `requestCollectXvideosMediaFromTab(tabId)` 추가.
+- `plugins/basic-plugin/src/xvideosManager.tsx` 신규: React root(`StrictMode`+`createRoot`), `tabId` 쿼리 파싱(`chrome.tabs.get` 검증 → `chrome.tabs.query` 폴백) → initError 표시("xvideos.com 탭을 찾을 수 없습니다..."), 최초 자동 목록 생성(`builtOnce`).
+- `plugins/basic-plugin/src/components/XvideosManagerView.tsx` 신규: `XvideosManagerApi` 타입, 전체 레이아웃(헤더/제목+pageUrl+닫기, 저장 위치+상태 메시지, 2열 그리드 항목 목록, 버튼 3종(목록 생성/진행/초기화), 로그 터미널), `getDownloadStatusInfo`(대기/다운로드/완료/실패)/`DownloadListItem`/`LogLine` 컴포넌트. `popup.css`의 `btn-primary`/`btn-secondary`/`btn-mini` 토큰 재사용.
+- `plugins/basic-plugin/src/components/tabs/BasicTab.tsx`: xvideos Props 6종 → `onOpenXvideosManager` 1종 교체, 카테고리 버튼 라벨을 "다운로드 매니저 열기"로 변경, 인라인 목록/진행/초기화/저장위치 JSX 제거.
+- `plugins/basic-plugin/src/hooks/usePopupState.ts`: xvideos state 5종 및 관련 import 제거, 기존 목록/진행 핸들러를 `handleOpenXvideosManager`(xvideos 탭 검색 → `chrome.windows.create` 팝업)로 교체, return 객체 반영.
+- `plugins/basic-plugin/src/sidepanel.tsx`/`popup.tsx`: BasicTab props를 `onOpenXvideosManager={handleOpenXvideosManager}`로 교체, `public/manifest.json`(basic·opera 양쪽)에 `"windows"` 권한 추가.
+- `plugins/opera-plugin/` 동기화(신규 3종 + `xvideos-manager.html` + `vite.config.ts` + 수정 5종 복사 및 헤더 주석 교체), `background.ts`는 `chrome.sidePanel?.` 옵셔널 처리 차이로 의도적 유지.
+- 문서: R-00440 §2.3(매니저 팝업 창 UI 규격 신설), R-00430 §5.4(목록 이관·`requestCollectXvideosMediaFromTab` 반영)·§6, R-00420 §4.5(주체 사이드바→매니저 창), R-00450(엔트리 4→5) 갱신.
+
+### 변경된 파일
+- `plugins/basic-plugin/vite.config.ts`, `xvideos-manager.html`, `src/xvideosManager.tsx`, `src/components/XvideosManagerView.tsx`, `src/hooks/useXvideosDownloadManager.ts`
+- `plugins/basic-plugin/src/services/chromeService.ts`, `src/hooks/usePopupState.ts`, `src/components/tabs/BasicTab.tsx`, `src/sidepanel.tsx`, `src/popup.tsx`
+- `plugins/basic-plugin/public/manifest.json`, `plugins/opera-plugin/public/manifest.json`
+- `plugins/opera-plugin/` 신규 3종 + html + vite.config + 수정 5종 (동기화)
+- `docs/rule/R-00440 plugin-ui-ux.md`, `docs/rule/R-00430 plugin-crawling.md`, `docs/rule/R-00420 plugin-communication.md`, `docs/rule/R-00450 plugin-build-env.md`
+- `docs/askLogs/ask-20260810061757.md`(신규)
+
+### 검증 결과
+- basic-plugin/opera-plugin `npm run build` 성공(각 52 모듈, `xvideos-manager.html` + `xvideosManager.js` 8.73 kB 생성, 공용 CSS `chromeService.css` 공유 청크).
+- 동기화 검증: opera-plugin 파일이 헤더 경로만 제외하고 basic-plugin과 동일, `plugins/basic-plugin` 잔존 참조 0건.
+
+### 잔여 사항
+- 브라우저 실측 확인: 사이드바 버튼 → 매니저 창(900×760) 열림, 대상 탭 목록 자동 생성(중복 제거·상한 없음), 진행 시 txt+썸네일2종+preview.mp4 저장 및 완료/실패 배지, 닫기·초기화·로그 출력 확인.
+
+---
+
+## 2026-08-10 | xvideos.com 미디어 다운로드 매니저 — txt 참조 저장·3자산 번들 저장·DownloadThemAll식 목록 UI
+
+### 요청
+- "xvideos.com 이미지 수집 시 `.url` 참조 파일 대신 `.txt` 파일로 저장되게 하고, txt에 `click_url`/`title` 메타를 수집해서 추가하고 싶다."
+- "실제 이미지(`xv_24_t.jpg` 메인·`xv_3_t.jpg` 보조)와 프리뷰 `preview.mp4`를 플러그인에서 서버 저장 위치를 받아 직접 다운로드해 저장하고 싶다. 서버 다운로드는 차단되고 오페라 브라우저 VPN 기능이 있으므로 오페라 플러그인에서 직접 내려받아 저장하는 방식을 쓰겠다."
+- "다운로드 상한 없이 DownloadThemAll처럼 다운로드 목록을 만들고 진행 버튼을 누르면 순차 다운로드하면서 완료 표시, 동일 주소 중복 제거를 원한다."
+
+### 확정된 상세 규격 (사용자 협의)
+- 흐름: 콘텐츠 스크립트가 `.thumb-block` 전량 파싱(상한 없음, `no-img.png` 제외, clickUrl 중복 제거) → 사이드바 목록 UI → [진행] 시 오프스크린이 3자산 fetch(CORS 우회 + 오페라 VPN) → `CRAWL_IMAGE` 번들(assets[3] + txtContent) WebSocket 전송 → 서버가 `images/xvideos.com/normal/<ts>-<seq>.txt` + `<baseName>_thumb/sfw/preview.<ext>` 저장 → `CRAWL_MEDIA_SAVED` ACK(저장 경로) → 항목 상태 완료 표시.
+- 다운로드 폴더 변경 불가 → `chrome.downloads` 직접 저장 포기, **오프스크린 fetch → 서버 물리 저장** 채택. txt는 플러그인이 생성(서버는 원문 그대로 저장). 상한 없음.
+- txt 포맷: `# WebCrawlServer 이미지 참조 파일` / `# 인출 방식: 플러그인 직접 다운로드 (오페라 VPN)` / page_url / image_url / click_url / title / [sfw_image_url] / [preview_video_url] / saved_files 목록.
+
+### 완료된 작업 목록
+- `server/src/services/fileStorageService.ts`: 실패 참조 확장자 `.url`→`.txt`(전역), `SaveCrawledImageOptions`에 `clickUrl`/`title` 추가, `mimeToExtension`에 `video/mp4`/`video/webm` 추가, 신규 `saveCrawledMediaBundle()`(txt+자산 일괄 저장, 실패 자산 data 빈 문자열 스킵, `savedDir`/`savedFiles` 반환).
+- `server/src/index.ts`: `GET_STORAGE_LOCATION` 액션 신설(→`STORAGE_LOCATION_RESPONSE` absDir/relDir 응답). CRAWL_IMAGE 분기에서 `payloadObj.assets` 배열 감지 시 번들 저장 + `CRAWL_MEDIA_SAVED` ACK(bundleId/savedDir/savedFiles) 응답, 기존 단일 이미지 분기 유지.
+- `plugins/basic-plugin/src/types/index.ts`: `XvideosMediaEntry`/`MediaAssetPayload`/`CrawlMediaBundlePayload`/`StorageLocationRequestPayload`/`StorageLocationResponsePayload`/`CrawlMediaSavedAckPayload`/`XvideosDownloadStatus`/`XvideosDownloadItem` 신설.
+- `plugins/basic-plugin/src/content.ts`: 신규 `collectXvideosMediaEntries()`(`.thumb-block` 전량 파싱, `resolveImageSource` 재사용, no-img/assets-cdn77 제외, `.videopv a`→closest a[href]→thumb a 순 clickUrl, `.thumb-under .title a[title]` 우선 title, eid 정규식 `/video\.([a-z0-9]+)\//i`) + `COLLECT_XVIDEOS_MEDIA` 명령 핸들러(entries+pageUrl 응답).
+- `plugins/basic-plugin/src/offscreen.ts`: `mediaAckWaiters` Map(bundleId→해소, 60초 타임아웃)/`storageLocationWaiter`(15초 타임아웃), `arrayBufferToBase64()`/`extractMediaFileName()`/`fetchAssetAsBase64()`(credentials:"omit", 실패 시 빈 data), `handleFetchMediaBundle()`(3자산 순차 인출→번들 전송→ACK 대기), `GET_STORAGE_LOCATION`/`FETCH_MEDIA_BUNDLE` 메시지 핸들러, `CRAWL_MEDIA_SAVED`/`STORAGE_LOCATION_RESPONSE` 수신 해소 로직.
+- `plugins/basic-plugin/src/services/chromeService.ts`: `requestCollectXvideosMedia()`/`requestStorageLocation()`/`requestFetchMediaBundle()` 신설.
+- `plugins/basic-plugin/src/hooks/usePopupState.ts`: xvideos 매니저 state 5종(`xvideosDownloadList`/`isXvideosQueueRunning`/`xvideosPageUrl`/`xvideosStorageDir`/`xvideosRelDir`) + `extFromUrl`/`buildXvideosTxtContent`/`handleBuildXvideosDownloadList`(목록 생성+저장 위치 조회)/`handleStartXvideosDownloads`(순차 진행, done/failed 실시간 집계)/`handleResetXvideosDownloadList`, `getPacketLogType`에 `CRAWL_MEDIA_SAVED`/`STORAGE_LOCATION_RESPONSE` success 처리.
+- `plugins/basic-plugin/src/components/tabs/BasicTab.tsx`: Props 6종 추가, `getDownloadStatusInfo()`(대기/다운로드/완료/실패 배지), xvideos.com "normal" 버튼을 미디어 다운로드 목록 생성으로 연결, DownloadThemAll식 매니저 패널(저장 위치 절대경로/항목 상태 목록/진행·초기화 버튼) JSX 추가.
+- `plugins/basic-plugin/src/sidepanel.tsx`/`popup.tsx`: BasicTab에 xvideos 6종 props 전달.
+- `plugins/opera-plugin/` 동일 8종 동기화(복사 + 헤더 주석 교체), `background.ts`는 `chrome.sidePanel?.` 옵셔널 처리 차이로 의도적 유지.
+- 문서: R-00208 §2.1(참조 `.txt`/click_url·title 포맷)·§2.2(미디어 번들 저장 규격)·§3.1(`saveCrawledMediaBundle` API)·§5, R-00430 §5.4(xvideos 파싱)·§6, R-00420 §4.5(번들 통신 규격·ACK 대기)·§5 갱신.
+
+### 변경된 파일
+- `server/src/services/fileStorageService.ts`, `server/src/index.ts`
+- `plugins/basic-plugin/src/types/index.ts`, `content.ts`, `offscreen.ts`, `services/chromeService.ts`, `hooks/usePopupState.ts`, `components/tabs/BasicTab.tsx`, `sidepanel.tsx`, `popup.tsx`
+- `plugins/opera-plugin/src/` 동일 8종 (동기화)
+- `docs/rule/R-00208 local-file-storage-system.md`, `docs/rule/R-00430 plugin-crawling.md`, `docs/rule/R-00420 plugin-communication.md`
+- `docs/askLogs/ask-20260810051720.md`(신규)
+
+### 검증 결과
+- basic-plugin/opera-plugin `npm run build` 성공(각 48 모듈, offscreen.js 5.11 kB·content.js 8.98 kB·sidepanel.js 225.30 kB).
+- server `npm run build`(tsc) 성공 → pm2 `WebCrawlServer` 재시작 후 online(9600), dist에 `GET_STORAGE_LOCATION`/`STORAGE_LOCATION_RESPONSE`/`CRAWL_MEDIA_SAVED`/`saveCrawledMediaBundle` 포함 확인.
+
+### 잔여 사항
+- 브라우저 실측 확인: xvideos.com에서 목록 생성(clickUrl 중복 제거·상한 없음) → 진행 시 txt+썸네일2종+preview.mp4가 `images/xvideos.com/normal/`에 저장되고 항목 상태 배지가 완료/실패로 갱신되는지 확인.
+
+---
+
+## 2026-08-10 | 플러그인 UI/스타일 정비 — 폰트 아이콘 제거·터미널·이미지 수집 정돈·버튼 가시성
+
+### 요청
+- "플러그인에 폰트 아이콘 등은 제거해 줬으면 좋겠다. 터미널 출력 부분·입력 부분, 이미지 수집 부분들의 스타일이 정돈되어야 한다."
+- "버튼인데 흰글씨에 흰바탕이면 보이지도 않는다. 일관적인 스타일, 가급적 아이콘 배제."
+- "플러그인의 UI 디자인을 보고 개선점을 찾아라. 특히 스타일 부분, 버튼들의 색과 폰트 색 등이 엉망인 것 같다."
+
+### 확정된 상세 규격 (사용자 협의)
+- Material Symbols 폰트 아이콘 **전부 제거**(22곳), 아코디언 열림/닫힘만 유니코드 `▼`/`▶` 허용
+- 버튼 색상: **파랑 단일화 + 앰버 유지** — 주 실행 파랑 그라데이션 통일, `요소 선택` 모드만 앰버, 설정탭 `#1A73E8` 제거
+- 버튼 가시성: 비활성 상태를 `opacity` 대신 **명시적 고대비 색상**으로 표시
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/src/popup.css`: Material Symbols `@import`(google fonts CDN) 제거. 공통 버튼 토큰 신설 — `btn-primary`(파랑 그라데이션, 비활성 `#1e293b`/`#334155` 테두리/`#94a3b8` 글씨), `btn-accent`(앰버), `btn-secondary`(보조 그리드, 비활성 `#64748b`), `btn-mini`(소형 다크, ON 에메랄드). `terminal-log-line`/`terminal-log-time`(타임스탬프 계층 + 호버) 및 `terminal-input`(박스형 + sky 포커스 링) 추가. 기존 `.send-button`/`.send-button-accent` 제거.
+- 폰트 아이콘 22곳 전면 제거: `Header.tsx`(로고→파랑 도트 배지), `TerminalConsole.tsx`(terminal), `BasicTab.tsx` 16곳(data_object/image/play_circle/link/web/ads_click/web_stories/photo_library/public/카테고리 4종/스피너) → 텍스트 레이블 + `▼/▶`, `getSendButtonIcon()` 삭제, `DebugTab.tsx`(send), `InfoTab.tsx` 2곳, `SettingsTab.tsx`(settings). HTML 3종(popup.html, sidepanel.html, public/sidepanel.html) Material CDN `<link>` 제거.
+- `BasicTab.tsx`/`DebugTab.tsx`/`SettingsTab.tsx`: 실행 버튼 `btn-primary`(+요소선택 `btn-accent`), 사이트 카테고리 `btn-secondary`, 설정탭 저장 `#1A73E8`→`btn-primary`, 설정탭 input 포커스 `#1A73E8`→`#38bdf8`.
+- `TerminalConsole.tsx`: 로그 행 타임스탬프/본문 분리(`terminal-log-time`), 호버 배경, 헤더 버튼 `btn-mini`(자동 스크롤 ON 에메랄드), 입력줄 박스형(`>` 프롬프트 + sky 포커스 링).
+- `plugins/opera-plugin/` 동일 10종 동기화(복사 + 헤더 주석 `plugins/opera-plugin/` 교체), 내용 MATCH(헤더 제외) 확인.
+- 문서: `docs/rule/R-00440 plugin-ui-ux.md` §1.3 "아이콘 시스템(Material Symbols)" → **아이콘 배제 원칙**(텍스트 레이블 중심, `▼/▶`만 예외 허용), §1.4 버튼 색상 체계 신설, §2 레이아웃 도식(● 도트 배지), §4.2 진행 표시(아이콘 스피너→텍스트) 갱신.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/popup.css`, `components/Header.tsx`, `components/TerminalConsole.tsx`, `components/tabs/BasicTab.tsx`, `components/tabs/DebugTab.tsx`, `components/tabs/InfoTab.tsx`, `components/tabs/SettingsTab.tsx`
+- `plugins/basic-plugin/popup.html`, `sidepanel.html`, `public/sidepanel.html`
+- `plugins/opera-plugin/` 동일 10종 (동기화)
+- `docs/rule/R-00440 plugin-ui-ux.md`
+- `docs/askLogs/ask-20260810033437.md`(신규)
+
+### 검증 결과
+- basic-plugin/opera-plugin `npm run build` 성공(각 48 모듈, sidepanel.css 6.55→8.08 kB — 버튼 토큰/터미널 스타일 추가분).
+- 소스에서 `material`/`send-button`/`#1A73E8` 참조 0건(grep), opera 동기화 10종 MATCH 확인.
+
+### 잔여 사항
+- 브라우저 수동 확인: 아이콘 사라짐, 버튼 가시성·색상 통일, 터미널 출력/입력 스타일, 이미지 수집 카테고리 버튼 활성/비활성 대비.
+
+---
+
+## 2026-08-10 | 이미지 수집 3그룹 정렬 개선 — 전체 추출·lazy 대응·중복 제거·www 루트 도메인 저장
+
+### 요청
+- "플러그인에 이미지 수집 하위에 버튼을 3개: ① 일반 이미지 수집 ② xchina.co — 일반/앨범/표지/정보 ③ xvideos.com — 일반/정보."
+- "일반 이미지 수집은 현재 열려있는 화면 렌더링이 되어있는 실제 DOM 요소들의 이미지를 전부 산출 후 다운로드해서 서버로 보내고, 서버는 기본 저장 경로에 각 도메인별로(일반은 normal) `/` 디렉토리 구분해서 저장."
+
+### 확정된 상세 규격 (사용자 협의)
+- 이미지 상한 `MAX_IMAGE_COLLECT_COUNT` 50 → **500**, 중복 URL Set 제거, lazy `data-src` 폴백 적용
+- 사이트 버튼 **항상 3그룹 표시** + 비매칭 그룹 disabled·"다른 도메인" 배지
+- 저장 폴더 도메인 `www.` 제거 → **루트 도메인 통일**(기존 `www.` 폴더는 이관 없이 유지)
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/src/content.ts`: `MAX_IMAGE_COLLECT_COUNT` 50→500. 신규 `resolveImageSource()` — `currentSrc → src → data-src/data-original/data-lazy-src/data-url/data-lazy` 순 최종 URL 결정. `collectAndSendImages()` — 렌더링 DOM `img` 전부 취합 → 중복 URL `Set` 제거 + 상한 초과 중단, 대상 구조 `{ img, src }`로 변경해 루프에서 해석된 src 재사용.
+- `plugins/basic-plugin/src/components/tabs/BasicTab.tsx`: 사이트 전용 그리드 `matchedSite` 조건부 → `Object.entries(SITE_IMAGE_BUTTONS)` 항상 렌더링. 그룹 헤더에 `현재 도메인`/`다른 도메인` 배지, 비매칭 그룹 버튼 `disabled` + title 안내("~ 페이지에서만 사용할 수 있습니다").
+- `server/src/index.ts`: 신규 `normalizeRootDomain()` — `www.` 접두사만 제거(그 외 서브도메인 유지). `targetUrl`/`pageUrl` hostname 도메인 추출에 적용 → 저장 폴더 및 `crawl_logs.domain` 루트 도메인 통일.
+- `plugins/opera-plugin/src/` 동일 2종(content.ts, BasicTab.tsx) 동기화(복사 + 헤더 교체).
+- 문서: `docs/rule/R-00208 local-file-storage-system.md` §2.1(카테고리 하위 폴더·info JSON·루트 도메인 통일 규격), `docs/rule/R-00430 plugin-crawling.md` §5.3(500 상한/lazy/중복 제거/3그룹 배지/www 정규화)·§6 체크리스트 3건 추가.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/content.ts`, `components/tabs/BasicTab.tsx`
+- `plugins/opera-plugin/src/content.ts`, `components/tabs/BasicTab.tsx` (동기화)
+- `server/src/index.ts`
+- `docs/rule/R-00208 local-file-storage-system.md`, `docs/rule/R-00430 plugin-crawling.md`
+- `docs/askLogs/ask-20260810031128.md`(신규)
+
+### 검증 결과
+- basic-plugin/opera-plugin `npm run build` 성공(각 48 모듈, content.js 7.65→7.95 kB, sidepanel.js 221.10 kB).
+- server `npm run build`(tsc) 성공 → pm2 `WebCrawlServer` 재시작 후 online(9600).
+
+### 잔여 사항
+- 브라우저 수동 확인: 이미지 수집 섹션 3그룹 상시 표시/비매칭 그룹 비활성화 배지, lazy 포함·중복 제거·500 상한, `www.` 페이지 수집 시 `images/<루트도메인>/normal/` 저장.
+
+---
+
+## 2026-08-10 | 플러그인 DOM 액션 개편·이미지 수집 3버튼 + admin DB 정렬/필드검색/SQL 예제
+
+### 요청
+- "현재 페이지 전체 DOM 전송은 페이지 이전 소스가 아닌 버튼을 누를 때 현재 렌더링된 DOM을 다시 전체 읽어 전송. 전체 페이지 액션명 `CRAWL_DOCUMENT` → `fullPage`, DOM 요소 전송은 `DomCapture`로."
+- "이미지 수집 버튼 3개: ① 일반 ② xchina.co — 일반/앨범/표지/정보 ③ xvideos.com — 일반/정보. 서버는 기본 저장 경로에 도메인별 디렉토리 구분 저장(일반은 `normal`)."
+- "admin DB 관리 테이블 rows 컬럼 옆에 오름차순/내림차순 화살표 소팅."
+- "행 검색(LIKE) 앞에 각 테이블 필드 선택 드롭다운 — 선택 필드에 대해서만 LIKE."
+- "SQL 실행기에 예제 샘플 20가지 드롭다운 — 선택 시 에디터에 쿼리 삽입."
+
+### 완료된 작업 목록
+- **플러그인 액션 개편**: `content.ts` — 요소선택 전송 `CRAWL_PARTIAL`→`DomCapture`, iframe 전체문서 `CRAWL_DOCUMENT`→`fullPage`, `COLLECT_FULL_DOM`→`fullPage`(버튼 누를 때 현재 렌더링 DOM outerHTML 재캡처). 구형 `CRAWL_DOCUMENT`/`CRAWL_PARTIAL` 서버 수신 호환 유지. 크로스오리진 iframe src 참조는 기존 `CRAWL_PARTIAL` 유지.
+- **이미지 수집 3버튼 + SITE_INFO**: `collectAndSendImages(category="normal")` — 페이로드에 `category` 추가(data:/fetch 성공 binary_base64/실패 json 모두 전달). 신규 `collectAndSendSiteInfo()` — 메타(description/keywords/og/canonical 등) JSON → `SITE_INFO`. 리스너 `COLLECT_IMAGES`가 payload.category 파싱 + 신규 `COLLECT_SITE_INFO`. `chromeService.ts` — `requestCollectImages(category)`/`requestCollectSiteInfo()`. `usePopupState.ts` — `handleCollectImages(category)`/`handleCollectSiteInfo()`. `BasicTab.tsx` — `matchSiteDomain()`(호스트 정확 일치/`.도메인` 접미사), `CATEGORY_LABELS`/`SITE_IMAGE_BUTTONS`(xchina.co → normal/album/cover/info, xvideos.com → normal/info), 일반 버튼 상시 + matchedSite 시 사이트 전용 그리드. `sidepanel.tsx`/`popup.tsx` props 체인.
+- **서버 저장/액션**: `fileStorageService.ts` — `SaveCrawledImageOptions.category?` + `saveCrawledImage` `images/<도메인>/<카테고리>` 삽입, 신규 `saveSiteInfoToFile` → `images/<도메인>/info/<ts>-<seq>.json`. `index.ts` — 액션 허용 목록에 `fullPage`/`DomCapture`/`SITE_INFO` 추가, `CRAWL_IMAGE` category 전달, 신규 `SITE_INFO` 분기(JSON 물리 저장 + crawl_logs), 워커 파이프라인 조건 `CRAWL_DOCUMENT || fullPage`로 확장. `useAdminSocket.ts` — 실시간 액션 목록에 신규 액션 추가.
+- **서버 fetchTableRows 확장**: `dbManagerService.ts` — 시그니처 `(dbRel, tableName, page=1, size=20, search="", searchField="", orderBy="", orderDir="asc")`. 검색 필드 컬럼 화이트리스트(`PRAGMA table_info` 기반), 필드 단일 LIKE/미지정 시 전체 컬럼 OR LIKE + `%`/`_` `ESCAPE '\'` 이스케이프, `ORDER BY <col> ASC|DESC`(유효 컬럼만, 페이지 캡 최대 200 유지). `index.ts` `/api/admin/db/rows` 라우트에 `searchField`/`orderBy`/`orderDir` 쿼리 파싱 추가.
+- **admin 데이터 브라우저 정렬/필드검색**: `dbApiService.fetchTableRowsApi` 8파라미터 확장, `useDbManager.loadRows` 확장, `DbBrowserPanel` — 검색 필드 드롭다운(`전체 필드`+스키마 컬럼)·정렬 상태(`SortState`)·테이블 전환 시 검색어/필드/정렬/페이지 리셋, `DbDataGrid` — `sortColumn`/`sortDir`/`onSortChange` prop + 헤더 클릭 서버 정렬(▲`arrow_upward`/▼`arrow_downward`/미정렬`unfold_more`).
+- **admin SQL 예제 + 클라이언트 정렬**: `SqlQueryPanel` — `EXAMPLE_QUERIES` 20개(sqlite_master/로그 분석/이미지 카테고리/스케줄/PRAGMA 등) 드롭다운(선택 시 에디터 삽입, 자동 실행 없음). `DbDataGrid` `clientSort` prop — 헤더 클릭 시 브라우저 내부 정렬(숫자 수치 비교/문자열 localeCompare, 토글).
+- **opera-plugin 동기화**: 변경 6종(content.ts, chromeService.ts, usePopupState.ts, BasicTab.tsx, sidepanel.tsx, popup.tsx) 복사 + 헤더 경로만 `plugins/opera-plugin/src/` 교체. 양 플러그인 빌드 성공(각 48 모듈).
+- **문서**: `docs/rule/R-00203 database.md`(rows API `searchField`/`orderBy`/`orderDir` + LIKE 이스케이프 규격), `docs/rule/R-00304 admin-worker-and-db-manager.md`(§3.1 기능 탭·§3.3 필드검색/헤더정렬/SQL 예제+클라이언트정렬 규정·검증 체크리스트 3건 추가).
+
+### 변경된 파일
+- `plugins/basic-plugin/src/content.ts`·`services/chromeService.ts`·`hooks/usePopupState.ts`·`components/tabs/BasicTab.tsx`·`sidepanel.tsx`·`popup.tsx`
+- `plugins/opera-plugin/src/` 동일 6종 (동기화)
+- `server/src/index.ts`, `server/src/services/fileStorageService.ts`, `server/src/services/dbManagerService.ts`
+- `admin/src/hooks/useAdminSocket.ts`, `admin/src/hooks/useDbManager.ts`, `admin/src/services/dbApiService.ts`
+- `admin/src/components/tables/DbDataGrid.tsx`, `admin/src/components/views/db/DbBrowserPanel.tsx`·`SqlQueryPanel.tsx`
+- `docs/rule/R-00203 database.md`, `docs/rule/R-00304 admin-worker-and-db-manager.md`
+- `docs/askLogs/ask-20260810024611.md`(신규)
+
+### 검증 결과
+- server `npm run build`(tsc) 성공 → pm2 `WebCrawlServer` 재시작 후 online(9600).
+- admin `tsc --noEmit` 내 변경 파일 0건(선재 비차단 에러: FaviconGeneratorView/NetworkMonitorView/socketService env 동일), `vite build` 성공.
+- basic-plugin/opera-plugin `npm run build` 성공(각 48 모듈, dist 갱신).
+- API 수동: `crawl_logs` `orderBy=id&orderDir=desc` 첫행 175 / asc 첫행 27(총 144), `searchField=status&search=error` 112건, 전체 필드 LIKE 리터럴 `100%` 3건(`ESCAPE` 동작), 주입(`;DROP TABLE`) 0건 + configs 테이블 생존(화이트리스트 검증).
+
+### 잔여 사항
+- 브라우저 수동 확인: 사이트 전용 이미지 버튼(도메인 매칭/카테고리 저장), fullPage 재캡처, admin 헤더 정렬/필드 검색/예제 쿼리.
+
+---
+
+## 2026-08-09 | DB 관리 UX 개선 — 긴 셀 미리보기 + 페이지네이션 기본값 configs + file_path 탐색기
+
+### 요청
+- "DB관리에서 log_message 같이 html이 통으로 들어간 것은 너무 길다. 출력 문자열 제한하고 더보기로 전체 log_message를 레이어 창으로 볼 수 있게. 레이어 창은 현재 브라우저 창 높이에 맞게 하고 스크롤도."
+- "테이블 선택하면 몇 행씩 보는 기능이 없다. 기본 20개씩 페이징 처리. 기본 값은 server/configs.json에 지정하고 기초 환경설정으로 편입."
+- "file_path 부분도 옆에 작은 버튼으로 파일 브라우저가 열리게. 파일까지는 프로그램 연결이 필요하니 디렉토리까지만, 디렉토리는 윈도우 파일 브라우저가 실행되게. 브라우저 내부 파일 브라우저 레이어로 처리하지 말고."
+
+### 완료된 작업 목록
+- `server/configs.json`: `db_page_size`(20, "DB 관리 테이블 기본 출력 행 개수 (페이지당 행 수)")·`db_cell_preview_chars`(200, "DB 관리 그리드 셀 출력 문자열 제한 길이 (초과 시 더보기)") 시드 추가. `seedConfigDefaults()` 누락 키만 자동 INSERT → configs 테이블 + admin 환경설정(`/settings`) 자동 노출(기존 값 보존).
+- `server/src/index.ts`: `POST /api/admin/fs/open-explorer` 신규 — `{path}` 실존 검증(미존재 404) → 파일이면 `dirname`(부모 디렉토리) / 디렉토리면 그대로 → win32 `explorer.exe`(비Win `xdg-open`/`open`) 실행, `windowsHide: true`, `FS_OPEN_EXPLORER` 관리자 활동 로그. `/api/admin/db/rows` size 미지정 기본값 50→20.
+- `server/src/services/dbManagerService.ts`: `fetchTableRows` 기본 `size=20`, `pageSize = Math.min(200, Math.max(1, Number(size)||20))` 캡 유지.
+- `admin/src/components/modals/ValuePreviewModal.tsx` 신규: 창 높이 기준 `maxHeight = window.innerHeight - 120px`(최소 320px), 본문 `overflow-y: auto`, 닫기 버튼·backdrop·ESC, 헤더에 전체 글자수·줄수 표시, material-symbols-outlined.
+- `admin/src/components/tables/DbDataGrid.tsx` 개편: `CellValue` 하위 컴포넌트 — `cellPreviewLimit`(기본 200) 초과 시 `…` 잘림 + `더보기` 링크 → ValuePreviewModal, **`col === "file_path"` 정확 일치**·값 비어있지 않은 셀에만 `folder_open` 탐색기 버튼(진행 스피너·중복 실행 차단, 실패 시 그리드 하단 오류 배너). import 경로는 `../../services/apiService.js`·`../modals/ValuePreviewModal.js`.
+- `admin/src/services/apiService.ts`: `openExplorerApi(path)` 추가(`POST /api/admin/fs/open-explorer`).
+- `admin/src/hooks/useDbManager.ts`: `selectTable(table, size = 20)` — 하드코딩 50 제거, `loadRows(table, 1, size, "")`.
+- `admin/src/components/views/db/DbBrowserPanel.tsx`: `dbPageSize=20`/`cellPreviewChars=200` props, `PAGE_SIZE_OPTIONS=[20,50,100,200]`, 페이지 크기 드롭다운(변경 시 1페이지부터 재조회), 검색/페이지 이동에 pageSize 전달, DbDataGrid에 `cellPreviewLimit` 전달.
+- `admin/src/components/views/db/SqlQueryPanel.tsx`: `cellPreviewChars` prop → DbDataGrid `cellPreviewLimit` 전달.
+- `admin/src/components/views/db/DbManagerView.tsx`: `dbPageSize`/`cellPreviewChars` props, `handleSelectTable` → `selectTable(table, dbPageSize)`, browser/sql 패널에 props 전달.
+- `admin/src/App.tsx`: `dbPageSize = Number(configs…db_page_size)||20`, `cellPreviewChars = Number(…)||200` 파싱 → `<DbManagerView dbPageSize cellPreviewChars>`.
+- 문서: `docs/rule/R-00203 database.md`(configs 키 2종 + open-explorer API + rows 기본 20), `docs/rule/R-00304 admin-worker-and-db-manager.md`(§3.1 데이터 브라우저 항목, §3.3 그리드 셀 규정, 검증 체크리스트 3건 추가).
+
+### 변경된 파일
+- `server/configs.json`, `server/src/index.ts`, `server/src/services/dbManagerService.ts`
+- `admin/src/components/modals/ValuePreviewModal.tsx`(신규), `admin/src/components/tables/DbDataGrid.tsx`, `admin/src/services/apiService.ts`, `admin/src/hooks/useDbManager.ts`, `admin/src/components/views/db/DbBrowserPanel.tsx`·`SqlQueryPanel.tsx`·`DbManagerView.tsx`, `admin/src/App.tsx`
+- `docs/rule/R-00203 database.md`, `docs/rule/R-00304 admin-worker-and-db-manager.md`
+- `docs/askLogs/ask-20260809231120.md`(신규)
+
+### 검증 결과
+- server `tsc` 0건 + `npm run build` 성공, pm2 `WebCrawlServer` 재시작 후 online(9600).
+- admin `tsc --noEmit` 내 변경 파일 0건(선재 비차단 에러 동일), `vite build` 성공.
+- `GET /api/admin/configs` → `db_page_size=20`, `db_cell_preview_chars=200` 시드 확인.
+- `GET /api/admin/db/rows`(crawl_logs, total=145) → size 미지정 시 `size=20, returned=20`(기본 20), page=2·size=50 정상.
+- `POST /api/admin/fs/open-explorer` → 파일 지정 시 부모 `databases` 디렉토리로 Explorer 실행 성공, 미존재 경로 404.
+
+### 잔여 사항
+- 브라우저 수동 확인: 더보기 레이어(창 높이/스크롤), 행 수 드롭다운 20 기본, file_path 탐색기 버튼.
+
+---
+
 ## 2026-08-09 | 기본 탭 개편 + 터미널 모든 탭 하단 공통화 + 현재 페이지 URL 자동 갱신
 
 ### 요청

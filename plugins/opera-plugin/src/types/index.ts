@@ -135,9 +135,131 @@ export interface CrawlImagePayload {
   [key: string]: unknown;
 }
 
+/** xvideos 비디오 블록 수집 항목 구조체 (다운로드 매니저 목록 구성용) */
+export interface XvideosMediaEntry {
+  /** 비디오 블록 고유 EID (예: "kavfihb169e") */
+  eid: string;
+  /** 비디오 클릭 URL (절대 경로, .videopv 앵커 또는 썸네일 링크에서 추출) */
+  clickUrl: string;
+  /** 비디오 제목 (title 속성에서 추출) */
+  title: string;
+  /** 메인 썸네일 URL (xv_24_t.jpg 등, 단일 영상 페이지에서는 포스터 이미지 1종) */
+  mainUrl: string;
+  /** 보조(무해) 썸네일 URL (xv_3_t.jpg, data-sfwthumb) — 단일 영상 페이지에서는 빈 문자열 */
+  sfwUrl: string;
+  /** 프리뷰 mp4 URL (data-pvv) — 단일 영상 페이지에서는 빈 문자열 */
+  previewUrl: string;
+}
+
+/** 미디어 번들 자산 구조체 (CRAWL_IMAGE 번들 페이로드 assets 항목) */
+export interface MediaAssetPayload {
+  /** 자산 구분 키 (thumb | sfw | preview) */
+  kind: string;
+  /** 자산 원본 URL */
+  url: string;
+  /** 원본 파일명 (확장자 폴백 후보) */
+  fileName?: string;
+  /** MIME 타입 (예: "image/jpeg", "video/mp4") */
+  mimeType?: string;
+  /** Base64 인코딩 바이너리 데이터 (다운로드 실패 시 빈 문자열) */
+  data?: string;
+}
+
+/** 미디어 번들 전송 페이로드 구조체 (CRAWL_IMAGE 번들, payloadType: binary_base64) */
+export interface CrawlMediaBundlePayload {
+  /** 다운로드 매니저 내 항목 추적 ID (서버 ACK가 동일 ID로 응답) */
+  bundleId?: string;
+  /** 파일명 시퀀스 (플러그인이 생성한 <timestamp>-<index> 문자열) */
+  baseName?: string;
+  /** 이미지가 포함된 페이지 URL */
+  pageUrl?: string;
+  /** 수집 카테고리 (기본 "normal") */
+  category?: string;
+  /** 비디오 블록 클릭 URL */
+  clickUrl?: string;
+  /** 비디오 블록 제목 */
+  title?: string;
+  /** 플러그인이 생성한 txt 메타 원문 (서버가 그대로 저장) */
+  txtContent?: string;
+  /** 자산 목록 (최대 3종: thumb/sfw/preview) */
+  assets?: MediaAssetPayload[];
+  /** 수집 시점 타임스탬프 */
+  timestamp?: number;
+}
+
+/** 저장 위치 조회 요청 페이로드 구조체 (GET_STORAGE_LOCATION 액션) */
+export interface StorageLocationRequestPayload {
+  /** 대상 페이지 URL (도메인 산출 기준) */
+  pageUrl?: string;
+  /** 수집 카테고리 (기본 "normal") */
+  category?: string;
+}
+
+/** 저장 위치 조회 응답 페이로드 구조체 (STORAGE_LOCATION_RESPONSE 액션) */
+export interface StorageLocationResponsePayload {
+  /** 조회 성공 여부 */
+  success: boolean;
+  /** 산출된 루트 도메인 */
+  domain?: string;
+  /** 수집 카테고리 */
+  category?: string;
+  /** 저장소 최상위 절대 경로 (configs.data_path) */
+  absRoot?: string;
+  /** 저장소 루트 기준 상대 경로 (images/<도메인>/<카테고리>) */
+  relDir?: string;
+  /** 대상 저장 절대 경로 */
+  absDir?: string;
+  /** 오류 메시지 */
+  message?: string;
+}
+
+/** 미디어 번들 저장 완료 ACK 페이로드 구조체 (CRAWL_MEDIA_SAVED 액션) */
+export interface CrawlMediaSavedAckPayload {
+  /** 저장 성공 여부 */
+  success: boolean;
+  /** 요청한 번들의 추적 ID */
+  bundleId?: string;
+  /** 실제 저장된 절대 디렉토리 경로 */
+  savedDir?: string;
+  /** 실제 저장된 파일 절대 경로 목록 */
+  savedFiles?: string[];
+  /** 총 저장 크기 (Bytes) */
+  fileSize?: number;
+}
+
+/** 다운로드 매니저 진행률 브로드캐스트 페이로드 구조체 (FETCH_MEDIA_BUNDLE_PROGRESS) */
+export interface FetchMediaBundleProgressPayload {
+  /** 진행률을 갱신할 항목 추적 ID */
+  bundleId: string;
+  /** 진행률 퍼센트 (0~100, 오프스크린 단계별 갱신) */
+  progress: number;
+}
+
+/** xvideos 다운로드 매니저 항목 상태 구분자 */
+export type XvideosDownloadStatus = "pending" | "downloading" | "done" | "failed";
+
+/** xvideos 다운로드 매니저 큐 항목 구조체 (DownloadThemAll식 목록 UI 구성용) */
+export interface XvideosDownloadItem {
+  /** 항목 추적 ID (서버 ACK 매핑용) */
+  bundleId: string;
+  /** 파일명 시퀀스 (txt/자산 파일명 공통 베이스) */
+  baseName: string;
+  /** 비디오 블록 메타 항목 */
+  entry: XvideosMediaEntry;
+  /** 항목 다운로드 상태 */
+  status: XvideosDownloadStatus;
+  /** 다운로드 진행률 (0~100, 오프스크린 FETCH_MEDIA_BUNDLE_PROGRESS로 갱신) */
+  progress: number;
+  /** 저장 완료된 절대 디렉토리 경로 (완료 시) */
+  savedDir?: string;
+  /** 저장 완료된 파일 절대 경로 목록 (완료 시) */
+  savedFiles?: string[];
+  /** 실패 사유 (실패 시) */
+  error?: string;
+}
+
 /** 요소 선택 결과 전송 페이로드 구조체 (요소 선택 모드 → CRAWL_PARTIAL) */
-export interface CrawlElementPayload {
-  /** 수집 페이지 URL */
+export interface CrawlElementPayload {  /** 수집 페이지 URL */
   url?: string;
   /** 페이지 타이틀 */
   title?: string;

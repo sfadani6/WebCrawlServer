@@ -6,7 +6,13 @@
 
 1.1 **테마 규격**: 다크 투톤 스타일 적용 (기본 배경: `#0d131f`, 카드 배경: `#162032`, 주요 강조색: `#1d4ed8` / `#38bdf8`)  
 1.2 **타이포그래피**: 기본 본문 `Noto Sans KR`, 폰트 및 노드 ID/로그 표현용 `JetBrains Mono` / `monospace`  
-1.3 **아이콘 시스템**: Google Material Symbols Outlined 사용 (`sidepanel.html` CDN 로드)  
+1.3 **아이콘 배제 원칙**: 폰트 아이콘(Google Material Symbols 등)은 사용하지 않으며, 텍스트 레이블 중심으로 UI를 구성한다. 예외적으로 아코디언 열림/닫힘 표시만 유니코드 `▼`/`▶` 문자를 허용한다.  
+1.4 **버튼 색상 체계**: 파랑 그라데이션을 주 실행 색으로 단일화한다.
+   - `btn-primary` (주 실행 버튼, 전체 폭): 파랑 그라데이션 `#1d4ed8→#3b82f6` + 흰 글씨. **비활성 상태는 `opacity` 대신 명시적 색상**(배경 `#1e293b` + 테두리 `#334155` + 글씨 `#94a3b8`)으로 표시해 가시성을 확보한다.
+   - `btn-accent` (요소 선택 모드): 앰버 그라데이션 `#b45309→#f59e0b` — 기능 구분용 유일 예외.
+   - `btn-secondary` (보조 그리드 — 이미지 수집 카테고리): 배경 `#1e293b` + 테두리 `#334155` + 글씨 `#e2e8f0`, 비활성 시 글씨 `#64748b`.
+   - `btn-mini` (소형 다크 — 터미널 헤더 버튼): 배경 `#334155`, 활성 토글 시 에메랄드 `#059669` + 흰 글씨.
+   - 파랑은 단일 스펙으로 통일하며, `#1A73E8` 등 이종 파랑은 사용하지 않는다.
 
 ---
 
@@ -16,7 +22,7 @@
 
 ```
 +------------------------------------------+
-| [icon] WebCrawlServer 대시보드          | <- Header
+| ● WebCrawlServer 대시보드               | <- Header (아이콘 대신 도트 배지)
 +------------------------------------------+
 | [ 기본 ] | [ 정보 ] | [ 디버깅 ] | [ 설정 ] | <- TabBar
 +------------------------------------------+
@@ -46,6 +52,24 @@
   - (터미널 콘솔은 하단 공통 컴포넌트로 이동)
 - **`설정` 탭**:
   - 노드 한글 별칭(Alias) 입력 및 서버 저장
+
+### 2.3 xvideos 다운로드 매니저 전용 팝업 창 (`xvideosManager.tsx`)
+
+패널 폭 협소 문제를 해소하기 위해 xvideos 다운로드 매니저는 사이드바 내부가 아닌 **전용 팝업 창(`chrome.windows.create({ type: "popup" })`, 900×760)**으로 분리 표시합니다. 사이드바/팝업의 xvideos 그룹은 "다운로드 매니저 열기" 버튼만 유지하며, 매니저 창은 대상 xvideos 탭(`?tabId=`)을 쿼리로 전달받아 독립 동작합니다.
+
+- **창 생성 흐름**: 사이드바 `handleOpenXvideosManager` → `chrome.tabs.query({ url: "*://*.xvideos.com/*" })`로 대상 xvideos 탭 탐색(활성 탭 우선, 없으면 첫 탭) → `chrome.windows.create({ url: chrome.runtime.getURL("xvideos-manager.html?tabId=…"), type: "popup", width: 900, height: 760, focused: true })`. `windows` 권한이 manifest permissions에 필요합니다.
+- **진입 검증**: 매니저 페이지가 `chrome.tabs.get(tabId)`로 탭 유효성을 확인하고, 실패 시 `chrome.tabs.query`로 폴백하며, xvideos 탭이 없으면 초기 오류 안내("xvideos.com 탭을 찾을 수 없습니다...")를 표시합니다.
+- **레이아웃**:
+  - 헤더: 제목(`xvideos.com 다운로드 매니저`) + 대상 페이지 URL(축약) + [닫기] 버튼(`window.close()`)
+  - 상태 영역: 저장 위치 절대경로(`absDir`) + 진행 상태 메시지
+  - **페이지 전체 스크롤**: 매니저 HTML `<html class="manager-scrollable">`이 전역 `html/body { overflow: hidden }`을 해제하고(`popup.css`의 `html.manager-scrollable { overflow-y: auto }` + 가시 스크롤바 thumb `#475569`), 목록·버튼·로그를 포함한 **창 전체가 통째로 스크롤**되어 아래 데이터까지 항상 확인 가능합니다. 루트는 `h-screen`이 아닌 `min-h-screen`으로 자연 높이로 펼쳐집니다.
+  - 항목 목록: 항목 카드(상태 배지: 대기/다운로드/완료/실패 + 제목 + clickUrl)
+  - 항목별 **다운로드 대상 이미지 URL 주소**: `image_url`/`sfw_image_url`/`preview_video_url` 3줄을 `break-all`+선택 복사 가능하게 표시(썸네일 미리보기가 아니라 실제 다운로드할 주소)
+  - 항목별 **프로그레스 바**: 다운로드 시작 직후(0%) 스카이 쉬머 애니메이션(`progress-bar-indeterminate`) → 오프스크린 단계 이벤트로 실제 % 갱신 → 완료 100%(에메랄드)/실패 100%(레드), 우측 % 숫자 표기
+  - 버튼 3종: [목록 생성] / [진행] / [초기화] — `btn-primary`/`btn-secondary`/`btn-mini` 토큰 재사용
+  - 하단 로그 터미널: 작업 진행 로그(레벨별 색상)
+- **상태 관리**: `useXvideosDownloadManager` 훅(`src/hooks/useXvideosDownloadManager.ts`)이 목록/순차 진행/초기화/로그(200건 상한)를 전담하며, 오프스크린의 `FETCH_MEDIA_BUNDLE_PROGRESS` 브로드캐스트를 `chrome.runtime.onMessage`로 수신해 항목 `progress`를 실시간 갱신합니다. 기존 `mediaAckWaiters`(60초)/`storageLocationWaiter`(15초) 파이프라인과 동일 컨텍스트에서 동작합니다.
+- **자동 목록 생성**: 최초 진입 시 대상 탭으로 `COLLECT_XVIDEOS_MEDIA`를 1회 요청해 목록을 자동 구성합니다.
 
 ---
 
@@ -78,7 +102,7 @@
    - `● 온라인 (사이드바 활성 🖥️)`: 파란색 애니메이션 펄스 배지
    - `● 온라인 (백그라운드 가동 🌙)`: 초록색 애니메이션 펄스 배지
 4.2 **버튼 처리 상태**:
-   - 전송 중일 때 버튼 비활성화(`disabled`) 및 동기화 아이콘 회전 애니메이션(`animate-spin`) 적용.
+   - 전송 중일 때 버튼 비활성화(`disabled`)하고 라벨을 "전송 중..."/“이미지 수집 중...” 등 텍스트로 전환한다. (아이콘 스피너 대신 텍스트 기반 진행 표시)
 4.3 **원격 긴급 모달**:
    - 서버에서 `SHOW_ALERT_MODAL` 패킷 수신 시 사이드바 중앙에 경고 모달 창 즉시 팝업.
 

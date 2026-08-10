@@ -35,8 +35,7 @@ export function DebugTab({
           className="debug-textarea font-mono"
           placeholder="서버로 전달할 JSON 객체를 입력하세요"
         />
-        <button onClick={onSendDebugMessage} className="send-button mt-1">
-          <span className="material-symbols-outlined text-base">send</span>
+        <button onClick={onSendDebugMessage} className="btn-primary mt-1">
           <span>보내기</span>
         </button>
         {debugStatus && (

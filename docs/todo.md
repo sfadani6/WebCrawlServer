@@ -1,47 +1,126 @@
 # 실행 계획 체크리스트 (docs/todo.md)
 
 ## 현재 작업
-- (없음 — ask-20260809205823 기본 탭 개편 사이클 완료)
+- ask-20260810071013: xvideos 단일 영상 페이지(플레이어)에서 포스터 이미지 1종 + 타이틀 추출 — "여긴 이미지 하나면되"
+
+## 완료된 작업 (ask-20260810071013)
+- [x] content.ts: `isXvideosVideoPage()`(URL/DOM 판별) + `collectXvideosVideoPageEntry()`(포스터·타이틀·EID)
+- [x] content.ts: COLLECT_XVIDEOS_MEDIA 핸들러에 비디오 페이지 폴백(1건, sfw/preview 빈 문자열)
+- [x] types/index.ts: sfwUrl/previewUrl JSDoc에 단일 영상 페이지 빈 문자열 명시
+- [x] XvideosManagerView.tsx: 빈 목록 안내 문구에 단일 영상 페이지 파싱 추가
+- [x] opera-plugin 동기화 3종 + 양 플러그인 빌드 성공
+- [x] 문서: R-00430 §5.4(단일 영상 페이지 폴백), R-00420 §4.5, askLog 신규(ask-20260810071013)
+
+## 예정 작업 (ask-20260810071013)
+- [ ] 브라우저 실측: 영상 재생 페이지에서 매니저 → 현재 영상 1건 목록 → 포스터 이미지 1종 + txt만 저장 확인
+
+## 완료된 작업 (ask-20260810065244)
+- [x] offscreen.ts: `broadcastFetchProgress()` 신설 + 인출 단계별(메인30/보조55/프리뷰80/전송95) `FETCH_MEDIA_BUNDLE_PROGRESS` 브로드캐스트(.catch 가드)
+- [x] types/index.ts: `XvideosDownloadItem.progress` + `FetchMediaBundleProgressPayload` 신설
+- [x] useXvideosDownloadManager.ts: progress 초기 0/진행 리셋/done·failed 100, onMessage 리스너(bundleId 매칭 갱신)
+- [x] XvideosManagerView.tsx: `.manager-list-scroll` + 항목별 image_url/sfw_image_url/preview_video_url 3줄 + 프로그레스 바(0% 쉬머→%→완료/실패 100)
+- [x] popup.css: 가시 스크롤바(thumb #475569) + `progress-bar-indeterminate` 쉬머 애니메이션
+- [x] opera-plugin 동기화 5종 + 양 플러그인 빌드 성공(각 52 모듈, offscreen.js 5.33 kB·xvideosManager.js 10.42 kB)
+- [x] 문서: R-00440 §2.3, R-00420 §4.5·§5, R-00430 §5.4·§6, askLog 신규(ask-20260810064441)
+
+## 예정 작업 (ask-20260810064441)
+- [ ] 브라우저 실측: 매니저 창 목록 스크롤바 표시, 항목별 이미지 URL 주소 3줄 표시, 진행 시 프로그레스 바(쉬머→%→완료) 및 저장 배지 갱신 확인
+
+## 완료된 작업 (ask-20260810061757)
+- [x] vite.config.ts: `rollupOptions.input`에 xvideosManager 엔트리(`xvideos-manager.html`) 추가(기존 sidepanel/offscreen/background/content 유지, 엔트리 5종) + `xvideos-manager.html` 신규
+- [x] `useXvideosDownloadManager.ts` 신규: `extFromUrl`/`buildXvideosTxtContent` 이관 + 훅(목록/순차진행/초기화/로그 200건 상한)
+- [x] chromeService.ts: `sendCommandToActiveTab` 일반화 `sendCommandToTab(tabId)` 신설(주입+재시도), `requestCollectXvideosMediaFromTab(tabId)` 추가
+- [x] `xvideosManager.tsx` 신규(React root, tabId 쿼리 검증·폴백, initError, 최초 자동 목록 생성) + `XvideosManagerView.tsx` 신규(2열 그리드·상태 배지·버튼 3종·로그 터미널)
+- [x] BasicTab.tsx: xvideos Props 6종 → `onOpenXvideosManager` 1종, "다운로드 매니저 열기" 버튼만 유지
+- [x] usePopupState.ts: xvideos state 5종 제거, `handleOpenXvideosManager`(xvideos 탭 검색→windows.create) 신규 + return 반영
+- [x] sidepanel.tsx/popup.tsx props 교체 + manifest `windows` 권한 추가(basic/opera)
+- [x] opera-plugin 동기화(신규 3종+html+vite.config+수정 5종 헤더 교체) + 양 플러그인 빌드 성공(각 52 모듈, xvideosManager.js 8.73 kB)
+- [x] 문서: R-00440 §2.3(매니저 창 UI 규격), R-00430 §5.4·§6, R-00420 §4.5, R-00450(엔트리 4→5), askLog 신규(ask-20260810061757)
+
+## 예정 작업 (ask-20260810061757)
+- [ ] 브라우저 실측: 사이드바 버튼→매니저 창(900×760) 열림, 대상 탭 목록 자동 생성(중복 제거·상한 없음), 진행 시 txt+썸네일2종+preview.mp4 저장 및 완료/실패 배지, 닫기·초기화·로그 출력 확인
+
+## 완료된 작업 (ask-20260810051720)
+- [x] 서버 fileStorageService: 실패 참조 `.url`→`.txt`(clickUrl/title 라인), `mimeToExtension` mp4/webm 추가, 신규 `saveCrawledMediaBundle()`(txt+자산 일괄 저장·실패 자산 스킵·savedDir/savedFiles 반환)
+- [x] 서버 index.ts: `GET_STORAGE_LOCATION`→`STORAGE_LOCATION_RESPONSE`(absDir/relDir) 신설, CRAWL_IMAGE assets 배열 감지 시 번들 저장+`CRAWL_MEDIA_SAVED` ACK 응답
+- [x] 플러그인 content.ts: `collectXvideosMediaEntries()`(`.thumb-block` 상한 없음·no-img 제외·clickUrl 중복 제거·eid/clickUrl/title/sfw/메인/preview 수집) + `COLLECT_XVIDEOS_MEDIA` 핸들러
+- [x] 플러그인 offscreen.ts: `mediaAckWaiters`(60s)/`storageLocationWaiter`(15s), `fetchAssetAsBase64()`(실패 시 빈 data), `handleFetchMediaBundle()` 3자산 인출→번들 전송→ACK 대기
+- [x] 플러그인 usePopupState.ts: xvideos 매니저 state 5종 + `buildXvideosTxtContent`/목록 생성/순차 진행(done·failed 집계)/초기화, `getPacketLogType` ACK success 처리
+- [x] BasicTab.tsx: DownloadThemAll식 매니저 패널(저장 위치 절대경로·항목 상태 배지·진행/초기화) + sidepanel/popup props 전달
+- [x] opera-plugin 동기화 8종(헤더 교체, background.ts는 `chrome.sidePanel?.` 차이로 유지) + 양 플러그인 빌드 성공(각 48 모듈)
+- [x] 검증: server 빌드(tsc)+pm2 재시작 online(9600), dist에 신규 핸들러 포함 확인
+- [x] 문서: R-00208 §2.1/§2.2/§3.1, R-00430 §5.4, R-00420 §4.5 갱신, askLog 신규(ask-20260810051720)
+
+## 예정 작업 (ask-20260810051720)
+- [ ] (ask-20260810061757 예정 작업으로 대체) 브라우저 실측: xvideos.com 목록 생성(중복 제거·상한 없음)→진행 시 txt+썸네일2종+preview.mp4 저장 및 항목 완료/실패 배지 갱신 확인
+
+## 완료된 작업 (ask-20260810033437)
+- [x] popup.css: Material Symbols `@import` 제거, 공통 버튼 토큰 신설(`btn-primary`/`btn-accent`/`btn-secondary`/`btn-mini`, 비활성 opacity→명시 고대비), `terminal-log-line`/`terminal-input` 스타일 추가
+- [x] 폰트 아이콘 22곳 전면 제거(Header/TerminalConsole/BasicTab 16/DebugTab/InfoTab 2/SettingsTab) + 아코디언 `▼/▶` 유니코드 전환 + HTML 3종 CDN 제거
+- [x] 터미널 정돈: 로그 행 타임스탬프/본문 분리·호버, 입력줄 박스형(sky 포커스 링), 헤더 버튼 `btn-mini` 통일
+- [x] 버튼 일관화: 설정탭 `#1A73E8`→`btn-primary`(파랑 그라데이션), 요소 선택 앰버 유지, 사이트 카테고리 `btn-secondary` 통일
+- [x] opera-plugin 동기화(10종 복사 + 헤더 교체) + 양 플러그인 빌드 성공(각 48 모듈)
+- [x] 문서: R-00440 §1.3 아이콘 배제 원칙·§1.4 버튼 색상 체계 신설, §2 도식·§4.2 갱신
+
+## 예정 작업 (ask-20260810033437)
+- [ ] 브라우저 수동 확인: 아이콘 제거·버튼 가시성·색상 통일, 터미널 출력/입력 스타일, 이미지 수집 카테고리 버튼 활성/비활성 대비
+
+## 완료된 작업 (ask-20260810031128)
+- [x] content.ts: `MAX_IMAGE_COLLECT_COUNT` 50→500, `resolveImageSource()` lazy 폴백(data-src/data-original/data-lazy-src/data-url/data-lazy), `collectAndSendImages` 중복 URL Set 제거
+- [x] BasicTab.tsx: 사이트 전용 그리드 → 항상 3그룹 표시(일반/xchina.co/xvideos.com), 비매칭 그룹 disabled + "다른 도메인" 배지 + title 안내
+- [x] 서버 index.ts: `normalizeRootDomain()` 신규 — `www.` 제거한 루트 도메인으로 저장 폴더/crawl_logs domain 통일
+- [x] opera-plugin 동기화(2종: content.ts, BasicTab.tsx) + 양 플러그인 빌드 성공
+- [x] 문서: R-00208 §2.1(카테고리 하위 폴더·info·루트 도메인), R-00430 §5.3·§6 갱신
+- [x] 검증: server 빌드 + pm2 재시작 online, 플러그인 빌드 성공
+
+## 예정 작업 (ask-20260810031128)
+- [ ] 브라우저 수동 확인: 3그룹 상시 표시/비매칭 비활성화 배지, lazy 포함·중복 제거·500 상한, `images/<루트도메인>/normal/` 저장
+
+## 완료된 작업 (ask-20260810024611)
+- [x] 플러그인 액션 개편: 전체 페이지 → `fullPage`(버튼 누를 때 현재 렌더링 DOM 재캡처 outerHTML), 요소 선택 → `DomCapture`, 구형 CRAWL_DOCUMENT/PARTIAL 하위 호환 유지 (content.ts/chromeService/usePopupState/BasicTab/sidepanel/popup)
+- [x] 이미지 수집 3버튼: 일반 상시 + xchina.co(normal/album/cover/info)·xvideos.com(normal/info) 사이트 전용, `matchSiteDomain()` 호스트 정확/접미사 매칭, category 페이로드 전달
+- [x] 정보 수집 `SITE_INFO` 액션 신규: 메타 JSON → `<기본경로>/images/<도메인>/info/<ts>-<seq>.json` 물리 저장
+- [x] 서버: `saveCrawledImage` `images/<도메인>/<카테고리>` 저장, CRAWL_IMAGE category 전달, SITE_INFO 분기, 워커 파이프라인 조건 `CRAWL_DOCUMENT || fullPage`
+- [x] 서버: `fetchTableRows` searchField/orderBy/orderDir 파라미터 + 컬럼 화이트리스트 + `%`/`_` LIKE `ESCAPE '\'` + rows 라우트 파싱
+- [x] admin 데이터 브라우저: 컬럼 헤더 ▲▼ 서버 정렬(onSortChange) + 검색 필드 드롭다운(전체/개별 컬럼) + 테이블 전환 시 리셋
+- [x] admin SQL 실행기: 예제 쿼리 20개 드롭다운(선택 시 에디터 삽입) + 결과 그리드 `clientSort` 클라이언트 정렬
+- [x] opera-plugin 동기화(6종 복사 + 헤더 교체) + 양 플러그인 빌드 성공
+- [x] 문서: R-00203(rows API 규격), R-00304(§3.1/§3.3/체크리스트) 갱신
+- [x] 검증: server 빌드 + pm2 재시작 online, admin vite build, API 수동(정렬/검색/이스케이프/주입 안전)
+
+## 예정 작업 (ask-20260810024611)
+- [ ] 브라우저 수동 확인: 사이트 전용 이미지 버튼/카테고리 저장, fullPage 재캡처, admin 헤더 정렬/필드 검색/예제 쿼리
+
+## 완료된 작업 (ask-20260809231120)
+- [x] server/configs.json: `db_page_size`(20), `db_cell_preview_chars`(200) 시드 추가 (누락 키 자동 INSERT, admin 환경설정 자동 노출)
+- [x] server: `POST /api/admin/fs/open-explorer` 신규 (파일이면 부모 디렉토리, 디렉토리면 그대로, win32 explorer.exe/비Win xdg-open, 미존재 404, 관리자 활동 로그)
+- [x] server: `/api/admin/db/rows` 및 `fetchTableRows` size 미지정 기본값 50→20 (최대 200 유지)
+- [x] admin ValuePreviewModal.tsx 신규: 창 높이 기준 maxHeight(`innerHeight - 120px`) + 본문 스크롤 + 닫기/backdrop/ESC + 글자수·줄수 표시
+- [x] admin DbDataGrid.tsx: 셀 길이 제한(기본 200) + `더보기` 링크 + `file_path` 컬럼 정확 일치 시 folder_open 탐색기 버튼 + 실패 배너
+- [x] admin apiService.ts: openExplorerApi() 추가
+- [x] admin useDbManager.ts: selectTable(table, size=20) size 파라미터화
+- [x] admin DbBrowserPanel.tsx: dbPageSize 기본값 + 페이지당 행 수 드롭다운(20/50/100/200) + cellPreviewChars 전달
+- [x] admin SqlQueryPanel.tsx: cellPreviewChars → DbDataGrid 전달
+- [x] admin DbManagerView.tsx: dbPageSize/cellPreviewChars props 수신·전달, selectTable(table, dbPageSize)
+- [x] admin App.tsx: configs에서 두 키 파싱 → DbManagerView props 전달
+- [x] 검증: server tsc/빌드 통과 + pm2 재시작 online(9600), admin tsc 신규 에러 0건 + vite build 성공
+- [x] API 수동: configs 시드 확인(20/200), rows 기본 size=20·page2·size=50 정상, open-explorer 파일→부모 디렉토리 성공/미존재 404
+- [x] 이력 기록: docs/askLogs/ask-20260809231120.md, docs/todo.history.md, docs/ask.md 초기화
 
 ## 완료된 작업 (ask-20260809205823)
 - [x] 기본 탭 개편: DOM 전송(라디오 전체/요소선택/프레임), 이미지 수집, 액션 실행(미개발 disabled) 아코디언+카드 구성 (BasicTab.tsx)
-- [x] 요소 선택 모드: content.ts 파란 테두리 오버 → 클릭 시 "전송" 플로팅 버튼 → outerHTML을 CRAWL_PARTIAL로 전송, ESC 종료 + ELEMENT_PICKER_ENDED 통지
-- [x] 프레임 수집: GET_FRAME_INFO(iframe 개수 조회, 미존재 시 비활성화) + COLLECT_FRAME_DOM(같은 오리진 fullDom/크로스 오리진 src 참조)
-- [x] 이미지 수집: COLLECT_IMAGES(fetch→base64 성공 시 CRAWL_IMAGE binary_base64, 크로스 오리진 실패 시 CRAWL_IMAGE json URL 참조, 최대 50개)
-- [x] 터미널 공통화: TerminalConsole.tsx 신설 — 모든 탭 하단 맨 아래 고정 배치 + 외곽 아웃라인/스크롤바 개선, DebugTab은 디버그 송출 카드만 유지
-- [x] 현재 페이지 URL 자동 갱신: chrome.tabs.onActivated + onUpdated(status complete) 리스너로 활성 탭 감시 (usePopupState refreshCurrentTabInfo)
-- [x] chromeService.ts 공통 명령 헬퍼(sendCommandToActiveTab) + 요소/프레임/이미지 요청 함수, types에 CrawlImagePayload/CrawlElementPayload 추가
-- [x] 서버: CRAWL_IMAGE 액션 분기 + saveCrawledImage(images/<domain>/<timestamp>-<index>.<ext>, 실패 .url 참조 저장, pageUrl 도메인 분류)
-- [x] opera-plugin 소스 동기화 (10개 파일, 헤더 경로 주석 교체)
-- [x] 검증: basic/opera tsc+eslint+빌드 통과, 서버 tsc+빌드+pm2 재시작 안정 확인
-- [x] 이력 기록: docs/askLogs/ask-20260809205823.md, docs/todo.history.md, docs/ask.md 초기화
-
-## 예정 작업 (ask-20260809205823)
-- [ ] 브라우저에서 수동 테스트: 요소 선택(파란 테두리/전송 버튼/outerHTML 전송), 프레임 비활성화, 이미지 저장, URL 자동 갱신
-- [ ] 액션 실행 기능 설계 및 구현 (미개발 상태 유지)
+- [x] 요소 선택 모드, 프레임 수집, 이미지 수집(최대 50개, CORS 실패 시 URL 참조)
+- [x] 터미널 공통화(TerminalConsole.tsx) + 현재 페이지 URL 자동 갱신(활성 탭 감시)
+- [x] opera-plugin 동기화 + 서버 CRAWL_IMAGE 저장 + 문서/이력 기록
 
 ## 완료된 작업 (ask-20260809100542)
-- [x] plugins/opera-plugin 신설 (basic-plugin 전체 사본, node_modules/dist 제외)
-- [x] 오페라 특수 변경: manifest.json(sidePanel 제거 + sidebar_action 추가), background.ts(chrome.sidePanel 옵셔널 가드), package.json(name=opera-plugin), 소스 헤더 경로 주석 일괄 교체
-- [x] 루트 package.json: workspaces에 opera-plugin 추가, plugin:opera:dev 신설, build:all 포함
-- [x] 문서 갱신: R-00460(§1.4/§6/§7 오페라 규정), R-00410(§2.1 병행 구조), ADR-006 신규
-- [x] 검증: opera/basic 플러그인 빌드 성공, dist/manifest.json sidebar_action 존재 + sidePanel/side_panel 부재 확인
-- [x] 이력 기록: docs/askLogs/ask-20260809100542.md, docs/todo.history.md, docs/ask.md 초기화
-
-## 예정 작업 (ask-20260809100542)
-- [ ] 오페라 실제 로드 테스트(opera://extensions/) 및 사이드바 표시 확인
-- [ ] 오페라에서 offscreen/기타 권한 미지원 확인 시 폴백 대응 (ADR-006 §3-5)
+- [x] plugins/opera-plugin 신설 (sidebar_action, basic 기능 동일), 문서/ADR-006/이력 기록
 
 ## 완료된 작업 (ask-20260809)
-- [x] 서버 database.ts: clients 4컬럼 재구성 + 마이그레이션(6컬럼→4컬럼, alias ADD COLUMN), plugin_messages 테이블/함수, insertCrawlLog action 파라미터, ensureCrawlLogsTableSchema 전체 컬럼(domain/action/worker_name/url/title/file_path/file_size) 마이그레이션
-- [x] 서버 fileStorageService.ts: savePluginMessageToFile 평면 구조 저장 함수
-- [x] 서버 index.ts: 저장경로 로직 수정, 원장 저장 훅, CRAWL_* 4액션 분기, GET /api/db/plugin_messages, ws 수신 Buffer → string 변환, 빈 catch → WARN 로그, logPluginComm 호출부 예외 가드
-- [x] 서버 logger.ts: logPluginComm/logServerSystem 내부 appendFileSync 예외 격리
-- [x] 플러그인: types/TabBar/content/offscreen/chromeService/usePopupState/SettingsTab/sidepanel
-- [x] admin: Client 타입 정리, NodeConfigModal 별칭만 유지, props 체인 정리, plugin_messages API 연동, PluginMessagesPanel/DbManagerView "메시지 원장" 탭
-- [x] 문서/규칙 갱신 (R-00203/204/420, ADR-005 신규)
-- [x] 검증: server tsc, plugin/admin 빌드, 기동 테스트(마이그레이션/별칭/ACK/원장/파일/plugins_comm.log/WARN 소거)
-- [x] 이력 기록: docs/askLogs/ask-<ts>.md, docs/todo.history.md, docs/ask.md 초기화
+- [x] 클라이언트 4컬럼 재구성 + 플러그인 메시지 원장/파일 저장 + CLIENT_CONFIG_UPDATE/ACK 근본 수정
+- [x] 노드/워커 저장 경로 파일 브라우저 + data_path 폴백 연동
+- [x] serverlogs DB(systemlog) + 초기 값 검증 + 파일 브라우저 버튼
+- [x] configs 테이블 신설 + admin 환경 설정 메뉴
 
 ## 예정 작업 (ask-20260809)
 - (없음)

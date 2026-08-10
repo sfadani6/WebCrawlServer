@@ -39,12 +39,16 @@ export function useAdminSocket(
       try {
         const message: WebSocketMessage = JSON.parse(event.data);
         // 실시간 수집 패킷 도착 시 상태 배열 최선두에 동적 추가 주입
-        // 수집 전송 액션(콘텐츠 타입별 세분화)에 대응: CRAWL_DOCUMENT/PARTIAL/METADATA/BINARY
+        // 수집 전송 액션(콘텐츠 타입별 세분화)에 대응: fullPage/DomCapture/CRAWL_DOCUMENT 등
         if (
           message.action === "CRAWL_DOCUMENT" ||
           message.action === "CRAWL_PARTIAL" ||
           message.action === "CRAWL_METADATA" ||
-          message.action === "CRAWL_BINARY"
+          message.action === "CRAWL_BINARY" ||
+          message.action === "fullPage" ||
+          message.action === "DomCapture" ||
+          message.action === "SITE_INFO" ||
+          message.action === "CRAWL_IMAGE"
         ) {
           setLogs((prev) => [
             {

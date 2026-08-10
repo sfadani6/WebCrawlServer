@@ -4,9 +4,7 @@ export function Header() {
   return (
     <div className="popup-header">
       <div className="popup-title-row">
-        <span className="material-symbols-outlined text-[#38bdf8] text-xl">
-          download_for_offline
-        </span>
+        <span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8] shadow-[0_0_8px_rgba(56,189,248,0.8)] flex-shrink-0" />
         <span className="popup-title">WebCrawlServer basic</span>
       </div>
     </div>

@@ -95,6 +95,14 @@ chrome.runtime.onConnect.addListener((port) => {
    - **로그 실패 예외 격리**: `logPluginComm()`/`logServerSystem()`은 내부에서 `appendFileSync`를 호출하므로 파일 쓰기 실패가 상위 소켓 통신·DB 처리 흐름을 중단하지 않도록 함수 내부에서 예외를 격리합니다. 호출부에서도 개별 try/catch 가드를 추가해 로그 실패가 별칭 저장·ACK 등 후속 액션을 막지 않게 합니다.
    - **원장 훅 우선 실행**: 수신 메시지는 액션 분기 처리보다 먼저 `plugin_messages` 원장에 기록되어, 이후 액션 처리에서 예외가 발생해도 수신 사실과 payload가 보존됩니다.
 
+4.5 **미디어 번들 통신 규격 (xvideos 다운로드 매니저)**:
+   - **`GET_STORAGE_LOCATION` → `STORAGE_LOCATION_RESPONSE`**: 다운로드 목록 생성 시 매니저(전용 팝업 창)가 저장 위치를 조회합니다. 서버는 `absDir`(절대 경로)/`relDir`(상대 경로, 예: `images/xvideos.com/normal`)을 응답합니다. `offscreen.ts`의 `storageLocationWaiter`(15초 타임아웃)가 응답을 해소합니다.
+   - **`COLLECT_XVIDEOS_MEDIA`**: 콘텐츠 스크립트에 `.thumb-block` 파싱을 요청하고, 응답으로 `entries`(clickUrl/title/eid/메인·sfw 썸네일/preview URL) + `pageUrl`을 받습니다(R-00430 §5.4). `.thumb-block`이 없고 단일 영상 페이지(플레이어)로 판별되면 포스터 이미지 1종 + 타이틀 항목으로 폴백하며, 이 경우 `sfwUrl`/`previewUrl`는 빈 문자열입니다. 매니저 창은 활성 탭이 아니므로 `requestCollectXvideosMediaFromTab(tabId)`로 명시적 `tabId`를 전달하며, 콘텐츠 스크립트 미주입 탭은 `sendCommandToTab`이 content.js 주입 후 자동 재시도합니다.
+   - **`FETCH_MEDIA_BUNDLE`**: 매니저 → 오프스크린으로 항목별 3자산 인출+전송을 요청합니다. 오프스크린 `handleFetchMediaBundle()`이 자산을 순차 `fetch`(`credentials: "omit"`, CORS 우회+오페라 VPN 경유)해 `arrayBufferToBase64()`로 변환하고, 실패 자산은 `data: ""`로 표시합니다. 이후 `CRAWL_IMAGE`(payloadType `json`)에 `assets` 배열 + `txtContent`를 담아 전송합니다.
+   - **`FETCH_MEDIA_BUNDLE_PROGRESS`**: 오프스크린이 3자산 인출·전송 단계마다 매니저 창으로 진행률을 브로드캐스트합니다(`chrome.runtime.sendMessage`, 메인 인출 30 → 보조 55 → 프리뷰 80 → 서버 전송 95%). 매니저 `useXvideosDownloadManager`의 `chrome.runtime.onMessage` 리스너가 `bundleId`로 매칭해 항목별 프로그레스 바를 갱신하며, 완료/실패 시 훅이 100%로 확정합니다. 수신자 미연결 시 `.catch()` 가드로 무시합니다.
+   - **`CRAWL_MEDIA_SAVED` ACK 대기**: 오프스크린이 번들 전송 후 `mediaAckWaiters`(Map: bundleId → 해소 함수)를 등록하고, 서버의 `CRAWL_MEDIA_SAVED`(bundleId/savedDir/savedFiles) 수신 시 해소합니다. 60초 타임아웃이 지나면 실패 처리합니다.
+   - **예외 가드**: 번들 전송·ACK 대기 중 발생하는 예외는 `.catch()`로 삼켜 큐 진행을 중단하지 않으며, 실패 항목은 `failed` 상태로 마킹해 다음 항목 진행을 보장합니다.
+
 ---
 
 ## 5. 검증 체크리스트
@@ -106,3 +114,6 @@ chrome.runtime.onConnect.addListener((port) => {
 - [ ] 백엔드 `ws.on("message")`에서 수신 데이터를 string으로 변환한 뒤 처리하는가? (Buffer 그대로 `substring` 호출 금지)
 - [ ] 패킷 처리 예외 시 빈 `catch {}`로 삼키지 않고 최소 `logServerSystem("WARN")`을 기록하는가?
 - [ ] `logPluginComm()`/`logServerSystem()` 파일 기록 실패가 소켓 통신·별칭 저장·ACK 흐름을 중단시키지 않는가?
+- [ ] `GET_STORAGE_LOCATION`→`STORAGE_LOCATION_RESPONSE` 조회(15초 타임아웃)와 `CRAWL_MEDIA_SAVED` ACK 대기(60초 타임아웃)가 정상 동작하는가?
+- [ ] `FETCH_MEDIA_BUNDLE_PROGRESS` 브로드캐스트가 매니저 항목별 프로그레스 바를 30/55/80/95% 단계로 갱신하는가?
+- [ ] `FETCH_MEDIA_BUNDLE` 인출 실패 자산이 `data: ""`로 표시되고, 예외가 큐 진행을 중단시키지 않고 `failed` 마킹으로 이어지는가?

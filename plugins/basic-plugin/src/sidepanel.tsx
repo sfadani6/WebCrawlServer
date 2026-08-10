@@ -47,6 +47,8 @@ export default function SidePanel() {
     handleStopElementPicker,
     handleCollectFrameDom,
     handleCollectImages,
+    handleCollectSiteInfo,
+    handleOpenXvideosManager,
     handleSendDebugMessage,
     handleTabChange,
     terminalLogs,
@@ -101,7 +103,9 @@ export default function SidePanel() {
             isFrameCollecting={isFrameCollecting}
             onCollectFrameDom={handleCollectFrameDom}
             isImageCollecting={isImageCollecting}
-            onCollectImages={handleCollectImages}
+            onCollectImages={(category) => handleCollectImages(category)}
+            onCollectSiteInfo={handleCollectSiteInfo}
+            onOpenXvideosManager={handleOpenXvideosManager}
           />
         )}
 

@@ -38,7 +38,8 @@
     "tts",
     "ttsEngine",
     "webNavigation",
-    "webRequest"
+    "webRequest",
+    "windows"
   ],
   "host_permissions": [
     "<all_urls>"

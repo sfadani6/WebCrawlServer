@@ -133,6 +133,11 @@ export default function App() {
   const defaultStoragePath =
     configs.find((c) => c.key === 'data_path')?.value ?? '';
 
+  /** configs에서 DB 관리 테이블 기본 출력 행 수(db_page_size) 값을 파싱 (기본 20) */
+  const dbPageSize = Number(configs.find((c) => c.key === 'db_page_size')?.value) || 20;
+  /** configs에서 DB 관리 그리드 셀 출력 제한 길이(db_cell_preview_chars) 값을 파싱 (기본 200) */
+  const cellPreviewChars = Number(configs.find((c) => c.key === 'db_cell_preview_chars')?.value) || 200;
+
   return (
     <GcpMainLayout
       wsStatus={wsStatus}
@@ -174,7 +179,7 @@ export default function App() {
           path="/db/*"
           element={
             <Suspense fallback={<div className="text-slate-300">DB 관리 로딩 중...</div>}>
-              <DbManagerView clients={clients} />
+              <DbManagerView clients={clients} dbPageSize={dbPageSize} cellPreviewChars={cellPreviewChars} />
             </Suspense>
           }
         />

@@ -1,6 +1,6 @@
 // admin/src/components/views/db/DbBrowserPanel.tsx
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DbColumnInfo,
   DbTableInfo,
@@ -21,14 +21,40 @@ interface DbBrowserPanelProps {
   schema: TableSchemaResult | null;
   /** 데이터 그리드 행 조회 결과 */
   rowsResult: TableRowsResult | null;
-  /** 페이지/검색 조건으로 행 조회 콜백 */
-  onLoadRows: (table: string, page: number, size: number, search: string) => Promise<void>;
+  /** 페이지/검색/정렬 조건으로 행 조회 콜백 */
+  onLoadRows: (
+    table: string,
+    page: number,
+    size: number,
+    search: string,
+    searchField: string,
+    orderBy: string,
+    orderDir: string
+  ) => Promise<void>;
   /** 행 추가 콜백 */
   onAddRow: (table: string, data: Record<string, unknown>) => Promise<boolean>;
   /** 행 수정 콜백 */
   onUpdateRow: (table: string, pk: string | number, data: Record<string, unknown>) => Promise<boolean>;
   /** 행 삭제 콜백 */
   onDeleteRow: (table: string, pk: string | number) => Promise<boolean>;
+  /** 페이지당 기본 행 수 (configs.db_page_size, 기본 20) */
+  dbPageSize?: number;
+  /** 셀 출력 문자열 제한 길이 (configs.db_cell_preview_chars, 기본 200) */
+  cellPreviewChars?: number;
+}
+
+/** 페이지당 행 수 선택 옵션 */
+const PAGE_SIZE_OPTIONS = [20, 50, 100, 200];
+
+/** 검색 필드 "전체" 옵션 값 (서버에 빈 문자열로 전달 → 전체 컬럼 LIKE) */
+const SEARCH_FIELD_ALL = "";
+
+/** 정렬 상태 구조체 */
+interface SortState {
+  /** 정렬 대상 컬럼명 */
+  column: string;
+  /** 정렬 방향 */
+  dir: "asc" | "desc";
 }
 
 /**
@@ -63,17 +89,35 @@ export function DbBrowserPanel({
   onAddRow,
   onUpdateRow,
   onDeleteRow,
+  dbPageSize = 20,
+  cellPreviewChars = 200,
 }: DbBrowserPanelProps) {
   /** 현재 페이지 번호 상태 */
   const [page, setPage] = useState(1);
+  /** 페이지당 행 수 상태 (configs.db_page_size 기본값) */
+  const [pageSize, setPageSize] = useState<number>(
+    PAGE_SIZE_OPTIONS.includes(dbPageSize) ? dbPageSize : 20
+  );
   /** 검색어 상태 */
   const [search, setSearch] = useState("");
+  /** 검색 대상 필드 상태 ("" = 전체 컬럼 LIKE) */
+  const [searchField, setSearchField] = useState<string>(SEARCH_FIELD_ALL);
+  /** 정렬 상태 (null = 정렬 없음) */
+  const [sort, setSort] = useState<SortState | null>(null);
   /** 행 추가/수정 폼 표시 여부 상태 */
   const [formVisible, setFormVisible] = useState(false);
   /** 편집 중인 PK 값 상태 (null이면 신규 추가 모드) */
   const [editingPk, setEditingPk] = useState<string | null>(null);
   /** 행 입력 폼 값 상태 (컬럼명 → 문자열) */
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+
+  // 테이블 전환 시 검색어/검색 필드/정렬/페이지 상태 초기화
+  useEffect(() => {
+    setSearch("");
+    setSearchField(SEARCH_FIELD_ALL);
+    setSort(null);
+    setPage(1);
+  }, [selectedTable]);
 
   /** 스키마의 컬럼명 → 타입 매핑 객체 */
   const columnTypeMap = useMemo(() => {
@@ -103,18 +147,77 @@ export function DbBrowserPanel({
     ? Math.max(1, Math.ceil(rowsResult.total / rowsResult.size))
     : 1;
 
-  /** 검색 실행 핸들러 (1페이지부터) */
+  /** 검색 실행 핸들러 (1페이지부터, 선택 필드 LIKE) */
   const handleSearch = () => {
     setPage(1);
-    onLoadRows(selectedTable, 1, 50, search);
+    onLoadRows(
+      selectedTable,
+      1,
+      pageSize,
+      search,
+      searchField,
+      sort?.column || "",
+      sort?.dir || "asc"
+    );
   };
 
   /** 페이지 이동 핸들러 */
   const handlePageChange = (nextPage: number) => {
     if (nextPage < 1 || nextPage > totalPages) return;
     setPage(nextPage);
-    onLoadRows(selectedTable, nextPage, 50, search);
+    onLoadRows(
+      selectedTable,
+      nextPage,
+      pageSize,
+      search,
+      searchField,
+      sort?.column || "",
+      sort?.dir || "asc"
+    );
   };
+
+  /** 페이지당 행 수 변경 핸들러 (1페이지부터 재조회) */
+  const handlePageSizeChange = (nextSize: number) => {
+    setPageSize(nextSize);
+    setPage(1);
+    onLoadRows(
+      selectedTable,
+      1,
+      nextSize,
+      search,
+      searchField,
+      sort?.column || "",
+      sort?.dir || "asc"
+    );
+  };
+
+  /** 컬럼 헤더 정렬 핸들러 (같은 컬럼이면 방향 토글, 새 컬럼이면 오름차순) */
+  const handleSortChange = (column: string) => {
+    setSort((prev) =>
+      prev && prev.column === column
+        ? { column, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { column, dir: "asc" }
+    );
+    setPage(1);
+    onLoadRows(
+      selectedTable,
+      1,
+      pageSize,
+      search,
+      searchField,
+      column,
+      prevDir("asc", column)
+    );
+  };
+
+  /** 정렬 핸들러 내 방향 결정 헬퍼 (토글 후 방향 계산) */
+  function prevDir(fallbackDir: "asc" | "desc", column: string): "asc" | "desc" {
+    return sort && sort.column === column
+      ? sort.dir === "asc"
+        ? "desc"
+        : "asc"
+      : fallbackDir;
+  }
 
   /** 신규 행 추가 폼 열기 */
   const handleOpenAddForm = () => {
@@ -254,8 +357,22 @@ export function DbBrowserPanel({
           </div>
         ) : (
           <>
-            {/* 검색 + 추가 버튼 */}
+            {/* 검색 필드 선택 + 검색 + 추가 버튼 */}
             <div className="flex items-center gap-2">
+              <select
+                value={searchField}
+                onChange={(e) => setSearchField(e.target.value)}
+                aria-label="검색 대상 필드 선택"
+                title="검색 대상 컬럼 (미선택 시 전체 컬럼 LIKE)"
+                className="p-2 bg-[#1E293B] border border-slate-700 rounded text-xs text-slate-100 font-mono outline-none focus:border-[#1A73E8] max-w-[10rem]"
+              >
+                <option value={SEARCH_FIELD_ALL}>전체 필드</option>
+                {schema?.columns.map((col) => (
+                  <option key={col.name} value={col.name}>
+                    {col.name}
+                  </option>
+                ))}
+              </select>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -289,6 +406,10 @@ export function DbBrowserPanel({
                   columns={Object.keys(rowsResult.rows[0] || {})}
                   rows={rowsResult.rows}
                   emptyText="조회된 행이 없습니다."
+                  cellPreviewLimit={cellPreviewChars}
+                  sortColumn={sort?.column ?? null}
+                  sortDir={sort?.dir ?? "asc"}
+                  onSortChange={handleSortChange}
                   rowActions={(row) => (
                     <div className="flex justify-end gap-2">
                       <button
@@ -324,6 +445,23 @@ export function DbBrowserPanel({
                   : "0"}
               </span>
               <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-slate-500">표시</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) =>
+                      handlePageSizeChange(Number(e.target.value))
+                    }
+                    aria-label="페이지당 행 수 선택"
+                    className="p-1.5 bg-[#1E293B] border border-slate-700 rounded text-xs text-slate-100 font-mono outline-none focus:border-[#1A73E8]"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size}행
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <button
                   onClick={() => handlePageChange(page - 1)}
                   disabled={page <= 1}

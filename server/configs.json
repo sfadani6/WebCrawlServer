@@ -2,6 +2,14 @@
     "data_path": {
         "value": "E:/up/WebCrawlServer/",
         "description": "데이터 저장 경로"
+    },
+    "db_page_size": {
+        "value": "20",
+        "description": "DB 관리 테이블 기본 출력 행 개수 (페이지당 행 수)"
+    },
+    "db_cell_preview_chars": {
+        "value": "200",
+        "description": "DB 관리 그리드 셀 출력 문자열 제한 길이 (초과 시 더보기)"
     }
 
 }

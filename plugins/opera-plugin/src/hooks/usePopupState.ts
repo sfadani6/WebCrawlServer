@@ -19,6 +19,7 @@ import {
   requestFrameInfo,
   requestCollectFrameDom,
   requestCollectImages,
+  requestCollectSiteInfo,
   sendDebugMessage,
   sendSocketPacket,
   sendClientConfigUpdate,
@@ -66,7 +67,12 @@ function formatPacketLog(packet: {
  * @returns 콘솔 로그 타입
  */
 function getPacketLogType(packet: { action?: unknown }): PluginLogType {
-  if (packet.action === "PONG_RESPONSE") return "success";
+  if (
+    packet.action === "PONG_RESPONSE" ||
+    packet.action === "CRAWL_MEDIA_SAVED" ||
+    packet.action === "STORAGE_LOCATION_RESPONSE"
+  )
+    return "success";
   return "info";
 }
 
@@ -270,15 +276,17 @@ export function usePopupState() {
 
   /**
    * 현재 페이지의 이미지를 추출해 서버로 전송합니다.
+   * 카테고리(category)를 전달해 저장소 디렉토리를 구분합니다.
    *
+   * @param category - 수집 카테고리 (기본 "normal", 사이트별 album/cover 등)
    * @returns Promise<void>
    */
-  const handleCollectImages = useCallback(async () => {
+  const handleCollectImages = useCallback(async (category: string = "normal") => {
     setIsImageCollecting(true);
-    setStatusMessage("이미지 수집 중...");
-    addTerminalLog("페이지 이미지 추출 및 전송을 요청합니다...", "info");
+    setStatusMessage(`이미지 수집 중(${category})...`);
+    addTerminalLog(`페이지 이미지 추출 및 전송을 요청합니다 (카테고리: ${category})...`, "info");
     try {
-      const res = await requestCollectImages();
+      const res = await requestCollectImages(category);
       setStatusMessage(res.message);
       addTerminalLog(res.message, res.success ? "success" : "error");
     } catch {
@@ -286,6 +294,65 @@ export function usePopupState() {
       addTerminalLog("이미지 수집 중 오류가 발생했습니다.", "error");
     }
     setIsImageCollecting(false);
+  }, [addTerminalLog]);
+
+  /**
+   * 현재 페이지의 사이트 정보(메타데이터)를 추출해 서버로 전송합니다.
+   * 정보 수집 버튼(사이트 전용)에서 호출됩니다.
+   *
+   * @returns Promise<void>
+   */
+  const handleCollectSiteInfo = useCallback(async () => {
+    setIsImageCollecting(true);
+    setStatusMessage("사이트 정보 수집 중...");
+    addTerminalLog("사이트 정보 수집을 요청합니다...", "info");
+    try {
+      const res = await requestCollectSiteInfo();
+      setStatusMessage(res.message);
+      addTerminalLog(res.message, res.success ? "success" : "error");
+    } catch {
+      setStatusMessage("사이트 정보 수집 중 오류가 발생했습니다.");
+      addTerminalLog("사이트 정보 수집 중 오류가 발생했습니다.", "error");
+    }
+    setIsImageCollecting(false);
+  }, [addTerminalLog]);
+
+  /**
+   * xvideos 다운로드 매니저 전용 팝업 창을 엽니다.
+   * 대상 xvideos 탭(tabId)을 쿼리로 전달해 매니저 페이지가 해당 탭에서
+   * 목록 생성/순차 다운로드를 독립 수행하도록 합니다. (패널 폭 협소 문제 해소)
+   *
+   * @returns Promise<void>
+   */
+  const handleOpenXvideosManager = useCallback(async () => {
+    setStatusMessage("xvideos 다운로드 매니저 창을 엽니다...");
+    try {
+      // 열려 있는 xvideos 탭 검색 (활성 탭 우선, 없으면 첫 번째 탭)
+      const tabs = await chrome.tabs.query({ url: "*://*.xvideos.com/*" });
+      const target =
+        tabs.find((t) => t.active) || tabs.find((t) => typeof t.id === "number");
+      const tabId = target && typeof target.id === "number" ? target.id : null;
+      if (tabId === null) {
+        setStatusMessage("xvideos.com 탭을 찾을 수 없습니다.");
+        addTerminalLog("xvideos.com 페이지를 연 상태에서 다시 시도하세요.", "warning");
+        return;
+      }
+      const managerUrl = chrome.runtime.getURL(
+        `xvideos-manager.html?tabId=${tabId}`,
+      );
+      await chrome.windows.create({
+        url: managerUrl,
+        type: "popup",
+        width: 900,
+        height: 760,
+        focused: true,
+      });
+      setStatusMessage("xvideos 다운로드 매니저 창을 열었습니다.");
+      addTerminalLog("xvideos 다운로드 매니저 창을 열었습니다.", "success");
+    } catch {
+      setStatusMessage("다운로드 매니저 창을 여는 중 오류가 발생했습니다.");
+      addTerminalLog("다운로드 매니저 창을 여는 중 오류가 발생했습니다.", "error");
+    }
   }, [addTerminalLog]);
 
   // 초기화 및 오프스크린 패킷 수신 리스너 등록
@@ -590,6 +657,8 @@ export function usePopupState() {
     handleStopElementPicker,
     handleCollectFrameDom,
     handleCollectImages,
+    handleCollectSiteInfo,
+    handleOpenXvideosManager,
     handleSendDebugMessage,
     handleTabChange,
     executePluginCommand,

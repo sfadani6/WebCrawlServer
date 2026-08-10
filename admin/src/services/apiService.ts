@@ -169,6 +169,27 @@ export async function updateConfigValueApi(
 }
 
 /**
+ * OS 네이티브 파일 탐색기(Windows Explorer)로 대상 경로를 엽니다.
+ * 파일 경로가 전달되면 부모 디렉토리까지만 열리며, 디렉토리면 그 디렉토리가 열립니다.
+ * 브라우저 내부 레이어가 아닌 서버측 explorer.exe 실행 방식입니다.
+ *
+ * @param path - 열 대상 파일/디렉토리 절대 경로
+ * @returns 성공 여부
+ */
+export async function openExplorerApi(path: string): Promise<boolean> {
+  const res = await fetch("/api/admin/fs/open-explorer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  });
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.message || "파일 탐색기 열기에 실패했습니다.");
+  }
+  return true;
+}
+
+/**
  * 플러그인 수신 메시지 원장(plugin_messages)을 필터 및 페이지네이션으로 인출합니다.
  *
  * @param params - 조회 필터 파라미터 (클라이언트 ID / 액션명 / 건수 제한 / 오프셋 선택)

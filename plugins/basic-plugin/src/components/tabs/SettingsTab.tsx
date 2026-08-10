@@ -27,7 +27,6 @@ export function SettingsTab({
     <div className="tab-content">
       <div className="info-section">
         <div className="info-section-title">
-          <span className="material-symbols-outlined text-sm text-blue-400">settings</span>
           <span>노드 환경 설정</span>
         </div>
 
@@ -40,7 +39,7 @@ export function SettingsTab({
               value={alias}
               onChange={(e) => onAliasChange(e.target.value)}
               placeholder="예: 오페라-개인-수집기-1"
-              className="w-full p-2.5 bg-[#0F172A] border border-slate-700 rounded text-slate-100 outline-none focus:border-[#1A73E8] text-xs"
+              className="w-full p-2.5 bg-[#0F172A] border border-slate-700 rounded text-slate-100 outline-none focus:border-[#38bdf8] text-xs"
             />
             <p className="text-[10px] text-slate-500">
               별칭은 서버의 clients 테이블에 저장되며, 관리자 대시보드 노드 목록에 표시됩니다.
@@ -50,7 +49,7 @@ export function SettingsTab({
           {/* 저장 버튼 */}
           <button
             onClick={onSave}
-            className="px-4 py-2.5 bg-[#1A73E8] hover:bg-[#185abc] text-white rounded font-semibold text-xs transition w-full"
+            className="btn-primary"
           >
             별칭 저장
           </button>

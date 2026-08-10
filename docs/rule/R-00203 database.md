@@ -35,6 +35,7 @@
   - `description` TEXT (설정 항목 설명/코멘트)
   - 서버 기동 시 `server/configs.json`(`{ "키": { "value", "description" } }`)을 디폴트 소스로 하여 **누락된 키만 INSERT** 시드하며, 이미 존재하는 키의 값은 유지(관리자 수정값 보존)합니다.
   - `data_path`(데이터 저장 기본 경로)는 노드/워커 전용 저장 경로 미지정 시 물리 파일 분리 저장소의 **글로벌 기본 저장 경로**로 사용됩니다(R-00208: `data_path` > `STORAGE_ROOT_PATH` > `./storage`). 서버 기동 시 `runStartupValidation()`이 실존 검증 후 없으면 자동 생성합니다.
+  - `db_page_size`(DB 관리 테이블 기본 출력 행 수, 기본 `20`)는 관리자 DB 관리의 데이터 브라우저 페이지당 행 수 기본값으로 사용되며, `db_cell_preview_chars`(DB 관리 그리드 셀 출력 문자열 제한 길이, 기본 `200`)는 긴 셀(log_message 등)의 "더보기" 분기 기준으로 사용됩니다. 두 키 모두 `server/configs.json` 디폴트 시드 + admin 환경설정(`/settings`)에서 수정할 수 있습니다.
 
 `databases/serverlogs.db` (서버 로그 전용 DB)
 
@@ -80,6 +81,7 @@
 - `GET /api/admin/configs`: 시스템 환경 설정 목록 조회 (변수명/값/코멘트)
 - `PUT /api/admin/configs/:key` `{value}`: 환경 설정 값 수정 (미존재 키 404, 빈 값 400)
 - `GET /api/admin/fs/browse?path=...`: 파일 브라우저 디렉토리 목록 조회 (path 미지정 시 드라이브 루트, 지정 시 하위 디렉토리 목록/부모 경로, 로컬 전체 파일시스템 탐색 허용)
+- `POST /api/admin/fs/open-explorer` `{path}`: OS 네이티브 파일 탐색기 열기 (파일이면 부모 디렉토리까지, 디렉토리면 그대로, 미존재 경로 404, win32 `explorer.exe`/비Win `xdg-open`, DB 관리 `file_path` 셀 연동)
 
 ## DB 관리 매니저 API (R-00304 DB 관리 UI 규격)
 
@@ -89,7 +91,10 @@
 - `GET /api/admin/db/tables?dbRel=...`: 대상 DB의 테이블 목록 (행 수 포함)
 - `GET /api/admin/db/schema?dbRel=...&table=...`: 특정 테이블의 컬럼/인덱스/행 수 스키마
 - `POST /api/admin/db/query` `{dbRel, sql}`: 임의 SQL 실행 (쓰기/DDL 시 관리자 활동 로그 기록)
-- `GET /api/admin/db/rows?dbRel=...&table=...&page=&size=&search=`: 행 페이지네이션 조회 (TEXT LIKE 검색)
+- `GET /api/admin/db/rows?dbRel=...&table=...&page=&size=&search=&searchField=&orderBy=&orderDir=`: 행 페이지네이션 조회 (TEXT LIKE 검색, **size 미지정 시 기본 20**, 최대 200)
+  - `searchField`: 검색 대상 컬럼명 (미지정 시 전체 컬럼 OR LIKE, 컬럼명은 `PRAGMA table_info` 기반 화이트리스트 검증)
+  - `orderBy`/`orderDir`(`asc|desc`): 정렬 컬럼/방향 (컬럼명 화이트리스트 검증, 미지정 시 자연 순서)
+  - LIKE 와일드카드 `%`/`_`는 `ESCAPE '\'`로 이스케이프하여 리터럴 검색 지원
 - `POST /api/admin/db/rows` `{dbRel, table, data}`: 행 추가
 - `PUT /api/admin/db/rows/:pkValue`: PK 기반 행 수정 (PK 없는 테이블은 거부)
 - `DELETE /api/admin/db/rows/:pkValue`: PK 기반 행 삭제

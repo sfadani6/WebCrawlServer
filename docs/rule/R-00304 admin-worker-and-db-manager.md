@@ -264,8 +264,8 @@ export function WorkerManagerView({ workers, onCreateWorker }: WorkerManagerView
 
 - **대상 DB 선택 드롭다운**: `GET /api/admin/db/files` 결과(`dbRel`·테이블 수·크기)를 표시하고 선택한 DB를 모든 탭에 공유합니다.
 - **기능 탭 5종**:
-  1. **데이터 브라우저** (`DbBrowserPanel`): 테이블 목록(행 수) + 테이블 선택 시 스키마(컬럼/PK/인덱스)와 데이터 그리드. 그리드는 페이지네이션·LIKE 검색·행 추가/수정/삭제 폼을 제공합니다.
-  2. **SQL 실행** (`SqlQueryPanel`): SQL 에디터(Ctrl+Enter 실행), 결과 그리드, 실행 히스토리 표시. 쓰기/DDL은 서버에서 관리자 활동 로그를 남깁니다.
+  1. **데이터 브라우저** (`DbBrowserPanel`): 테이블 목록(행 수) + 테이블 선택 시 스키마(컬럼/PK/인덱스)와 데이터 그리드. 그리드는 페이지네이션·**페이지당 행 수 선택(기본 20, `configs.db_page_size`)**·**필드별 LIKE 검색 드롭다운(전체 필드/개별 컬럼)**·**컬럼 헤더 정렬(▲▼ 서버 정렬)**·행 추가/수정/삭제 폼을 제공합니다.
+  2. **SQL 실행** (`SqlQueryPanel`): SQL 에디터(Ctrl+Enter 실행), **예제 쿼리 20개 드롭다운**(선택 시 에디터 삽입), 결과 그리드(**클라이언트 정렬**), 실행 히스토리 표시. 쓰기/DDL은 서버에서 관리자 활동 로그를 남깁니다.
   3. **스키마 편집** (`SchemaEditorPanel`): 동적 컬럼 정의(이름/타입/NOT NULL/PK)로 테이블 생성, 테이블 삭제, 컬럼 추가.
   4. **백업 / 복원** (`BackupRestorePanel`): 백업 생성, 백업 목록(원본 DB 식별 표시)의 다운로드·직접 복원, DB 파일 업로드(base64) 복원.
   5. **스토리지 모니터링** (`StorageMonitorPanel`): 저장소 루트/파일 수/총 용량/백업 용량 카드와 DB 파일별 크기 비율 막대.
@@ -277,6 +277,16 @@ export function WorkerManagerView({ workers, onCreateWorker }: WorkerManagerView
 - 데이터 그리드는 `admin/src/components/tables/DbDataGrid.tsx` 재사용 컴포넌트로 분리합니다.
 - DB 식별자(테이블/컬럼명)는 서버측 검증을 거치므로 클라이언트에서 별도 인젝션 대응 없이 인라인 렌더링합니다.
 
+### 3.3 데이터 그리드 셀 규정 (`DbDataGrid.tsx`)
+
+- **긴 셀 미리보기**: 셀 텍스트가 `cellPreviewLimit`(`configs.db_cell_preview_chars`, 기본 200자)를 초과하면 `…` 잘림 표시와 **더보기** 링크를 노출합니다. `log_message`처럼 HTML이 통으로 들어간 컬럼은 반드시 이 규칙을 따릅니다.
+- **값 미리보기 레이어**(`ValuePreviewModal.tsx`): 더보기 클릭 시 브라우저 **현재 창 높이**를 기준으로 레이어 최대 높이(`window.innerHeight - 120px`)를 산정하고 본문은 `overflow-y: auto` 스크롤로 전체 값을 표시합니다. 닫기 버튼·배경 클릭·ESC로 닫으며, 헤더에 전체 글자 수/줄 수를 표시합니다.
+- **파일 경로 탐색기 버튼**: **`file_path` 컬럼명과 정확히 일치**하고 값이 비어 있지 않은 셀에 작은 `folder_open` 버튼을 표시합니다. 클릭 시 `POST /api/admin/fs/open-explorer`로 **OS 네이티브 Windows 탐색기**를 열며(파일이면 부모 디렉토리까지만), 브라우저 내부 레이어(`DirectoryBrowserModal`)는 사용하지 않습니다. 실행 실패 시 그리드 하단에 일시적 오류 메시지를 표시합니다.
+- **페이지당 행 수**: 데이터 브라우저 하단 페이지네이션에 행 수 선택 드롭다운(20/50/100/200)을 제공하고, 기본값은 `configs.db_page_size`(기본 20)입니다. 변경 시 1페이지부터 재조회하며, 테이블 재선택 시에도 해당 크기가 적용됩니다(`selectTable(table, size)`).
+- **필드별 LIKE 검색**: 검색 입력 앞에 검색 대상 컬럼 드롭다운(`전체 필드` + 스키마 컬럼)을 배치합니다. `전체 필드`는 기존 전체 컬럼 OR LIKE, 개별 컬럼 선택 시 해당 컬럼만 LIKE로 검색합니다. 서버 `fetchTableRows`의 `searchField`로 전달되며, 컬럼명은 서버 화이트리스트로 검증됩니다.
+- **컬럼 헤더 정렬**: 데이터 브라우저의 `DbDataGrid`는 헤더 클릭 시 서버 정렬(`onSortChange` → `orderBy`/`orderDir`)을 요청합니다. 같은 컬럼 클릭 시 오름차순↔내림차순 토글, 새 컬럼은 오름차순 시작, 정렬 시 1페이지부터 재조회하며 아이콘은 ▲(`arrow_upward`)/▼(`arrow_downward`)/미정렬(`unfold_more`)로 구분합니다. 테이블 전환 시 검색어·검색 필드·정렬·페이지가 초기화됩니다.
+- **SQL 예제 쿼리 + 클라이언트 정렬**: `SqlQueryPanel`은 예제 쿼리 20개(`EXAMPLE_QUERIES`, sqlite_master/로그 분석/이미지 카테고리/스케줄 등) 드롭다운을 에디터 하단에 제공하며, 선택 시 에디터에 삽입합니다(자동 실행 안 함). SQL 결과 그리드는 `clientSort` 모드로 헤더 클릭 시 **브라우저 내부 클라이언트 정렬**을 수행합니다(서버 재조회 없음, 숫자는 수치 비교·문자열은 localeCompare).
+
 ---
 
 ## 4. 검증 체크리스트
@@ -286,5 +296,11 @@ export function WorkerManagerView({ workers, onCreateWorker }: WorkerManagerView
 - [ ] 생성된 워커 목록 및 매핑 정보가 관리자 대시보드에 시각화되는가?
 - [ ] [DB 관리] DB 선택 시 데이터 브라우저/스키마가 즉시 갱신되는가?
 - [ ] [DB 관리] SQL 실행, 행 CRUD, 테이블/컬럼 편집이 백엔드에 반영되는가?
+- [ ] [DB 관리] 긴 셀(log_message)이 제한 길이만큼만 표시되고 더보기 레이어가 창 높이에 맞게 스크롤되는가?
+- [ ] [DB 관리] 테이블 선택 시 기본 20행(`configs.db_page_size`)으로 조회되고 행 수 드롭다운이 정상 동작하는가?
+- [ ] [DB 관리] `file_path` 셀의 탐색기 버튼이 OS 네이티브 탐색기로 부모 디렉토리를 여는가? (미존재 경로는 404 안내)
+- [ ] [DB 관리] 헤더 클릭 정렬이 ▲▼로 표시되고 같은 컬럼 토글/새 컬럼 오름차순/1페이지 재조회가 동작하는가?
+- [ ] [DB 관리] 검색 필드 드롭다운 선택 시 해당 컬럼만 LIKE로 검색되고 `%`/`_` 리터럴 검색이 정상인가?
+- [ ] [DB 관리] SQL 예제 20개 드롭다운 선택이 에디터에 삽입되고 결과 그리드 클라이언트 정렬이 동작하는가?
 - [ ] [DB 관리] 백업 생성→다운로드→복원(파일/업로드) 사이클이 정상 동작하고 복원 전 자동 보존 백업이 생성되는가?
 - [ ] [DB 관리] `dbRel` 경로 이탈 요청(`../`, 절대경로, 비 `.db`)이 화이트리스트로 거부되는가?

@@ -106,24 +106,19 @@ export function TerminalConsole({
       />
       {/* 콘솔 헤더 */}
       <div className="px-3 py-2 bg-[#0d131f] border-b border-slate-700/80 flex justify-between items-center">
-        <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-sm text-sky-400">terminal</span>
+        <span className="text-[11px] font-semibold text-slate-400">
           터미널 콘솔
         </span>
         <div className="flex gap-2">
           <button
             onClick={onClearTerminal}
-            className="text-[11px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded transition"
+            className="btn-mini"
           >
             콘솔 소거
           </button>
           <button
             onClick={() => setAutoScroll(!autoScroll)}
-            className={`text-[11px] px-2 py-0.5 rounded transition ${
-              autoScroll
-                ? "bg-emerald-600 text-white"
-                : "bg-slate-700 hover:bg-slate-600 text-slate-300"
-            }`}
+            className={`btn-mini ${autoScroll ? "on" : ""}`}
           >
             자동 스크롤 {autoScroll ? "ON" : "OFF"}
           </button>
@@ -140,12 +135,12 @@ export function TerminalConsole({
           terminalLogs.map((log) => (
             <div
               key={log.id}
-              className={`break-all whitespace-pre-wrap ${getLogTextColor(log.type)}`}
+              className={`terminal-log-line break-all whitespace-pre-wrap ${getLogTextColor(log.type)}`}
             >
-              <span className="text-slate-600 mr-1.5">
+              <span className="terminal-log-time">
                 [{new Date(log.timestamp).toLocaleTimeString()}]
               </span>
-              {log.text}
+              <span className="flex-1 min-w-0">{log.text}</span>
             </div>
           ))
         )}
@@ -153,15 +148,15 @@ export function TerminalConsole({
 
       {/* 명령어 입력 줄 */}
       <div className="px-3 py-2 bg-[#0d131f] border-t border-slate-700/80">
-        <div className="flex items-center gap-2">
-          <span className="text-sky-400 font-bold">&gt;</span>
+        <div className="terminal-input">
+          <span className="terminal-input-prompt">&gt;</span>
           <input
             type="text"
             value={commandInput}
             onChange={(e) => setCommandInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="명령어 입력 (help, status, ping, send, clear...)"
-            className="flex-1 bg-transparent border-none outline-none text-slate-100 font-mono text-[11px]"
+            className="terminal-input-field"
             autoComplete="off"
           />
         </div>

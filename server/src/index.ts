@@ -46,6 +46,9 @@ import {
   saveCrawledContentToFile,
   savePluginMessageToFile,
   saveCrawledImage,
+  saveSiteInfoToFile,
+  saveCrawledMediaBundle,
+  SaveCrawledMediaBundleOptions,
 } from "./services/fileStorageService.js";
 import { executeWorkerPipeline } from "./services/workerEngineService.js";
 import {
@@ -143,6 +146,21 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return "알 수 없는 오류가 발생했습니다.";
+}
+
+/**
+ * 호스트명에서 www. 서브도메인을 제거한 루트 도메인으로 정규화합니다.
+ * (예: "www.xchina.co" → "xchina.co", "xchina.co" → "xchina.co")
+ * 플러그인의 matchSiteDomain()이 서브도메인을 허용하므로, 저장 폴더를
+ * 사이트 도메인 단위로 통일하기 위해 사용합니다. 그 외 서브도메인(m. 등)은 유지합니다.
+ *
+ * @param hostname - 원본 호스트명
+ * @returns 정규화된 루트 도메인 문자열
+ */
+function normalizeRootDomain(hostname: string): string {
+  const lower = (hostname || "").toLowerCase();
+  if (lower.startsWith("www.")) return lower.slice(4);
+  return lower;
 }
 
 /**
@@ -561,6 +579,78 @@ app.get("/api/admin/fs/browse", (req, res) => {
         parentPath: parent === absPath ? null : parent,
         directories,
       },
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+/**
+ * [REST API 5] Windows 파일 탐색기로 디렉토리 열기 (DB 관리 file_path 연동)
+ * Body: { path: string }
+ * 브라우저 내부 파일 브라우저 레이어가 아닌 OS 네이티브 탐색기를 실행합니다.
+ * 파일 경로가 전달되면 해당 파일이 있는 부모 디렉토리까지만, 디렉토리 경로면 그 디렉토리를 엽니다.
+ * 로컬 서버 전용이며 전체 파일 시스템 접근을 허용합니다.
+ */
+app.post("/api/admin/fs/open-explorer", (req, res) => {
+  try {
+    const { path: targetPath } = req.body as { path?: unknown };
+    const rawPath = String(targetPath || "").trim();
+    if (!rawPath) {
+      res.status(400).json({
+        success: false,
+        message: "path 필드가 필요합니다.",
+      });
+      return;
+    }
+
+    const absPath = resolve(rawPath);
+
+    // 존재하지 않는 경로 → 404
+    if (!existsSync(absPath)) {
+      res.status(404).json({
+        success: false,
+        message: `존재하지 않는 경로입니다: ${absPath}`,
+      });
+      return;
+    }
+
+    // 파일이면 부모 디렉토리, 디렉토리면 그대로 (파일 자체는 연결 프로그램 없이 디렉토리까지만)
+    const isDirectory = statSync(absPath).isDirectory();
+    const openDir = isDirectory ? absPath : dirname(absPath);
+    if (!existsSync(openDir)) {
+      res.status(404).json({
+        success: false,
+        message: `열 수 없는 경로입니다: ${openDir}`,
+      });
+      return;
+    }
+
+    // OS 네이티브 탐색기 실행 (실패해도 프로세스 실행 자체는 성공 처리)
+    const command =
+      os.platform() === "win32"
+        ? `explorer "${openDir}"`
+        : `xdg-open "${openDir}" 2>/dev/null || open "${openDir}"`;
+    try {
+      exec(command, { windowsHide: true });
+    } catch {
+      // 탐색기 실행 실패는 응답 오류로 반환하지 않고 로그만 남김
+      logAdminActivity(
+        "SUPER_ADMIN",
+        "FS_OPEN_EXPLORER",
+        `탐색기 실행 실패 [${openDir}]`
+      );
+    }
+
+    logAdminActivity(
+      "SUPER_ADMIN",
+      "FS_OPEN_EXPLORER",
+      `파일 탐색기 열기 [${openDir}] (원본: ${absPath}, 디렉토리: ${isDirectory})`
+    );
+    res.json({
+      success: true,
+      data: { openedPath: openDir, isDirectory },
+      message: `파일 탐색기를 열었습니다: ${openDir}`,
     });
   } catch (error: unknown) {
     res.status(500).json({ success: false, message: getErrorMessage(error) });
@@ -1189,17 +1279,24 @@ app.post("/api/admin/db/query", (req, res) => {
 });
 
 /**
- * [DB API 5] 데이터 그리드용 테이블 행 조회 (페이지네이션/검색)
- * Query: ?dbRel=...&table=...&page=1&size=50&search=
+ * [DB API 5] 데이터 그리드용 테이블 행 조회 (페이지네이션/검색/정렬)
+ * Query: ?dbRel=...&table=...&page=1&size=20&search=&searchField=&orderBy=&orderDir=
+ * size 미지정 시 기본값 20 (configs.db_page_size와 연동은 관리자 UI에서 전달)
  */
 app.get("/api/admin/db/rows", (req, res) => {
   try {
     const dbRel = String(req.query.dbRel || "");
     const table = String(req.query.table || "");
     const page = Number(req.query.page) || 1;
-    const size = Number(req.query.size) || 50;
+    const size = Number(req.query.size) || 20;
     const search = String(req.query.search || "");
-    res.json({ success: true, data: fetchTableRows(dbRel, table, page, size, search) });
+    const searchField = String(req.query.searchField || "");
+    const orderBy = String(req.query.orderBy || "");
+    const orderDir = String(req.query.orderDir || "asc");
+    res.json({
+      success: true,
+      data: fetchTableRows(dbRel, table, page, size, search, searchField, orderBy, orderDir),
+    });
   } catch (error: unknown) {
     res.status(500).json({ success: false, message: getErrorMessage(error) });
   }
@@ -1786,18 +1883,75 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         return;
       }
 
+      // 2-1. 저장 위치 조회 요청 처리 (플러그인 다운로드 매니저의 대상 디렉토리 안내)
+      // 플러그인이 pageUrl/카테고리로 대상 저장 디렉토리를 서버에 조회하면,
+      // data_path 기준 절대 경로와 상대 경로(images/<도메인>/<카테고리>)를 응답합니다.
+      if (message.action === "GET_STORAGE_LOCATION") {
+        const payloadObj = (
+          typeof message.payload === "object" && message.payload !== null
+            ? message.payload
+            : {}
+        ) as Record<string, unknown>;
+
+        const pageUrl = String(payloadObj.pageUrl || "");
+        let domain = "common";
+        try {
+          if (pageUrl) domain = normalizeRootDomain(new URL(pageUrl).hostname);
+        } catch {
+          // 도메인 파싱 실패 시 기본값 유지
+        }
+        const category =
+          typeof payloadObj.category === "string" && payloadObj.category.trim()
+            ? payloadObj.category.trim()
+            : "normal";
+        const rootPath = getConfigDataPath() || "./storage";
+        const relDir = `images/${domain}/${category}`;
+        const absDir = resolve(rootPath, relDir);
+
+        const locationResponse: WebSocketMessage = {
+          senderId: "server",
+          targetId: clientId,
+          action: "STORAGE_LOCATION_RESPONSE",
+          payloadType: "json",
+          payload: {
+            success: true,
+            domain,
+            category,
+            absRoot: rootPath,
+            relDir,
+            absDir,
+          },
+          meta: { timestamp: Date.now() },
+        };
+        if (session && session.socket.readyState === WebSocket.OPEN) {
+          session.socket.send(JSON.stringify(locationResponse));
+        }
+        logPluginComm(
+          clientId,
+          "GET_STORAGE_LOCATION",
+          `저장 위치 응답 완료: ${absDir}`,
+        );
+        return;
+      }
+
       // 3. 수집 전송 액션 처리 (콘텐츠 타입별 세분화 — 이전 CRAWL_LOG 단일 액션을 대체)
-      //   CRAWL_DOCUMENT : 전체 페이지 문서 (일반 데이터, fullDom 포함 가능)
+      //   fullPage       : 전체 페이지/iframe 문서 (fullDom 물리 저장 + 워커 파이프라인)
+      //   CRAWL_DOCUMENT : 구형 전체 페이지 문서 (fullPage와 동일 처리, 하위 호환)
       //   CRAWL_PARTIAL  : 페이지 일부/부분 데이터
+      //   DomCapture     : 요소 선택 DOM 캡처 (outerHTML 단일 요소)
       //   CRAWL_METADATA : 메타 정보만 수집
       //   CRAWL_BINARY   : 바이너리/이미지 파일 (payloadType: binary_base64)
-      //   CRAWL_IMAGE    : 페이지 이미지 수집 (성공 binary_base64 / 실패 json URL 참조)
+      //   CRAWL_IMAGE    : 페이지 이미지 수집 (성공 binary_base64 / 실패 json URL 참조, category 구분)
+      //   SITE_INFO      : 사이트 정보 수집 (페이지 메타데이터 JSON 물리 저장)
       if (
         message.action === "CRAWL_DOCUMENT" ||
         message.action === "CRAWL_PARTIAL" ||
+        message.action === "fullPage" ||
+        message.action === "DomCapture" ||
         message.action === "CRAWL_METADATA" ||
         message.action === "CRAWL_BINARY" ||
-        message.action === "CRAWL_IMAGE"
+        message.action === "CRAWL_IMAGE" ||
+        message.action === "SITE_INFO"
       ) {
         const payloadObj = (
           typeof message.payload === "object" && message.payload !== null
@@ -1809,7 +1963,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         const targetUrl = String(payloadObj.url || "");
         let domain = "common";
         try {
-          if (targetUrl) domain = new URL(targetUrl).hostname;
+          if (targetUrl) domain = normalizeRootDomain(new URL(targetUrl).hostname);
         } catch {
           // 도메인 파싱 실패 시 기본값 유지
         }
@@ -1818,7 +1972,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
         if (message.action === "CRAWL_IMAGE") {
           const pageUrl = String(payloadObj.pageUrl || "");
           try {
-            if (pageUrl) domain = new URL(pageUrl).hostname;
+            if (pageUrl) domain = normalizeRootDomain(new URL(pageUrl).hostname);
           } catch {
             // 페이지 URL 파싱 실패 시 기존 도메인 유지
           }
@@ -1862,28 +2016,114 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
 
         // 이미지 전송 액션(CRAWL_IMAGE)은 전용 이미지 저장소에 보관 (R-00208)
         // 성공 페이로드(binary_base64)는 바이너리 이미지로, 실패 페이로드(json)는 URL 참조 파일로 저장
+        // category를 함께 전달해 도메인/카테고리별 디렉토리로 분리 저장합니다.
         if (message.action === "CRAWL_IMAGE") {
-          const imageSaveRes = saveCrawledImage({
+          // 미디어 번들(xvideos 다운로드 매니저): assets 배열 + txtContent 포함 시 번들 저장
+          if (Array.isArray(payloadObj.assets)) {
+            const bundleOptions: SaveCrawledMediaBundleOptions = {
+              globalDefaultPath: getConfigDataPath() || undefined,
+              domain,
+              pageUrl: String(payloadObj.pageUrl || ""),
+              category:
+                typeof payloadObj.category === "string"
+                  ? payloadObj.category
+                  : "normal",
+              clickUrl:
+                typeof payloadObj.clickUrl === "string"
+                  ? payloadObj.clickUrl
+                  : "",
+              title:
+                typeof payloadObj.title === "string" ? payloadObj.title : "",
+              baseName:
+                typeof payloadObj.baseName === "string" ? payloadObj.baseName : "",
+              txtContent:
+                typeof payloadObj.txtContent === "string"
+                  ? payloadObj.txtContent
+                  : "",
+              assets: (payloadObj.assets as Array<Record<string, unknown>>).map(
+                (asset) => ({
+                  kind:
+                    typeof asset.kind === "string" ? asset.kind : "asset",
+                  url: String(asset.url || ""),
+                  fileName:
+                    typeof asset.fileName === "string" ? asset.fileName : "",
+                  mimeType:
+                    typeof asset.mimeType === "string" ? asset.mimeType : "",
+                  data: typeof asset.data === "string" ? asset.data : "",
+                })
+              ),
+            };
+            const bundleRes = saveCrawledMediaBundle(bundleOptions);
+            savedPath = bundleRes.savedFilePath;
+            savedSize = bundleRes.fileSize;
+            updateCrawlLogFile(logId, savedPath, savedSize);
+
+            // 저장 완료 ACK: 실제 저장 경로/파일 목록을 플러그인에 응답 (항목별 완료 표시용)
+            const savedAckPacket: WebSocketMessage = {
+              senderId: "server",
+              targetId: clientId,
+              action: "CRAWL_MEDIA_SAVED",
+              payloadType: "json",
+              payload: {
+                success: true,
+                bundleId:
+                  typeof payloadObj.bundleId === "string"
+                    ? payloadObj.bundleId
+                    : "",
+                savedDir: bundleRes.savedDir,
+                savedFiles: bundleRes.savedFiles,
+                fileSize: bundleRes.fileSize,
+              },
+              meta: { timestamp: Date.now() },
+            };
+            if (session && session.socket.readyState === WebSocket.OPEN) {
+              session.socket.send(JSON.stringify(savedAckPacket));
+            }
+            logPluginComm(
+              clientId,
+              "CRAWL_IMAGE",
+              `미디어 번들 저장 완료 [${domain}/${bundleOptions.category}]: ${bundleRes.savedDir}`,
+            );
+          } else {
+            const imageSaveRes = saveCrawledImage({
+              globalDefaultPath: getConfigDataPath() || undefined,
+              domain,
+              fileName:
+                typeof payloadObj.fileName === "string" ? payloadObj.fileName : "",
+              mimeType:
+                typeof payloadObj.mimeType === "string" ? payloadObj.mimeType : "",
+              payloadType: message.payloadType || "json",
+              data: typeof payloadObj.data === "string" ? payloadObj.data : "",
+              url: String(payloadObj.url || ""),
+              pageUrl: String(payloadObj.pageUrl || ""),
+              category:
+                typeof payloadObj.category === "string" ? payloadObj.category : "normal",
+              error: typeof payloadObj.error === "string" ? payloadObj.error : "",
+              clickUrl:
+                typeof payloadObj.clickUrl === "string" ? payloadObj.clickUrl : "",
+              title: typeof payloadObj.title === "string" ? payloadObj.title : "",
+            });
+            savedPath = imageSaveRes.savedFilePath;
+            savedSize = imageSaveRes.fileSize;
+            updateCrawlLogFile(logId, savedPath, savedSize);
+          }
+        }
+
+        // 사이트 정보 수집(SITE_INFO)은 페이지 메타데이터를 JSON 물리 파일로 보관
+        if (message.action === "SITE_INFO") {
+          const infoSaveRes = saveSiteInfoToFile({
             globalDefaultPath: getConfigDataPath() || undefined,
             domain,
-            fileName:
-              typeof payloadObj.fileName === "string" ? payloadObj.fileName : "",
-            mimeType:
-              typeof payloadObj.mimeType === "string" ? payloadObj.mimeType : "",
-            payloadType: message.payloadType || "json",
-            data: typeof payloadObj.data === "string" ? payloadObj.data : "",
-            url: String(payloadObj.url || ""),
-            pageUrl: String(payloadObj.pageUrl || ""),
-            error: typeof payloadObj.error === "string" ? payloadObj.error : "",
+            info: payloadObj,
           });
-          savedPath = imageSaveRes.savedFilePath;
-          savedSize = imageSaveRes.fileSize;
+          savedPath = infoSaveRes.savedFilePath;
+          savedSize = infoSaveRes.fileSize;
           updateCrawlLogFile(logId, savedPath, savedSize);
         }
 
-        // 전체 문서(CRAWL_DOCUMENT)일 때만 디폴트 워커 파이프라인 단행 (R-00207)
-        // 일부/메타/바이너리 데이터는 원장 보존으로 충분하며 워커 파이프라인을 수행하지 않습니다.
-        if (message.action === "CRAWL_DOCUMENT") {
+        // 전체 문서(fullPage/CRAWL_DOCUMENT)일 때만 디폴트 워커 파이프라인 단행 (R-00207)
+        // 일부/메타/바이너리/이미지/사이트정보 데이터는 원장 보존으로 충분하며 워커 파이프라인을 수행하지 않습니다.
+        if (message.action === "CRAWL_DOCUMENT" || message.action === "fullPage") {
           const assignedWorker2 = getWorkerById("default_worker");
           if (assignedWorker2) {
             executeWorkerPipeline(

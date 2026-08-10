@@ -1,7 +1,13 @@
 // plugins/opera-plugin/src/offscreen.ts
 
 import { PLUGIN_CONFIG, getWebSocketUrl } from "./config/pluginConfig.js";
-import { WebSocketPacket } from "./types/index.js";
+import {
+  WebSocketPacket,
+  CrawlMediaBundlePayload,
+  MediaAssetPayload,
+  StorageLocationResponsePayload,
+  XvideosMediaEntry,
+} from "./types/index.js";
 
 /**
  * 오프스크린 문서에서 단일 소켓을 영구 보유하며 24시간 무중단 웹소켓 통신을 담당합니다.
@@ -10,6 +16,184 @@ import { WebSocketPacket } from "./types/index.js";
 
 /** 현재 유지 중인 웹소켓 인스턴스 */
 let socket: WebSocket | null = null;
+
+/** 서버 저장 완료 ACK(CRAWL_MEDIA_SAVED) 대기자 맵 (bundleId → 해소 함수) */
+const mediaAckWaiters = new Map<
+  string,
+  (ack: Record<string, unknown>) => void
+>();
+
+/** 저장 위치 응답(STORAGE_LOCATION_RESPONSE) 대기자 (단일 보류 허용) */
+let storageLocationWaiter: ((res: StorageLocationResponsePayload) => void) | null =
+  null;
+
+/**
+ * ArrayBuffer를 Base64 문자열로 변환합니다.
+ * (대용량 미디어 전송을 위해 2바이트 청크 단위 인코딩)
+ *
+ * @param buffer - 변환할 이진 버퍼
+ * @returns Base64 인코딩 문자열
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+/**
+ * 원본 URL로부터 안전한 파일명을 추출합니다.
+ *
+ * @param src - 자산 원본 URL
+ * @param fallbackName - 기본 파일명 (없을 시 사용)
+ * @returns 안전한 파일명 문자열
+ */
+function extractMediaFileName(src: string, fallbackName: string): string {
+  try {
+    const clean = (src || "").split(/[?#]/)[0];
+    const candidate = clean.split("/").filter(Boolean).pop() || "";
+    const safe = candidate.replace(/[^a-zA-Z0-9._-]/g, "_");
+    return safe.length > 0 ? safe : fallbackName;
+  } catch {
+    return fallbackName;
+  }
+}
+
+/**
+ * 원격 자산 URL을 fetch하여 Base64 데이터와 MIME 타입으로 변환합니다.
+ * 오프스크린 문서는 host_permissions(<all_urls>)로 CORS 우회가 가능하며,
+ * 오페라 브라우저의 VPN이 네트워크 계층에서 적용되어 차단을 우회합니다.
+ * 실패 시 빈 데이터를 반환해 서버가 바이너리 저장을 건너뛰게 합니다.
+ *
+ * @param url - 인출할 자산 URL
+ * @returns MIME 타입 및 Base64 데이터 (실패 시 빈 문자열)
+ */
+async function fetchAssetAsBase64(
+  url: string
+): Promise<{ mimeType: string; data: string }> {
+  if (!url) return { mimeType: "", data: "" };
+  try {
+    const resp = await fetch(url, { credentials: "omit" });
+    if (!resp.ok) return { mimeType: "", data: "" };
+    const blob = await resp.blob();
+    const buffer = await blob.arrayBuffer();
+    return { mimeType: blob.type || "", data: arrayBufferToBase64(buffer) };
+  } catch {
+    return { mimeType: "", data: "" };
+  }
+}
+
+/**
+ * 다운로드 매니저 창으로 항목별 진행률(0~100)을 브로드캐스트합니다.
+ * 오프스크린에서 3자산 인출·전송 단계가 끝날 때마다 호출되며,
+ * 매니저 페이지의 chrome.runtime.onMessage 리스너가 bundleId로 매칭해 프로그레스 바를 갱신합니다.
+ * 사이드바/팝업 등 타 컨텍스트는 타입 미매칭으로 안전하게 무시됩니다.
+ *
+ * @param bundleId - 진행률을 갱신할 항목 추적 ID
+ * @param progress - 진행률 퍼센트 (0~100)
+ * @returns void
+ */
+function broadcastFetchProgress(bundleId: string, progress: number): void {
+  try {
+    chrome.runtime
+      .sendMessage({
+        type: "FETCH_MEDIA_BUNDLE_PROGRESS",
+        payload: { bundleId, progress },
+      })
+      .catch(() => {
+        // 수신자 미연결(매니저 창 닫힘 등) 시 예외 무시 (R-00420 예외 가드)
+      });
+  } catch {
+    // 메시징 채널 파괴 등 예외 격리 — 진행 흐름을 중단하지 않는다.
+  }
+}
+
+/**
+ * xvideos 비디오 블록의 3종 자산(메인/보조 썸네일 + 프리뷰 mp4)을 순차 fetch하여
+ * CRAWL_IMAGE 번들 패킷으로 서버에 전송하고, 저장 완료 ACK를 대기합니다.
+ * 각 인출 단계가 끝날 때마다 매니저 창에 진행률을 브로드캐스트합니다.
+ *
+ * @param bundleId - 항목 추적 ID
+ * @param entry - 비디오 블록 메타 항목
+ * @param bundle - 미디어 번들 페이로드 (txtContent/baseName/category 등 포함)
+ * @returns 저장 완료 ACK 페이로드 (실패 시 success: false)
+ */
+async function handleFetchMediaBundle(
+  bundleId: string,
+  entry: XvideosMediaEntry,
+  bundle: CrawlMediaBundlePayload
+): Promise<{ success: boolean; ack?: Record<string, unknown>; error?: string }> {
+  const clientId = await getOrCreateClientId();
+
+  // 3종 자산 순차 인출 (메인 썸네일 → 보조 썸네일 → 프리뷰 mp4)
+  const main = await fetchAssetAsBase64(entry.mainUrl);
+  broadcastFetchProgress(bundleId, 30);
+  const sfw = await fetchAssetAsBase64(entry.sfwUrl);
+  broadcastFetchProgress(bundleId, 55);
+  const preview = await fetchAssetAsBase64(entry.previewUrl);
+  broadcastFetchProgress(bundleId, 80);
+
+  const assets: MediaAssetPayload[] = [
+    {
+      kind: "thumb",
+      url: entry.mainUrl,
+      fileName: extractMediaFileName(entry.mainUrl, "thumb.bin"),
+      mimeType: main.mimeType,
+      data: main.data,
+    },
+    {
+      kind: "sfw",
+      url: entry.sfwUrl,
+      fileName: extractMediaFileName(entry.sfwUrl, "sfw.bin"),
+      mimeType: sfw.mimeType,
+      data: sfw.data,
+    },
+    {
+      kind: "preview",
+      url: entry.previewUrl,
+      fileName: extractMediaFileName(entry.previewUrl, "preview.bin"),
+      mimeType: preview.mimeType,
+      data: preview.data,
+    },
+  ];
+
+  const fullPacket: WebSocketPacket = {
+    senderId: clientId,
+    targetId: "SERVER",
+    action: "CRAWL_IMAGE",
+    payloadType: "binary_base64",
+    payload: {
+      ...bundle,
+      bundleId,
+      assets,
+      timestamp: Date.now(),
+    },
+    meta: { timestamp: Date.now() },
+  };
+
+  // 소켓 미연결 시 즉시 재연결 시도 후 실패 반환
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    connectOffscreenSocket();
+    return { success: false, error: "SOCKET_OFFLINE" };
+  }
+  socket.send(JSON.stringify(fullPacket));
+  broadcastFetchProgress(bundleId, 95);
+
+  // 서버 저장 완료 ACK 대기 (60초 타임아웃)
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      mediaAckWaiters.delete(bundleId);
+      resolve({ success: false, error: "ACK_TIMEOUT" });
+    }, 60000);
+    mediaAckWaiters.set(bundleId, (ack) => {
+      clearTimeout(timer);
+      resolve({ success: true, ack });
+    });
+  });
+}
 
 /**
  * 크롬 로컬 스토리지에서 수집 노드 고유 UUID를 인출합니다.
@@ -154,6 +338,34 @@ async function connectOffscreenSocket(): Promise<void> {
           });
       }
 
+      // 미디어 번들 저장 완료 ACK(CRAWL_MEDIA_SAVED) 수신 시 대기 중인 promise 해소
+      if (
+        packet.action === "CRAWL_MEDIA_SAVED" &&
+        packet.payload &&
+        typeof packet.payload === "object"
+      ) {
+        const ackPayload = packet.payload as Record<string, unknown>;
+        if (
+          typeof ackPayload.bundleId === "string" &&
+          mediaAckWaiters.has(ackPayload.bundleId)
+        ) {
+          const resolveAck = mediaAckWaiters.get(ackPayload.bundleId);
+          mediaAckWaiters.delete(ackPayload.bundleId);
+          if (resolveAck) resolveAck(ackPayload);
+        }
+      }
+
+      // 저장 위치 응답(STORAGE_LOCATION_RESPONSE) 수신 시 대기 중인 promise 해소
+      if (
+        packet.action === "STORAGE_LOCATION_RESPONSE" &&
+        packet.payload &&
+        storageLocationWaiter
+      ) {
+        const locationRes = storageLocationWaiter;
+        storageLocationWaiter = null;
+        locationRes(packet.payload as StorageLocationResponsePayload);
+      }
+
       // 수신 패킷을 백그라운드로 중계하여 사이드바/탭에서 후속 처리를 수행합니다.
       chrome.runtime
         .sendMessage({ type: "SOCKET_PACKET_RECEIVED", packet })
@@ -233,6 +445,74 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
       }
     });
+    return true;
+  }
+
+  // 저장 위치 조회: 서버에 GET_STORAGE_LOCATION 전송 후 응답을 대기해 반환
+  if (message.type === "GET_STORAGE_LOCATION" && message.payload) {
+    getOrCreateClientId().then((clientId) => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        const fullPacket: WebSocketPacket = {
+          senderId: clientId,
+          targetId: "SERVER",
+          action: "GET_STORAGE_LOCATION",
+          payloadType: "json",
+          payload: message.payload,
+          meta: { timestamp: Date.now() },
+        };
+        socket.send(JSON.stringify(fullPacket));
+
+        const timer = setTimeout(() => {
+          if (storageLocationWaiter) storageLocationWaiter = null;
+          try {
+            sendResponse({ success: false, error: "STORAGE_LOCATION_TIMEOUT" });
+          } catch {
+            // 채널 파괴 방어
+          }
+        }, 15000);
+
+        storageLocationWaiter = (res) => {
+          clearTimeout(timer);
+          try {
+            sendResponse(res);
+          } catch {
+            // 채널 파괴 방어
+          }
+        };
+      } else {
+        connectOffscreenSocket();
+        try {
+          sendResponse({ success: false, reason: "SOCKET_OFFLINE" });
+        } catch {
+          // 채널 파괴 방어
+        }
+      }
+    });
+    return true;
+  }
+
+  // 미디어 번들 수집: 3자산 fetch → 서버 전송 → 저장 완료 ACK 대기
+  if (message.type === "FETCH_MEDIA_BUNDLE" && message.payload) {
+    const payload = message.payload as {
+      bundleId: string;
+      entry: XvideosMediaEntry;
+      bundle: CrawlMediaBundlePayload;
+    };
+    handleFetchMediaBundle(payload.bundleId, payload.entry, payload.bundle)
+      .then((result) => {
+        try {
+          sendResponse(result);
+        } catch {
+          // 채널 파괴 방어
+        }
+      })
+      .catch(() => {
+        try {
+          sendResponse({ success: false, error: "FETCH_MEDIA_BUNDLE_ERROR" });
+        } catch {
+          // 채널 파괴 방어
+        }
+      });
     return true;
   }
 

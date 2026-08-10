@@ -33,8 +33,43 @@ interface BasicTabProps {
   onCollectFrameDom: () => void;
   /** 이미지 수집 중 여부 */
   isImageCollecting: boolean;
-  /** 이미지 수집 콜백 */
-  onCollectImages: () => void;
+  /** 이미지 수집 콜백 (카테고리 구분) */
+  onCollectImages: (category: string) => void;
+  /** 사이트 정보 수집 콜백 */
+  onCollectSiteInfo: () => void;
+  /** xvideos 다운로드 매니저 팝업 창 열기 콜백 */
+  onOpenXvideosManager: () => void;
+}
+
+/** 이미지 수집 카테고리 표시 이름 매핑 */
+const CATEGORY_LABELS: Record<string, string> = {
+  normal: "일반 이미지 수집",
+  album: "앨범 수집",
+  cover: "표지 수집",
+  info: "정보 수집",
+};
+
+/** 사이트 전용 수집 버튼 구성 (도메인 → 카테고리 목록) */
+const SITE_IMAGE_BUTTONS: Record<string, string[]> = {
+  "xchina.co": ["normal", "album", "cover", "info"],
+  "xvideos.com": ["normal", "info"],
+};
+
+/**
+ * 도메인별 사이트 전용 수집 설정 매칭 여부를 판별합니다.
+ * 현재 페이지 호스트가 등록된 사이트 도메인의 하위 도메인인지 확인합니다.
+ *
+ * @param currentUrl - 현재 페이지 URL
+ * @returns 매칭된 사이트 도메인 (없으면 null)
+ */
+function matchSiteDomain(currentUrl: string): string | null {
+  try {
+    const hostname = new URL(currentUrl).hostname.toLowerCase();
+    const entries = Object.keys(SITE_IMAGE_BUTTONS);
+    return entries.find((domain) => hostname === domain || hostname.endsWith(`.${domain}`)) || null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -57,11 +92,15 @@ export function BasicTab({
   onCollectFrameDom,
   isImageCollecting,
   onCollectImages,
+  onCollectSiteInfo,
+  onOpenXvideosManager,
 }: BasicTabProps) {
   // 섹션 아코디언 열림/닫힘 상태 (기본 DOM 전송 섹션 열림)
   const [openSection, setOpenSection] = useState<string>("dom");
   // DOM 전송 대상 모드 (라디오 선택)
   const [sendMode, setSendMode] = useState<DomSendMode>("full");
+  // 현재 페이지와 매칭된 사이트 전용 도메인 (없으면 null)
+  const matchedSite = matchSiteDomain(currentUrl);
 
   /** 섹션 아코디언 토글 핸들러 */
   const toggleSection = (section: string) => {
@@ -99,14 +138,6 @@ export function BasicTab({
     return isSending ? "전송 중..." : "전체 DOM 전송";
   };
 
-  /** 실행 버튼 아이콘 (모드별 구분) */
-  const getSendButtonIcon = () => {
-    if (isSending || isElementPicking || isFrameCollecting) return "sync";
-    if (sendMode === "element") return "ads_click";
-    if (sendMode === "frame") return "web_stories";
-    return "upload_file";
-  };
-
   return (
     <div className="tab-content">
       {/* 서버 연동 상태 안내 카드 */}
@@ -121,8 +152,7 @@ export function BasicTab({
 
       {/* 현재 페이지 URL 표시 카드 */}
       <div className="url-card">
-        <span className="url-label flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-sm text-sky-400">link</span>
+        <span className="url-label">
           현재 페이지 URL <span className="text-sky-400/80">(자동 갱신)</span>
         </span>
         <div className="url-value truncate">{currentUrl}</div>
@@ -141,10 +171,9 @@ export function BasicTab({
           onClick={() => toggleSection("dom")}
           className="section-header"
         >
-          <span className="material-symbols-outlined text-base text-sky-400">data_object</span>
           <span className="flex-1 text-left font-semibold">DOM 전송</span>
-          <span className="material-symbols-outlined text-base text-slate-400 transition-transform">
-            {openSection === "dom" ? "expand_more" : "chevron_right"}
+          <span className="text-slate-400 text-sm leading-none">
+            {openSection === "dom" ? "▼" : "▶"}
           </span>
         </button>
 
@@ -159,7 +188,6 @@ export function BasicTab({
                   checked={sendMode === "full"}
                   onChange={() => setSendMode("full")}
                 />
-                <span className="material-symbols-outlined text-sm">web</span>
                 <span className="flex-1">
                   <span className="block text-[12px] font-semibold">전체</span>
                   <span className="block text-[10px] text-slate-400">
@@ -175,7 +203,6 @@ export function BasicTab({
                   checked={sendMode === "element"}
                   onChange={() => setSendMode("element")}
                 />
-                <span className="material-symbols-outlined text-sm">ads_click</span>
                 <span className="flex-1">
                   <span className="block text-[12px] font-semibold">요소 선택</span>
                   <span className="block text-[10px] text-slate-400">
@@ -196,7 +223,6 @@ export function BasicTab({
                   disabled={!hasFrame}
                   onChange={() => setSendMode("frame")}
                 />
-                <span className="material-symbols-outlined text-sm">web_stories</span>
                 <span className="flex-1">
                   <span className="block text-[12px] font-semibold">프레임</span>
                   <span className="block text-[10px] text-slate-400">
@@ -217,17 +243,10 @@ export function BasicTab({
                 (sendMode === "element" && isElementPicking)
                 || (sendMode === "frame" && (!hasFrame || isFrameCollecting))
               }
-              className={`send-button mt-3 ${
-                sendMode === "element" && !isElementPicking ? "send-button-accent" : ""
+              className={`btn-primary mt-3 ${
+                sendMode === "element" && !isElementPicking ? "btn-accent" : ""
               }`}
             >
-              <span
-                className={`material-symbols-outlined text-base ${
-                  isSending || isElementPicking || isFrameCollecting ? "animate-spin" : ""
-                }`}
-              >
-                {getSendButtonIcon()}
-              </span>
               <span>{getSendButtonLabel()}</span>
             </button>
 
@@ -243,33 +262,97 @@ export function BasicTab({
       {/* [2] 이미지 수집 아코디언 섹션 */}
       <div className="section-card">
         <button onClick={() => toggleSection("images")} className="section-header">
-          <span className="material-symbols-outlined text-base text-emerald-400">image</span>
           <span className="flex-1 text-left font-semibold">이미지 수집</span>
-          <span className="material-symbols-outlined text-base text-slate-400 transition-transform">
-            {openSection === "images" ? "expand_more" : "chevron_right"}
+          <span className="text-slate-400 text-sm leading-none">
+            {openSection === "images" ? "▼" : "▶"}
           </span>
         </button>
 
         {openSection === "images" && (
           <div className="section-body">
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              현재 페이지의 모든 이미지를 추출해 서버의 지정 폴더에 저장합니다.
-              크로스 오리진 이미지는 원본 URL 참조 파일로 보관됩니다.
+              현재 페이지의 렌더링된 이미지를 추출해 서버의 도메인/카테고리별 폴더에
+              저장합니다. 크로스 오리진 이미지는 원본 URL 참조 파일로 보관됩니다.
             </p>
+
+            {/* [1] 일반 이미지 수집 (모든 페이지) */}
             <button
-              onClick={onCollectImages}
+              onClick={() => onCollectImages("normal")}
               disabled={isImageCollecting || !isServerOnline}
-              className="send-button mt-3"
+              className="btn-primary mt-3"
             >
-              <span
-                className={`material-symbols-outlined text-base ${
-                  isImageCollecting ? "animate-spin" : ""
-                }`}
-              >
-                {isImageCollecting ? "sync" : "photo_library"}
+              <span>
+                {isImageCollecting
+                  ? "이미지 수집 중..."
+                  : "일반 이미지 수집 (normal)"}
               </span>
-              <span>{isImageCollecting ? "이미지 수집 중..." : "이미지 수집 및 전송"}</span>
             </button>
+
+            {/* [2] 사이트 전용 수집 버튼 그룹 (항상 3그룹 표시, 비매칭 사이트는 비활성화) */}
+            {Object.entries(SITE_IMAGE_BUTTONS).map(([site, categories]) => {
+              const isMatched = matchedSite === site;
+              return (
+                <div
+                  key={site}
+                  className="mt-3 rounded-lg border border-slate-700/60 bg-[#162032] p-3"
+                >
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-[11px] font-semibold text-slate-200">
+                      {site} 전용 수집
+                    </span>
+                    <span
+                      className={`ml-auto text-[10px] px-1.5 py-0.5 rounded border ${
+                        isMatched
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                          : "bg-slate-700/40 text-slate-400 border-slate-600"
+                      }`}
+                    >
+                      {isMatched ? "현재 도메인" : "다른 도메인"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {categories.map((category) => {
+                      const isInfo = category === "info";
+                      // xvideos.com "normal"은 전용 팝업 창 다운로드 매니저 열기로 연결
+                      const isXvideosManager = site === "xvideos.com" && category === "normal";
+                      return (
+                        <button
+                          key={category}
+                          onClick={() =>
+                            isInfo
+                              ? onCollectSiteInfo()
+                              : isXvideosManager
+                              ? onOpenXvideosManager()
+                              : onCollectImages(category)
+                          }
+                          disabled={!isMatched || isImageCollecting || !isServerOnline}
+                          title={
+                            isMatched
+                              ? isXvideosManager
+                                ? "전용 팝업 창에서 비디오 블록 미디어(썸네일+mp4) 다운로드 매니저 열기"
+                                : CATEGORY_LABELS[category]
+                              : `${site} 페이지에서만 사용할 수 있습니다`
+                          }
+                          className="btn-secondary"
+                        >
+                          {isXvideosManager
+                            ? "다운로드 매니저 열기"
+                            : CATEGORY_LABELS[category]}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* xvideos 다운로드 매니저 안내 (목록은 전용 팝업 창에서 표시) */}
+                  {site === "xvideos.com" && isMatched && (
+                    <p className="mt-3 border-t border-slate-700/60 pt-3 text-[10px] text-slate-500 leading-relaxed">
+                      "다운로드 매니저 열기" 버튼으로 새 팝업 창을 열어 넓은
+                      목록에서 순차 다운로드를 진행합니다.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -280,13 +363,12 @@ export function BasicTab({
           onClick={() => toggleSection("actions")}
           className="section-header opacity-80"
         >
-          <span className="material-symbols-outlined text-base text-purple-400">play_circle</span>
           <span className="flex-1 text-left font-semibold">액션 실행</span>
           <span className="text-[10px] text-slate-500 border border-slate-600 rounded px-1.5 py-0.5">
             미개발
           </span>
-          <span className="material-symbols-outlined text-base text-slate-400 transition-transform">
-            {openSection === "actions" ? "expand_more" : "chevron_right"}
+          <span className="text-slate-400 text-sm leading-none">
+            {openSection === "actions" ? "▼" : "▶"}
           </span>
         </button>
 
@@ -298,10 +380,9 @@ export function BasicTab({
             </p>
             <button
               disabled
-              className="send-button mt-3 opacity-60 cursor-not-allowed"
+              className="btn-primary mt-3 opacity-60 cursor-not-allowed"
               title="액션 실행은 아직 개발되지 않았습니다."
             >
-              <span className="material-symbols-outlined text-base">play_circle</span>
               <span>액션 실행 (개발 예정)</span>
             </button>
           </div>

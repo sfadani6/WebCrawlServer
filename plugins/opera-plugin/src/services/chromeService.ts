@@ -5,6 +5,9 @@ import {
   ProcessorInfo,
   SocketStatusResponse,
   PayloadType,
+  XvideosMediaEntry,
+  CrawlMediaBundlePayload,
+  StorageLocationResponsePayload,
 } from "../types/index.js";
 
 /**
@@ -199,6 +202,65 @@ export function requestCollectFullDom(): Promise<{
 }
 
 /**
+ * 특정 탭으로 콘텐츠 스크립트 명령을 송출합니다.
+ * 콘텐츠 스크립트 미주입 탭은 content.js를 주입 후 자동 재시도합니다.
+ *
+ * @param tabId - 대상 탭 ID
+ * @param command - 콘텐츠 스크립트 명령 문자열
+ * @param payload - 명령에 전달할 페이로드 (선택)
+ * @returns 콘텐츠 스크립트 응답 객체 또는 실패 안내
+ */
+function sendCommandToTab(
+  tabId: number,
+  command: string,
+  payload?: unknown
+): Promise<{ success: boolean; message: string; data?: unknown }> {
+  return new Promise((resolve) => {
+    const dispatch = (
+      cb: (res: { success?: boolean; message?: string; data?: unknown }) => void
+    ) => {
+      chrome.tabs.sendMessage(tabId, { command, payload }, (response) => {
+        if (chrome.runtime.lastError) {
+          // 콘텐츠 스크립트 미주입 탭: scripting.executeScript로 주입 후 자동 재시도
+          chrome.scripting.executeScript(
+            { target: { tabId }, files: ["content.js"] },
+            () => {
+              if (chrome.runtime.lastError) {
+                cb({
+                  success: false,
+                  message: "페이지 스크립트 주입 불가 (보호 페이지)",
+                });
+                return;
+              }
+              chrome.tabs.sendMessage(tabId, { command, payload }, (retry) => {
+                if (chrome.runtime.lastError) {
+                  cb({
+                    success: false,
+                    message: "페이지 스크립트 미연결 (페이지 새로고침 후 재시도)",
+                  });
+                  return;
+                }
+                cb(retry || { success: true });
+              });
+            }
+          );
+          return;
+        }
+        cb(response || { success: true });
+      });
+    };
+
+    dispatch((response) => {
+      resolve({
+        success: response.success !== false,
+        message: response.message || "명령이 정상 처리되었습니다.",
+        data: response.data,
+      });
+    });
+  });
+}
+
+/**
  * 현재 활성 탭으로 콘텐츠 스크립트 명령을 송출합니다.
  * 콘텐츠 스크립트 미주입 탭은 content.js를 주입 후 자동 재시도합니다.
  *
@@ -217,50 +279,7 @@ function sendCommandToActiveTab(
         resolve({ success: false, message: "활성화된 탭을 찾을 수 없습니다." });
         return;
       }
-      // 중첩 콜백에서 타입 안정성을 보장하도록 탭 ID를 상수로 고정
-      const targetTabId = activeTab.id;
-
-      const dispatch = (
-        cb: (res: { success?: boolean; message?: string; data?: unknown }) => void
-      ) => {
-        chrome.tabs.sendMessage(targetTabId, { command, payload }, (response) => {
-          if (chrome.runtime.lastError) {
-            // 콘텐츠 스크립트 미주입 탭: scripting.executeScript로 주입 후 자동 재시도
-            chrome.scripting.executeScript(
-              { target: { tabId: targetTabId }, files: ["content.js"] },
-              () => {
-                if (chrome.runtime.lastError) {
-                  cb({
-                    success: false,
-                    message: "페이지 스크립트 주입 불가 (보호 페이지)",
-                  });
-                  return;
-                }
-                chrome.tabs.sendMessage(targetTabId, { command, payload }, (retry) => {
-                  if (chrome.runtime.lastError) {
-                    cb({
-                      success: false,
-                      message: "페이지 스크립트 미연결 (페이지 새로고침 후 재시도)",
-                    });
-                    return;
-                  }
-                  cb(retry || { success: true });
-                });
-              }
-            );
-            return;
-          }
-          cb(response || { success: true });
-        });
-      };
-
-      dispatch((response) => {
-        resolve({
-          success: response.success !== false,
-          message: response.message || "명령이 정상 처리되었습니다.",
-          data: response.data,
-        });
-      });
+      sendCommandToTab(activeTab.id, command, payload).then(resolve);
     });
   });
 }
@@ -325,18 +344,22 @@ export function requestCollectFrameDom(): Promise<{
 
 /**
  * 현재 페이지의 이미지 추출 및 서버 전송을 콘텐츠 스크립트에 요청합니다.
+ * 카테고리(category)를 함께 전달해 서버가 도메인/카테고리별 디렉토리로 저장하게 합니다.
  * 인출 성공 이미지는 Base64로, 실패(크로스 오리진) 이미지는 src URL 참조로 전송됩니다.
  *
+ * @param category - 수집 카테고리 (기본 "normal", 사이트별 album/cover 등)
  * @returns 이미지 수집 결과 요약 객체
  */
-export function requestCollectImages(): Promise<{
+export function requestCollectImages(
+  category: string = "normal"
+): Promise<{
   success: boolean;
   message: string;
   total?: number;
   collected?: number;
   failed?: number;
 }> {
-  return sendCommandToActiveTab("COLLECT_IMAGES").then((res) => {
+  return sendCommandToActiveTab("COLLECT_IMAGES", { category }).then((res) => {
     const data =
       typeof res.data === "object" && res.data !== null
         ? (res.data as { total?: number; collected?: number; failed?: number; message?: string })
@@ -348,6 +371,149 @@ export function requestCollectImages(): Promise<{
       collected: data?.collected,
       failed: data?.failed,
     };
+  });
+}
+
+/**
+ * 현재 페이지의 사이트 정보(메타데이터) 수집을 콘텐츠 스크립트에 요청합니다.
+ * 정보 수집 버튼(사이트 전용)에서 호출되며 SITE_INFO 액션으로 JSON이 서버에 전송됩니다.
+ *
+ * @returns 사이트 정보 수집 처리 결과 객체
+ */
+export function requestCollectSiteInfo(): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  return sendCommandToActiveTab("COLLECT_SITE_INFO");
+}
+
+/**
+ * 현재 페이지(xvideos.com)의 비디오 블록 메타를 콘텐츠 스크립트에 요청해
+ * 미디어 다운로드 매니저 목록 구성에 필요한 항목(클릭 URL/제목/3종 자산 URL)을 인출합니다.
+ *
+ * @returns 파싱 결과 객체 (entries, pageUrl 포함)
+ */
+export function requestCollectXvideosMedia(): Promise<{
+  success: boolean;
+  message: string;
+  entries: XvideosMediaEntry[];
+  pageUrl: string;
+}> {
+  return sendCommandToActiveTab("COLLECT_XVIDEOS_MEDIA").then((res) => {
+    const data =
+      typeof res.data === "object" && res.data !== null
+        ? (res.data as {
+            entries?: XvideosMediaEntry[];
+            pageUrl?: string;
+            message?: string;
+          })
+        : undefined;
+    return {
+      success: res.success,
+      message: data?.message || res.message,
+      entries: Array.isArray(data?.entries) ? (data.entries as XvideosMediaEntry[]) : [],
+      pageUrl: data?.pageUrl || "",
+    };
+  });
+}
+
+/**
+ * 특정 탭(다운로드 매니저가 대상으로 하는 xvideos 탭)의 비디오 블록 메타를
+ * 콘텐츠 스크립트에 요청해 미디어 다운로드 매니저 목록 구성을 위한 항목을 인출합니다.
+ * 전용 매니저 팝업 창에서 호출되므로 활성 탭이 아닌 명시적 tabId로 송신합니다.
+ *
+ * @param tabId - 대상 xvideos 탭 ID
+ * @returns 파싱 결과 객체 (entries, pageUrl 포함)
+ */
+export function requestCollectXvideosMediaFromTab(tabId: number): Promise<{
+  success: boolean;
+  message: string;
+  entries: XvideosMediaEntry[];
+  pageUrl: string;
+}> {
+  return sendCommandToTab(tabId, "COLLECT_XVIDEOS_MEDIA").then((res) => {
+    const data =
+      typeof res.data === "object" && res.data !== null
+        ? (res.data as {
+            entries?: XvideosMediaEntry[];
+            pageUrl?: string;
+            message?: string;
+          })
+        : undefined;
+    return {
+      success: res.success,
+      message: data?.message || res.message,
+      entries: Array.isArray(data?.entries) ? (data.entries as XvideosMediaEntry[]) : [],
+      pageUrl: data?.pageUrl || "",
+    };
+  });
+}
+
+/**
+ * 대상 저장 디렉토리(images/<도메인>/<카테고리>)를 서버에 조회합니다.
+ * 오프스크린이 GET_STORAGE_LOCATION 패킷을 서버에 전송하고 STORAGE_LOCATION_RESPONSE를 대기합니다.
+ *
+ * @param pageUrl - 대상 페이지 URL (도메인 산출 기준)
+ * @param category - 수집 카테고리 (기본 "normal")
+ * @returns 저장 위치 응답 객체
+ */
+export function requestStorageLocation(
+  pageUrl: string,
+  category: string = "normal"
+): Promise<StorageLocationResponsePayload> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      { type: "GET_STORAGE_LOCATION", payload: { pageUrl, category } },
+      (res) => {
+        if (chrome.runtime.lastError || !res) {
+          resolve({ success: false, message: "저장 위치 조회 실패 (오프스크린 오프라인)" });
+          return;
+        }
+        resolve(res as StorageLocationResponsePayload);
+      }
+    );
+  });
+}
+
+/**
+ * xvideos 비디오 블록 1건의 미디어 번들 다운로드를 오프스크린에 요청합니다.
+ * 오프스크린이 3종 자산(썸네일 2 + 프리뷰 mp4)을 fetch 후 서버에 전송하고,
+ * 저장 완료 ACK(CRAWL_MEDIA_SAVED)를 대기해 결과를 반환합니다.
+ *
+ * @param bundleId - 항목 추적 ID
+ * @param entry - 비디오 블록 메타 항목
+ * @param bundle - 미디어 번들 페이로드 (txtContent/baseName/category 등 포함)
+ * @returns 저장 완료 결과 (ack에 저장 경로 포함)
+ */
+export function requestFetchMediaBundle(
+  bundleId: string,
+  entry: XvideosMediaEntry,
+  bundle: CrawlMediaBundlePayload
+): Promise<{
+  success: boolean;
+  ack?: { success?: boolean; savedDir?: string; savedFiles?: string[]; bundleId?: string };
+  error?: string;
+}> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(
+      { type: "FETCH_MEDIA_BUNDLE", payload: { bundleId, entry, bundle } },
+      (res) => {
+        if (chrome.runtime.lastError || !res) {
+          resolve({ success: false, error: "오프스크린 오프라인" });
+          return;
+        }
+        const data = res as {
+          success?: boolean;
+          ack?: { success?: boolean; savedDir?: string; savedFiles?: string[]; bundleId?: string };
+          error?: string;
+        };
+        resolve({
+          success: data.success === true,
+          ack: data.ack,
+          error: data.error,
+        });
+      }
+    );
   });
 }
 

@@ -102,15 +102,16 @@ export function useDbManager() {
    * 테이블을 선택하고 스키마와 첫 페이지 데이터를 로드합니다.
    *
    * @param table - 선택할 테이블명
+   * @param size - 페이지당 행 수 (미지정 시 기본 20)
    */
   const selectTable = useCallback(
-    async (table: string) => {
+    async (table: string, size: number = 20) => {
       if (!selectedDbRel || !table) return;
       setError("");
       try {
         const schemaData = await fetchTableSchemaApi(selectedDbRel, table);
         setSchema(schemaData);
-        await loadRows(table, 1, 50, "");
+        await loadRows(table, 1, size, "");
       } catch (err) {
         setSchema(null);
         setError(err instanceof Error ? err.message : "스키마 조회에 실패했습니다.");
@@ -120,18 +121,38 @@ export function useDbManager() {
   );
 
   /**
-   * 테이블 행 목록을 페이지/검색 조건으로 로드합니다.
+   * 테이블 행 목록을 페이지/검색/정렬 조건으로 로드합니다.
    *
    * @param table - 테이블명
    * @param page - 페이지 번호
    * @param size - 페이지당 행 수
    * @param search - 검색어
+   * @param searchField - 검색 대상 컬럼명 (미지정 시 전체 컬럼 LIKE)
+   * @param orderBy - 정렬 컬럼명 (미지정 시 자연 순서)
+   * @param orderDir - 정렬 방향 ("asc" | "desc")
    */
   const loadRows = useCallback(
-    async (table: string, page: number, size: number, search: string) => {
+    async (
+      table: string,
+      page: number,
+      size: number,
+      search: string,
+      searchField: string = "",
+      orderBy: string = "",
+      orderDir: string = "asc"
+    ) => {
       if (!selectedDbRel) return;
       try {
-        const data = await fetchTableRowsApi(selectedDbRel, table, page, size, search);
+        const data = await fetchTableRowsApi(
+          selectedDbRel,
+          table,
+          page,
+          size,
+          search,
+          searchField,
+          orderBy,
+          orderDir
+        );
         setRowsResult(data);
       } catch (err) {
         setRowsResult(null);

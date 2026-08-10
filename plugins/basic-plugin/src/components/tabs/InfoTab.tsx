@@ -12,7 +12,6 @@ export function InfoTab({ browserInfo, processorInfo }: InfoTabProps) {
     <div className="tab-content">
       <div className="info-section">
         <div className="info-section-title">
-          <span className="material-symbols-outlined text-sm text-sky-400">browser_updated</span>
           <span>브라우저 정보</span>
         </div>
         {browserInfo ? (
@@ -49,7 +48,6 @@ export function InfoTab({ browserInfo, processorInfo }: InfoTabProps) {
 
       <div className="info-section">
         <div className="info-section-title">
-          <span className="material-symbols-outlined text-sm text-emerald-400">memory</span>
           <span>브라우저 프로세서 정보</span>
         </div>
         {processorInfo ? (

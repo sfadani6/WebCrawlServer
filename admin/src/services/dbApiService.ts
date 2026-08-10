@@ -98,21 +98,27 @@ export async function executeSqlApi(
 }
 
 /**
- * 데이터 그리드용 테이블 행 목록을 페이지네이션/검색 조건으로 조회합니다.
+ * 데이터 그리드용 테이블 행 목록을 페이지네이션/검색/정렬 조건으로 조회합니다.
  *
  * @param dbRel - DB 상대 경로
  * @param table - 테이블명
  * @param page - 페이지 번호 (1부터 시작)
- * @param size - 페이지당 행 수
+ * @param size - 페이지당 행 수 (기본 20)
  * @param search - 검색어
+ * @param searchField - 검색 대상 컬럼명 (미지정 시 전체 컬럼 LIKE)
+ * @param orderBy - 정렬 컬럼명 (미지정 시 자연 순서)
+ * @param orderDir - 정렬 방향 ("asc" | "desc")
  * @returns 행 조회 결과
  */
 export async function fetchTableRowsApi(
   dbRel: string,
   table: string,
   page: number = 1,
-  size: number = 50,
-  search: string = ""
+  size: number = 20,
+  search: string = "",
+  searchField: string = "",
+  orderBy: string = "",
+  orderDir: string = "asc"
 ): Promise<TableRowsResult> {
   const params = new URLSearchParams({
     dbRel,
@@ -120,6 +126,9 @@ export async function fetchTableRowsApi(
     page: String(page),
     size: String(size),
     search,
+    searchField,
+    orderBy,
+    orderDir,
   });
   return requestJson<TableRowsResult>(`/api/admin/db/rows?${params.toString()}`);
 }

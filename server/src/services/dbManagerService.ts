@@ -442,47 +442,68 @@ export function executeQuery(dbRel: string, sql: string): SqlQueryResult {
 }
 
 /**
- * 데이터 그리드용 테이블 행을 페이지네이션 및 검색 조건으로 조회합니다.
+ * 데이터 그리드용 테이블 행을 페이지네이션, 검색 및 정렬 조건으로 조회합니다.
  *
  * @param dbRel - DB 상대 경로
  * @param tableName - 테이블명
  * @param page - 페이지 번호 (1부터 시작)
  * @param size - 페이지당 행 수
  * @param search - 검색어 (TEXT 컬럼 LIKE 검색)
+ * @param searchField - 검색 대상 컬럼명 (미지정/무효 시 전체 컬럼 LIKE, 컬럼명은 화이트리스트 검증)
+ * @param orderBy - 정렬 컬럼명 (미지정/무효 시 자연 순서, 컬럼명은 화이트리스트 검증)
+ * @param orderDir - 정렬 방향 ("asc" | "desc", 기본 asc)
  * @returns 행 조회 결과
  */
 export function fetchTableRows(
   dbRel: string,
   tableName: string,
   page: number = 1,
-  size: number = 50,
-  search: string = ""
+  size: number = 20,
+  search: string = "",
+  searchField: string = "",
+  orderBy: string = "",
+  orderDir: string = "asc"
 ): TableRowsResult {
   const targetDb = new Database(resolveDbRelPath(dbRel), { readonly: true });
   try {
     const pageNum = Math.max(1, Number(page) || 1);
-    const pageSize = Math.min(200, Math.max(1, Number(size) || 50));
+    const pageSize = Math.min(200, Math.max(1, Number(size) || 20));
     const offset = (pageNum - 1) * pageSize;
 
-    // 컬럼 목록 조회 (검색 조건 생성 및 직렬화에 사용)
+    // 컬럼 목록 조회 (검색/정렬 컬럼 화이트리스트 및 직렬화에 사용)
     const columnRows = targetDb
       .prepare(`PRAGMA table_info(${quoteIdentifier(tableName)})`)
       .all() as Array<{ name: string }>;
     const columnNames = columnRows.map((c) => c.name);
 
-    // 검색 조건 (LIKE) 구성
+    // 검색 조건 (LIKE) 구성 — searchField 지정 시 해당 컬럼만, 미지정 시 전체 컬럼 OR
     const keyword = String(search || "").trim();
+    const field = String(searchField || "").trim();
+    const validSearchField =
+      field.length > 0 && columnNames.includes(field) ? field : "";
     let whereClause = "";
     const whereParams: unknown[] = [];
     if (keyword.length > 0) {
-      const likeClauses = columnNames
-        .map((col) => `${quoteIdentifier(col)} LIKE ?`)
-        .join(" OR ");
-      whereClause = ` WHERE (${likeClauses})`;
-      whereParams.push(
-        ...columnNames.map(() => `%${keyword.replace(/[%_]/g, "\\$&")}%`)
-      );
+      if (validSearchField) {
+        whereClause = ` WHERE (${quoteIdentifier(validSearchField)} LIKE ? ESCAPE '\\')`;
+        whereParams.push(`%${keyword.replace(/[%_]/g, "\\$&")}%`);
+      } else {
+        const likeClauses = columnNames
+          .map((col) => `${quoteIdentifier(col)} LIKE ? ESCAPE '\\'`)
+          .join(" OR ");
+        whereClause = ` WHERE (${likeClauses})`;
+        whereParams.push(
+          ...columnNames.map(() => `%${keyword.replace(/[%_]/g, "\\$&")}%`)
+        );
+      }
     }
+
+    // 정렬 조건 구성 (유효 컬럼만 허용, 방향은 asc/desc만)
+    const sortColumn = orderBy && columnNames.includes(String(orderBy)) ? String(orderBy) : "";
+    const sortDirection = String(orderDir).toLowerCase() === "desc" ? "DESC" : "ASC";
+    const orderClause = sortColumn
+      ? ` ORDER BY ${quoteIdentifier(sortColumn)} ${sortDirection}`
+      : "";
 
     // 전체 행 수 조회
     const countRow = targetDb
@@ -491,10 +512,10 @@ export function fetchTableRows(
       )
       .get(...whereParams) as { cnt: number };
 
-    // 페이지 단위 데이터 조회
+    // 페이지 단위 데이터 조회 (정렬 조건 포함)
     const rawRows = targetDb
       .prepare(
-        `SELECT * FROM ${quoteIdentifier(tableName)}${whereClause} LIMIT ? OFFSET ?`
+        `SELECT * FROM ${quoteIdentifier(tableName)}${whereClause}${orderClause} LIMIT ? OFFSET ?`
       )
       .all(...whereParams, pageSize, offset) as Array<Record<string, unknown>>;
 

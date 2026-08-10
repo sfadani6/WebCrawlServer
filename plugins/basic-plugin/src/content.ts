@@ -1,5 +1,7 @@
 // plugins/basic-plugin/src/content.ts
 
+import { XvideosMediaEntry } from "./types/index.js";
+
 /**
  * 콘텐츠 스크립트 모듈입니다.
  * 현재 페이지 DOM을 수집하거나 선언형 페이징 크롤링을 수행하며,
@@ -22,8 +24,8 @@ export interface PaginationCrawlPayload {
 /** 요소 선택 모드 하이라이트 색상 (파란색 테두리) */
 const PICKER_HIGHLIGHT_COLOR = "#3b82f6";
 
-/** 한 번에 수집할 최대 이미지 개수 (메시지 폭주 방지) */
-const MAX_IMAGE_COLLECT_COUNT = 50;
+/** 한 번에 수집할 최대 이미지 개수 (메시지 폭주 방지, 요청 규격에 따라 상향 조정) */
+const MAX_IMAGE_COLLECT_COUNT = 500;
 
 /** 요소 선택 모드 활성화 여부 */
 let pickerActive = false;
@@ -135,11 +137,12 @@ function showPickerSendButton(element: HTMLElement): void {
     event.stopPropagation();
 
     // 선택된 요소의 outerHTML 전체를 서버로 전송 (결정 사항: outerHTML 전체 전송)
+    // 액션명: DomCapture (요소 선택 DOM 캡처)
     const outerHTML = element.outerHTML;
     chrome.runtime.sendMessage({
       type: "SEND_SOCKET_PACKET",
       packet: {
-        action: "CRAWL_PARTIAL",
+        action: "DomCapture",
         payloadType: "json",
         payload: {
           url: window.location.href,
@@ -290,29 +293,62 @@ function extractImageFileName(src: string, fallbackName: string): string {
 }
 
 /**
+ * lazy 로드 이미지의 실제 소스 URL을 결정합니다.
+ * 로드가 완료된 이미지는 currentSrc(반응형 srcset) 우선, 로드 전 lazy 이미지는
+ * data-src/data-original/data-lazy-src 등 data 속성 폴백으로 최종 이미지 URL을 얻습니다.
+ *
+ * @param img - 대상 img 요소
+ * @returns 최종 이미지 URL (없으면 빈 문자열)
+ */
+function resolveImageSource(img: HTMLImageElement): string {
+  const src = img.currentSrc || img.src || "";
+  if (src) return src;
+  const lazyAttrs = ["data-src", "data-original", "data-lazy-src", "data-url", "data-lazy"];
+  for (const attr of lazyAttrs) {
+    const value = img.getAttribute(attr);
+    if (value) return value;
+  }
+  return "";
+}
+
+/**
  * 페이지 내 이미지들을 추출하여 서버로 전송합니다.
  * 같은 오리진/CORS 허용 이미지는 fetch→Base64 변환 후 CRAWL_IMAGE(binary_base64)로,
  * 인출 실패(크로스 오리진) 이미지는 src URL만 CRAWL_IMAGE(json)로 전송합니다.
+ * 페이로드에 category를 실어 서버가 도메인/카테고리별 디렉토리로 분리 저장하게 합니다.
+ * 중복 URL은 Set으로 제거하고, lazy 로드 이미지(data-src 등)도 포함합니다.
  *
+ * @param category - 수집 카테고리 (기본 "normal", 사이트별 album/cover 등)
  * @returns 수집 결과 요약 객체
  */
-async function collectAndSendImages(): Promise<{
+async function collectAndSendImages(
+  category: string = "normal"
+): Promise<{
   success: boolean;
   total: number;
   collected: number;
   failed: number;
   message: string;
 }> {
-  const images = Array.from(document.querySelectorAll<HTMLImageElement>("img"));
-  const targets = images.slice(0, MAX_IMAGE_COLLECT_COUNT);
+  // 렌더링된 DOM 내 img 요소를 전부 취합하되, 중복 URL은 제거하고 상한(500)까지만 처리
+  const seenUrls = new Set<string>();
+  const targets: Array<{ img: HTMLImageElement; src: string }> = [];
+  const allImages = Array.from(document.querySelectorAll<HTMLImageElement>("img"));
+  for (const img of allImages) {
+    const src = resolveImageSource(img);
+    if (!src || seenUrls.has(src)) continue;
+    seenUrls.add(src);
+    targets.push({ img, src });
+    if (targets.length >= MAX_IMAGE_COLLECT_COUNT) break;
+  }
   const pageUrl = window.location.href;
   const pageTitle = document.title;
   let collected = 0;
   let failed = 0;
 
   for (let i = 0; i < targets.length; i++) {
-    const img = targets[i];
-    const src = img.currentSrc || img.src || "";
+    const target = targets[i];
+    const src = target.src;
     const fileName = extractImageFileName(src, `image_${i + 1}.png`);
     const timestamp = Date.now();
 
@@ -331,6 +367,7 @@ async function collectAndSendImages(): Promise<{
             mimeType: mimeMatch ? mimeMatch[1] : "image/png",
             url: src,
             pageUrl,
+            category,
             data: src.split(",")[1] || "",
             timestamp,
           },
@@ -359,6 +396,7 @@ async function collectAndSendImages(): Promise<{
             mimeType: blob.type || "image/png",
             url: src,
             pageUrl,
+            category,
             data: base64,
             timestamp,
           },
@@ -378,6 +416,7 @@ async function collectAndSendImages(): Promise<{
             mimeType: "",
             url: src,
             pageUrl,
+            category,
             error: "CORS_OR_FETCH_FAILED",
             timestamp,
           },
@@ -393,8 +432,47 @@ async function collectAndSendImages(): Promise<{
     total: targets.length,
     collected,
     failed,
-    message: `이미지 수집 완료: ${collected}개 전송, ${failed}개 URL 참조 (${pageTitle})`,
+    message: `이미지 수집 완료(${category}): ${collected}개 전송, ${failed}개 URL 참조 (${pageTitle})`,
   };
+}
+
+/**
+ * 현재 페이지의 사이트 정보(메타데이터)를 추출해 서버로 전송합니다.
+ * 정보 수집 버튼(사이트 전용)에서 호출되며 SITE_INFO 액션으로 JSON을 전송합니다.
+ *
+ * @returns 수집 결과 객체
+ */
+function collectAndSendSiteInfo(): { success: boolean; message: string } {
+  const meta = document.querySelector('meta[name="description"]');
+  const keywords = document.querySelector('meta[name="keywords"]');
+  const ogTitle = document.querySelector('meta[property="og:title"]');
+  const ogImage = document.querySelector('meta[property="og:image"]');
+  const ogDescription = document.querySelector('meta[property="og:description"]');
+  const canonical = document.querySelector('link[rel="canonical"]');
+
+  const info = {
+    url: window.location.href,
+    title: document.title,
+    description: meta?.getAttribute("content") || "",
+    keywords: keywords?.getAttribute("content") || "",
+    ogTitle: ogTitle?.getAttribute("content") || "",
+    ogImage: ogImage?.getAttribute("content") || "",
+    ogDescription: ogDescription?.getAttribute("content") || "",
+    canonical: canonical?.getAttribute("href") || "",
+    timestamp: Date.now(),
+  };
+
+  chrome.runtime.sendMessage({
+    type: "SEND_SOCKET_PACKET",
+    packet: {
+      action: "SITE_INFO",
+      payloadType: "json",
+      payload: info,
+      meta: { timestamp: Date.now() },
+    },
+  });
+
+  return { success: true, message: `사이트 정보 전송 완료: ${document.title}` };
 }
 
 /**
@@ -409,7 +487,7 @@ function getFrameInfo(): { success: boolean; frameCount: number } {
 
 /**
  * 현재 페이지의 첫 번째 iframe DOM을 수집하여 서버로 전송합니다.
- * 같은 오리진 프레임은 outerHTML을 CRAWL_DOCUMENT로 전송하고,
+ * 같은 오리진 프레임은 outerHTML을 fullPage(전체 문서)로 전송하고,
  * 크로스 오리진 프레임은 접근 불가 시 src URL만 CRAWL_PARTIAL로 전송합니다.
  *
  * @returns 프레임 수집 결과 객체
@@ -434,7 +512,7 @@ function collectAndSendFrame(): {
     chrome.runtime.sendMessage({
       type: "SEND_SOCKET_PACKET",
       packet: {
-        action: "CRAWL_DOCUMENT",
+        action: "fullPage",
         payloadType: "json",
         payload: {
           url: frameSrc,
@@ -480,6 +558,134 @@ function collectAndSendFrame(): {
 }
 
 /**
+ * xvideos.com 페이지의 비디오 블록(.thumb-block)에서 미디어 다운로드 매니저용
+ * 메타 정보(클릭 URL/제목/썸네일 2종/프리뷰 mp4)를 추출합니다.
+ *
+ * 파싱 규칙:
+ * - 클릭 URL: .videopv a[href] 우선, 없으면 썸네일 앵커(closest a[href]) 사용, 절대 경로로 변환
+ * - 제목: .thumb-under .title a[title] 우선, 없으면 블록 내 a[title] 사용
+ * - 메인 썸네일: img의 currentSrc/src(또는 data-src 폴백), no-img.png 플레이스홀더 제외
+ * - 보조 썸네일/프리뷰: data-sfwthumb / data-pvv 속성
+ * - 중복 제거: clickUrl 기준 Set 관리
+ * - 상한 없음: 페이지에 존재하는 비디오 블록 전부를 대상으로 합니다.
+ *
+ * @returns 추출된 비디오 블록 항목 목록
+ */
+function collectXvideosMediaEntries(): XvideosMediaEntry[] {
+  const pageUrl = window.location.href;
+  const entries: XvideosMediaEntry[] = [];
+  const seenClickUrls = new Set<string>();
+
+  const blocks = document.querySelectorAll<HTMLElement>(".thumb-block");
+  for (const block of blocks) {
+    const img = block.querySelector<HTMLImageElement>("img");
+    if (!img) continue;
+
+    const mainUrl = resolveImageSource(img);
+    // 섬네일 없음 플레이스홀더(no-img.png) 및 정적 자산 호스트는 추출 제외
+    if (!mainUrl) continue;
+    if (/no-img(\.|$)/.test(mainUrl) || mainUrl.includes("assets-cdn77")) continue;
+
+    // 클릭 URL 추출 (절대 경로로 정규화)
+    const clickAnchor =
+      block.querySelector<HTMLAnchorElement>(".videopv a[href]") ||
+      img.closest<HTMLAnchorElement>("a[href]") ||
+      block.querySelector<HTMLAnchorElement>('a[href][class*="thumb"]');
+    if (!clickAnchor) continue;
+    const clickUrl = new URL(
+      clickAnchor.getAttribute("href") || "",
+      pageUrl
+    ).href;
+    if (!clickUrl || seenClickUrls.has(clickUrl)) continue;
+    seenClickUrls.add(clickUrl);
+
+    // 제목 추출 (title 속성 우선)
+    const titleEl = block.querySelector<HTMLAnchorElement>(
+      ".thumb-under .title a[title]"
+    );
+    const title =
+      titleEl?.getAttribute("title") ||
+      block.querySelector<HTMLElement>("a[title]")?.getAttribute("title") ||
+      "";
+
+    // 비디오 EID 파싱 (예: /video.kavfihb169e/... → kavfihb169e)
+    const eidMatch = clickUrl.match(/\/video\.([a-z0-9]+)\//i);
+    const eid = eidMatch ? eidMatch[1] : "";
+
+    entries.push({
+      eid,
+      clickUrl,
+      title,
+      mainUrl,
+      sfwUrl: img.getAttribute("data-sfwthumb") || "",
+      previewUrl: img.getAttribute("data-pvv") || "",
+    });
+  }
+
+  return entries;
+}
+
+/**
+ * xvideos.com 단일 영상 페이지(플레이어) 여부를 판별합니다.
+ * URL 경로(/video 접두사) 또는 플레이어 DOM(#html5video/.video-bg-pic 등) 존재로 판단하며,
+ * 비디오 블록 목록(.thumb-block)이 없는 영상 재생 페이지를 목록 페이지와 구분합니다.
+ *
+ * @returns 단일 영상 페이지 여부
+ */
+function isXvideosVideoPage(): boolean {
+  return (
+    /^\/video(\d+|\.)/i.test(window.location.pathname) ||
+    Boolean(
+      document.querySelector(
+        "#html5video, #hlsplayer, .video-bg-pic, .video-pic",
+      ),
+    )
+  );
+}
+
+/**
+ * xvideos.com 단일 영상 페이지(플레이어)에서 포스터 이미지와 타이틀을 추출합니다.
+ * 영상 자체(blob 스트리밍)는 다운로드하지 않고, 재생 영역의 미리보기 포스터 이미지 1종만 항목으로 구성합니다.
+ *
+ * 파싱 규칙:
+ * - 포스터 이미지: .video-bg-pic .video-pic img (resolveImageSource, no-img 플레이스홀더 제외)
+ * - 타이틀: 플레이어 영역(#html5video/#hlsplayer)의 .video-title 텍스트
+ * - 클릭 URL: 현재 영상 페이지 URL / EID: URL에서 파싱
+ * - 보조/프리뷰 URL은 빈 문자열 (이미지 1종만 다운로드, 여긴 이미지 하나면 충분)
+ *
+ * @returns 추출된 단일 영상 항목 (추출 실패 시 null)
+ */
+function collectXvideosVideoPageEntry(): XvideosMediaEntry | null {
+  const pageUrl = window.location.href;
+
+  const posterImg = document.querySelector<HTMLImageElement>(
+    ".video-bg-pic .video-pic img, .video-bg-pic img",
+  );
+  if (!posterImg) return null;
+  const mainUrl = resolveImageSource(posterImg);
+  // 섬네일 없음 플레이스홀더(no-img.png)는 추출 제외
+  if (!mainUrl || /no-img(\.|$)/.test(mainUrl)) return null;
+
+  const titleEl = document.querySelector<HTMLElement>(
+    "#html5video .video-title, #hlsplayer .video-title, .video-bg-pic .video-title, .video-title",
+  );
+  const title = (titleEl?.textContent || "").trim();
+
+  const eidMatch =
+    pageUrl.match(/\/video\.([a-z0-9]+)\//i) || pageUrl.match(/\/video(\d+)/i);
+  const eid = eidMatch ? eidMatch[1] : "";
+
+  return {
+    eid,
+    clickUrl: pageUrl,
+    title,
+    mainUrl,
+    sfwUrl: "",
+    previewUrl: "",
+  };
+}
+
+/**
  * 크롬 메시지 수신기: 백그라운드 및 사이드바로부터의 DOM 수집/요소 선택/프레임/이미지 지시를 처리합니다.
  */
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
@@ -519,7 +725,9 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return false;
   }
 
-  // [3] 전체 DOM HTML 수집 지시 (물리 파일 저장소 연동용 → CRAWL_DOCUMENT)
+  // [3] 전체 DOM HTML 수집 지시 (물리 파일 저장소 연동용 → fullPage 액션)
+  // 버튼을 누르는 시점에 현재 렌더링된 DOM(document.documentElement.outerHTML)을
+  // 재캡처하므로 AJAX 등으로 동적 로드된 부분까지 포함됩니다.
   if (request.command === "COLLECT_FULL_DOM") {
     const fullDomHtml = document.documentElement.outerHTML;
     const domData = {
@@ -533,7 +741,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     chrome.runtime.sendMessage({
       type: "SEND_SOCKET_PACKET",
       packet: {
-        action: "CRAWL_DOCUMENT",
+        action: "fullPage",
         payloadType: "json",
         payload: domData,
         meta: { timestamp: Date.now() },
@@ -570,9 +778,44 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return false;
   }
 
+  // [7-1] xvideos 비디오 블록/단일 영상 페이지 메타 파싱 지시 (미디어 다운로드 매니저 목록 생성용)
+  // 파싱만 수행하며 실제 다운로드는 사이드바→오프스크린→서버 저장 흐름으로 진행됩니다.
+  // 비디오 블록(.thumb-block)이 없으면 단일 영상 페이지(플레이어)로 폴백해 포스터 이미지 1종을 파싱합니다.
+  if (request.command === "COLLECT_XVIDEOS_MEDIA") {
+    // 1) 목록/검색 페이지의 비디오 블록 파싱
+    let entries = collectXvideosMediaEntries();
+    let sourceLabel = "비디오 블록";
+    // 2) 블록이 없으면 단일 영상 페이지(플레이어) 파싱 폴백 — 포스터 이미지 1종 + 타이틀
+    if (entries.length === 0 && isXvideosVideoPage()) {
+      const single = collectXvideosVideoPageEntry();
+      if (single) {
+        entries = [single];
+        sourceLabel = "현재 영상 페이지";
+      }
+    }
+    const message = `xvideos ${sourceLabel}에서 미디어 ${entries.length}건 파싱 완료`;
+    sendResponse({
+      success: true,
+      data: {
+        entries,
+        pageUrl: window.location.href,
+        message,
+      },
+      message,
+    });
+    return false;
+  }
+
   // [8] 페이지 이미지 추출 및 전송 지시 (비동기 → return true)
+  // payload.category로 카테고리(일반/앨범/표지 등)를 전달받아 저장소 분리를 지원합니다.
   if (request.command === "COLLECT_IMAGES") {
-    collectAndSendImages().then((result) => {
+    const category =
+      request.payload &&
+      typeof request.payload === "object" &&
+      typeof (request.payload as { category?: string }).category === "string"
+        ? (request.payload as { category: string }).category
+        : "normal";
+    collectAndSendImages(category).then((result) => {
       try {
         sendResponse(result);
       } catch {
@@ -580,6 +823,12 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       }
     });
     return true;
+  }
+
+  // [9] 사이트 정보(메타데이터) 수집 및 전송 지시 (정보 수집 버튼)
+  if (request.command === "COLLECT_SITE_INFO") {
+    sendResponse(collectAndSendSiteInfo());
+    return false;
   }
 
   return false;

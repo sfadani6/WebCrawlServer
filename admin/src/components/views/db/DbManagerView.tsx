@@ -18,6 +18,10 @@ type DbManagerTab = "browser" | "sql" | "schema" | "backup" | "storage" | "plugi
 interface DbManagerViewProps {
   /** 등록된 클라이언트 목록 (메시지 원장 필터 드롭다운용) */
   clients: Client[];
+  /** 페이지당 기본 행 수 (configs.db_page_size, 기본 20) */
+  dbPageSize?: number;
+  /** 셀 출력 문자열 제한 길이 (configs.db_cell_preview_chars, 기본 200) */
+  cellPreviewChars?: number;
 }
 
 /** 탭 정의 배열 (라벨/타입 쌍) */
@@ -35,7 +39,11 @@ const TABS: Array<{ key: DbManagerTab; label: string }> = [
  * DB 파일 선택과 기능 탭(데이터 브라우저/SQL/스키마/백업/스토리지/메시지 원장)을 조율합니다.
  * 데이터 및 비즈니스 로직은 useDbManager 훅에 위임합니다.
  */
-export function DbManagerView({ clients }: DbManagerViewProps) {
+export function DbManagerView({
+  clients,
+  dbPageSize = 20,
+  cellPreviewChars = 200,
+}: DbManagerViewProps) {
   const {
     dbFiles,
     selectedDbRel,
@@ -94,11 +102,11 @@ export function DbManagerView({ clients }: DbManagerViewProps) {
     await selectDb(dbRel);
   };
 
-  /** 테이블 선택 핸들러 (스키마/행 데이터 로드) */
+  /** 테이블 선택 핸들러 (스키마/행 데이터 로드, configs 기본 행 수 적용) */
   const handleSelectTable = (table: string) => {
     setSelectedTable(table);
     setError("");
-    selectTable(table);
+    selectTable(table, dbPageSize);
   };
 
   return (
@@ -184,6 +192,8 @@ export function DbManagerView({ clients }: DbManagerViewProps) {
           onAddRow={addRow}
           onUpdateRow={updateRow}
           onDeleteRow={deleteRow}
+          dbPageSize={dbPageSize}
+          cellPreviewChars={cellPreviewChars}
         />
       )}
 
@@ -194,6 +204,7 @@ export function DbManagerView({ clients }: DbManagerViewProps) {
           loading={loading}
           error={error}
           onRunQuery={runQuery}
+          cellPreviewChars={cellPreviewChars}
         />
       )}
 

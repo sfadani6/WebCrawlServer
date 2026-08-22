@@ -76,6 +76,7 @@
 자동 이동·연속 수집 같은 **오래 걸리는 액션**은 사이드바가 아닌 **액션 실행기 전용 팝업 창(`chrome.windows.create({ type: "popup" })`, 900×760)**으로 분리 실행합니다. 진행 상태를 팝업이 보유하므로 **팝업 창을 닫으면 실행이 중단**되며, 서버·탭 상태에 부담을 주지 않습니다.
 
 - **실행 버튼 위치**: 기본 탭 하단의 **"액션 실행"** 섹션(§2.2 레이아웃) 하위에 사이트별 액션 모듈 카드를 배치합니다. 현재 구현된 `xvideos.com · xvideos.red` 모듈은 **"xvideos 페이징 액션"** 버튼을 제공하며, `(matchedSite === "xvideos.com" || matchedSite === "xvideos.red") && isServerOnline`일 때만 활성화됩니다. (버튼 활성화는 페이징 페이지 여부와 무관하며, 액션 실행기 팝업이 xvideos 탭을 직접 탐색합니다)
+- **도움말 아이콘 및 레이어 팝업(공간 절약 원칙)**: 액션 카드에는 장문 설명 문단을 인라인으로 노출하지 **않는다**. 실행 버튼 우측에 원형 **"?" 도움말 버튼(`btn-help-round`, 팝업.css 토큰)**을 배치하고, 클릭 시 `ActionHelpModal.tsx` 공용 레이어 팝업(§4.4)으로 상세 설명(섹션 개요/동작 방식/수집 조건/저장 경로/실행 조건)을 표출한다. 버튼 행은 `flex items-stretch gap-2`(실행 버튼 `flex-1`) 구성으로 아이콘 버튼이 행 높이에 맞춰진다.
 - **창 생성 흐름**: `handleOpenXvBestOfRedAction()` → `chrome.tabs.query({ url: ["*://*.xvideos.com/*", "*://*.xvideos.red/*"] })`로 대상 탭 탐색(페이징 경로 `/<세그먼트>/YYYY-MM` 탭 우선 → 활성 탭 → 첫 탭) → `chrome.windows.create({ url: chrome.runtime.getURL("action-runner.html?module=best-of-red&tabId=…"), type: "popup", width: 900, height: 760, focused: true })`. xvideos(xvideos.com/xvideos.red) 탭이 없으면 팝업이 초기 오류 안내를 표시합니다.
 - **액션 실행기 레이아웃** (`ActionRunnerView.tsx`, `xvideos-manager.html`과 동일한 `manager-scrollable` 전역 스크롤 규격):
   - 헤더: 액션명(`xvideos 페이징 액션`) + 대상 탭 URL(축약) + 실행 상태 배지(`idle`/`init`/`running`/`completed`/`stopped`/`error` 구분 색상) + [닫기] 버튼(`window.close()`)
@@ -119,6 +120,12 @@
    - 전송 중일 때 버튼 비활성화(`disabled`)하고 라벨을 "전송 중..."/“이미지 수집 중...” 등 텍스트로 전환한다. (아이콘 스피너 대신 텍스트 기반 진행 표시)
 4.3 **원격 긴급 모달**:
    - 서버에서 `SHOW_ALERT_MODAL` 패킷 수신 시 사이드바 중앙에 경고 모달 창 즉시 팝업.
+4.4 **액션 도움말 레이어 팝업 (`ActionHelpModal.tsx`)**:
+   - 액션 카드의 "?" 버튼(`btn-help-round`) 클릭 시 표출되는 공용 레이어 팝업. `fixed inset-0 z-[1000] bg-black/70` 오버레이 + 중앙 다이얼로그(최대 폭 340px, 최대 높이 70vh, 세로 스크롤) 구조.
+   - Props: `open`(미표시 시 null 렌더링) / `title`(헤더 제목) / `sections`(`ActionHelpSection { heading, paragraphs[] }` 목록) / `onClose`.
+   - **닫기 경로 3종**: 헤더 ✕ 버튼(`btn-mini`)·오버레이 배경 클릭(다이얼로그 내부 클릭은 `stopPropagation`)·ESC 키(`window keydown` 리스너를 open 중에만 등록).
+   - 접근성: `role="dialog"` + `aria-modal="true"` + `aria-label`, 닫기/도움말 버튼에 `aria-label` 부여.
+   - 아이콘 배제 원칙(§1.3) 준수 — 도움말 트리거는 텍스트 "?", 닫기는 유니코드 "✕" 사용.
 
 ---
 
@@ -130,5 +137,6 @@
 - [ ] 활성 탭 전환/페이지 이동 시 `[현재 페이지]` URL이 자동으로 갱신되는가?
 - [ ] 기본 탭의 DOM 전송 라디오(전체/요소선택/프레임) 및 이미지 수집/액션 실행(xvideos.com · xvideos.red 모듈) 섹션이 정상 표시되는가?
 - [ ] xvideos.com 또는 xvideos.red 페이지에서 액션 실행의 "xvideos 페이징 액션" 버튼이 활성화되고, 액션 실행기 팝업 창(900×760)이 열리며 **페이지별 트리 로그**(현재 페이지 자동 펼침·자동 스크롤, 전체 펼치기/접기) · 진행률 바 · 완료 배너(실패 페이지/미디어 집계)가 갱신되는가?
+- [ ] 액션 카드에 인라인 장문 설명이 노출되지 않으며, "?" 도움말 버튼 클릭 시 레이어 팝업(개요/동작/수집/저장/실행 조건)이 표시되고 ✕·배경 클릭·ESC로 닫히는가?
 - [ ] 주요 노드 ID, 로그, URL 문자가 마우스 드래그로 복사되는가?
 - [ ] 서버 패킷 수신 시 상태 배지 및 모달 창이 실시간으로 반응하는가?

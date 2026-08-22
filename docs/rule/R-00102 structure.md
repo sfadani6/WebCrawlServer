@@ -20,6 +20,10 @@
   - `tsconfig.json`: 플러그인 TypeScript 설정
 - `databases/`: SQLite 데이터베이스 파일 저장소
 - `logs/`: 운영 로그 저장소
+- `.opencode/`: OpenCode 로컬 도구 구성 영역 (AI 에이전트 실행 환경)
+  - `plugin/`: OpenCode 플러그인 소스 (세션 로거 등)
+  - `logs/`: OpenCode 세션 원장(JSONL, 일자별 롤오버, gitignore 대상)
+- 루트 `opencode.json`: OpenCode 프로젝트 설정(`$schema`/`instructions`/`logLevel`/`share`)
 - `docs/`: 프로젝트 문서
   - `rule/`: 규칙 문서
   - `decision/`: 설계 결정 및 ADR

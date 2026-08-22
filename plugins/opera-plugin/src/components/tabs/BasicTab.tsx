@@ -1,6 +1,7 @@
 // plugins/opera-plugin/src/components/tabs/BasicTab.tsx
 
 import { useState } from "react";
+import { ActionHelpModal, type ActionHelpSection } from "../ActionHelpModal";
 
 /** DOM 전송 대상 모드 구분자 */
 type DomSendMode = "full" | "element" | "frame";
@@ -59,6 +60,48 @@ const SITE_IMAGE_BUTTONS: Record<string, string[]> = {
 };
 
 /**
+ * xvideos 페이징 액션 도움말 콘텐츠 (레이어 팝업 본문).
+ * 카드에 인라인으로 노출하던 설명 문단을 공간 절약을 위해 팝업 안으로 이관했다.
+ */
+const XV_BEST_OF_RED_ACTION_HELP: ActionHelpSection[] = [
+  {
+    /** 액션 실행 섹션의 역할 안내 */
+    heading: "액션 실행",
+    paragraphs: [
+      "사이트별 페이지 자동화 액션 모듈을 실행하는 영역입니다. 각 액션은 전용 팝업 창에서 진행 로그(이동/로딩 완료/수집/저장)를 콘솔처럼 출력하며 실행됩니다.",
+    ],
+  },
+  {
+    /** 페이징 자동 순회 동작 방식 안내 */
+    heading: "동작 방식",
+    paragraphs: [
+      "페이지 수를 감지해 1페이지씩 순차 이동합니다. 마지막 페이지까지 도달하면 자동 종료되며, [중지] 버튼 또는 팝업 창을 닫으면 즉시 중단됩니다.",
+    ],
+  },
+  {
+    /** 수집 타이밍 조건 안내 */
+    heading: "수집 조건",
+    paragraphs: [
+      "각 페이지는 이미지 로딩이 완전히 끝난 뒤 수집합니다. 로딩 완료 판정(네트워크·DOM 안정 대기)이 끝나기 전에는 다음 페이지로 이동하지 않습니다.",
+    ],
+  },
+  {
+    /** 저장 경로 규칙 안내 */
+    heading: "저장 경로",
+    paragraphs: [
+      "저장 경로는 현재 URL을 분석해 도메인/카테고리/월/페이지 규칙으로 자동 분리됩니다. (예: images/xvideos.red/best/2026-03/1/)",
+    ],
+  },
+  {
+    /** 실행 가능 조건 안내 */
+    heading: "실행 조건",
+    paragraphs: [
+      "xvideos.com 또는 xvideos.red의 페이징 페이지(예: /best/2026-03)에서만 활성화되며, 로컬 서버가 온라인 상태여야 합니다.",
+    ],
+  },
+];
+
+/**
  * 도메인별 사이트 전용 수집 설정 매칭 여부를 판별합니다.
  * 현재 페이지 호스트가 등록된 사이트 도메인의 하위 도메인인지 확인합니다.
  *
@@ -103,6 +146,8 @@ export function BasicTab({
   const [openSection, setOpenSection] = useState<string>("dom");
   // DOM 전송 대상 모드 (라디오 선택)
   const [sendMode, setSendMode] = useState<DomSendMode>("full");
+  // xvideos 페이징 액션 도움말 레이어 팝업 표시 여부
+  const [isActionHelpOpen, setIsActionHelpOpen] = useState<boolean>(false);
   // 현재 페이지와 매칭된 사이트 전용 도메인 (없으면 null)
   const matchedSite = matchSiteDomain(currentUrl);
 
@@ -377,14 +422,8 @@ export function BasicTab({
 
         {openSection === "actions" && (
           <div className="section-body">
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              사이트별 페이지 자동화 액션 모듈을 실행하는 영역입니다. 각 액션은
-              전용 팝업 창에서 진행 로그(이동/로딩 완료/수집/저장)를 콘솔처럼
-              출력하며 실행됩니다.
-            </p>
-
             {/* xvideos.com · xvideos.red 페이징 액션 모듈 */}
-            <div className="mt-3 rounded-lg border border-slate-700/60 bg-[#121a26] p-3">
+            <div className="rounded-lg border border-slate-700/60 bg-[#121a26] p-3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
                 <h3 className="text-[11px] font-bold text-slate-200 shrink-0">
@@ -397,27 +436,41 @@ export function BasicTab({
                 </span>
               </div>
 
-              <button
-                onClick={onOpenXvBestOfRedAction}
-                disabled={
-                  (matchedSite !== "xvideos.com" && matchedSite !== "xvideos.red") ||
-                  !isServerOnline
-                }
-                title={
-                  matchedSite === "xvideos.com" || matchedSite === "xvideos.red"
-                    ? "현재 페이지의 카테고리·월(예: /best/2026-03)부터 마지막 페이지까지 순차 이동하며 각 페이지 비디오 메타를 수집·저장 (전용 팝업 창)"
-                    : "xvideos.com 또는 xvideos.red 페이징 페이지에서 사용할 수 있습니다"
-                }
-                className="btn-secondary w-full mt-2"
-              >
-                xvideos 페이징 액션
-              </button>
-              <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-                페이지 수를 감지해 1페이지씩 순차 이동합니다. 각 페이지는 이미지
-                로딩이 완전히 끝난 뒤 수집하며, 저장 경로는 현재 URL을 분석해
-                도메인/카테고리/월/페이지 규칙(예: images/xvideos.red/best/2026-03/1/)
-                으로 자동 분리됩니다.
-              </p>
+              {/* 실행 버튼 + 도움말 아이콘 행 (상세 설명은 레이어 팝업으로 이관) */}
+              <div className="flex items-stretch gap-2 mt-2">
+                <button
+                  onClick={onOpenXvBestOfRedAction}
+                  disabled={
+                    (matchedSite !== "xvideos.com" && matchedSite !== "xvideos.red") ||
+                    !isServerOnline
+                  }
+                  title={
+                    matchedSite === "xvideos.com" || matchedSite === "xvideos.red"
+                      ? "현재 페이지의 카테고리·월(예: /best/2026-03)부터 마지막 페이지까지 순차 이동하며 각 페이지 비디오 메타를 수집·저장 (전용 팝업 창)"
+                      : "xvideos.com 또는 xvideos.red 페이징 페이지에서 사용할 수 있습니다"
+                  }
+                  className="btn-secondary flex-1"
+                >
+                  xvideos 페이징 액션
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsActionHelpOpen(true)}
+                  aria-label="xvideos 페이징 액션 도움말"
+                  title="도움말"
+                  className="btn-help-round shrink-0"
+                >
+                  ?
+                </button>
+              </div>
+
+              {/* xvideos 페이징 액션 상세 도움말 레이어 팝업 */}
+              <ActionHelpModal
+                open={isActionHelpOpen}
+                onClose={() => setIsActionHelpOpen(false)}
+                title="xvideos 페이징 액션"
+                sections={XV_BEST_OF_RED_ACTION_HELP}
+              />
             </div>
           </div>
         )}

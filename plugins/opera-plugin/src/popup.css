@@ -390,6 +390,30 @@ html, body {
   color: #ffffff;
 }
 
+/* 원형 도움말(?) 버튼 — 액션 실행 버튼 우측에 배치, 클릭 시 상세 도움말 레이어 팝업 열림 */
+.btn-help-round {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  color: #38bdf8;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-help-round:hover {
+  background-color: #334155;
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+
 /* 4. 푸터 하단 정보 */
 .popup-footer {
   display: flex;

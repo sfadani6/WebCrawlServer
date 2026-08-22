@@ -2,6 +2,83 @@
 
 ---
 
+## 2026-08-22 | todo.md 완료 항목 CHANGELOG 이관 및 목록 정리
+
+### 요청
+- `docs/todo.md`의 완료된 작업을 `docs/CHANGELOG/` 항목별 완료 문서로 작성할 것.
+- `docs/todo.md`에서 문서 작업까지 완료된 항목은 삭제할 것.
+
+### 처리 내용
+- 완료 블록 20건(ask-20260809 ~ ask-20260822185248)을 `docs/CHANGELOG/` 영어 작업명+타임스탬프 파일로 전량 이관(출처/완료 내용/후속 확인 표기, 대체 작업 비고 명시).
+- 본 정리 작업도 항목별 문서로 기록.
+- `docs/todo.md` 재작성 — 잔여 "예정 작업"(브라우저 실측 등)만 유지.
+- `docs/CHANGELOG.md` Unreleased에 22건 링크 인덱스 추가.
+- R-00103 "완료 항목 CHANGELOG 이관 절차" 섹션 신설.
+
+### 변경된 파일
+- `docs/CHANGELOG/*.md` 22종(신규), `docs/todo.md`, `docs/CHANGELOG.md`
+- `docs/rule/R-00103 workflow-management.md`, `docs/askLogs/ask-20260822203606.md`(신규), `docs/ask.md`
+
+### 검증 결과
+- 원 완료 블록 20건 ↔ CHANGELOG 이관 문서 20건 1:1 대응 확인(+본 작업 문서 1건, 총 21파일), 링크 경로·파일명 일치 확인.
+- 잔여 예정 작업 16건 todo.md 유지.
+
+### 보류 항목
+- 해당 없음 (이후 완료 작업부터 이관 절차 상시 적용)
+
+---
+
+## 2026-08-22 | 오페라 플러그인 액션 실행 — "xvideos 페이징 액션" 도움말 레이어 팝업 분리 + 인라인 설명 제거
+
+### 요청
+- 액션 실행 → xvideos 페이징 액션 버튼 옆에 도움말을 넣을 것.
+- 카드의 장문 설명 텍스트는 공간 낭비므로 제거하고, 도움말 아이콘 클릭 시 레이어 팝업으로 표출할 것.
+
+### 처리 내용
+- `ActionHelpModal.tsx` 신규: 오버레이+중앙 다이얼로그(340px/70vh 스크롤) 공용 팝업, 섹션 목록 렌더링, ✕/배경 클릭/ESC 닫기 3종, 접근성 속성 적용.
+- `BasicTab.tsx`: 안내·설명 문단 2종 삭제 → `XV_BEST_OF_RED_ACTION_HELP`(5개 섹션)로 재구성해 팝업 본문 이관. 실행 버튼 행 개편(버튼 flex-1 + "?" 원형 버튼), `isActionHelpOpen` 상태 추가.
+- `popup.css`: `.btn-help-round` 원형 버튼 토큰 신설.
+- opera-plugin 동기화 3종(헤더 교체 후 diff 0).
+- R-00440 §2.4/§4.4/§5 갱신.
+
+### 변경된 파일
+- `plugins/{basic,opera}-plugin/src/components/ActionHelpModal.tsx`(신규), `components/tabs/BasicTab.tsx`, `src/popup.css`
+- `docs/rule/R-00440 plugin-ui-ux.md`, `docs/askLogs/ask-20260822185248.md`(신규), `docs/todo.md`, `docs/ask.md`
+
+### 검증 결과
+- tsc --noEmit basic/opera 통과, 양 플러그인 vite 빌드 성공(dist에 btn-help-round 확인), ESLint 신규 오류 0건.
+- (보류) 브라우저 실측 — "?" 팝업 표시/닫기(✕·배경·ESC) 동작은 사용자 브라우저에서 수행.
+
+### 보류 항목
+- 브라우저 실측: 액션 카드 장문 설명 미노출 확인, 도움말 팝업 표시 및 3종 닫기 경로 동작.
+
+---
+
+## 2026-08-22 | 로컬 환경 OpenCode 설정 — 프로젝트 내부 세션 원장 기록 체계 구축
+
+### 요청
+- 현재 로컬 환경에서 OpenCode를 설정할 것.
+- 앞으로 모든 질문·진행 절차·출력 로그가 프로젝트 안에서 기록되도록 할 것.
+
+### 처리 내용
+- 루트 `opencode.json` 신설: `$schema`/`instructions: ["AGENTS.md"]`/`logLevel: "INFO"`/`share: "disabled"`.
+- `.opencode/plugin/session-logger.ts` 신규: 이벤트 버스 전체 구독 — 질문/응답 텍스트(`chat.text`)·도구 실행(`chat.tool`)·세션/권한/파일 이벤트를 `.opencode/logs/YYYY-MM-DD.jsonl` 원장에 기록. 노이즈(time./lsp./file.watcher.)·스트리밍 델타 제외, 파트 단위 디바운스(텍스트 800ms/도구 300ms)로 중복 억제, exit 시 잔여 버퍼 동기 플러시.
+- `eslint.config.mts`: 최상위 ignores에 `.opencode/**` 추가(tsconfig 프로젝트 범위 밖 린트 오류 방지).
+- R-00102 폴더 구조에 `.opencode/`·루트 `opencode.json` 명시.
+
+### 변경된 파일
+- `opencode.json`(신규), `.opencode/plugin/session-logger.ts`(신규), `eslint.config.mts`
+- `docs/rule/R-00102 structure.md`, `docs/askLogs/ask-20260822170705.md`(신규), `docs/todo.md`, `docs/ask.md`
+
+### 검증 결과
+- esbuild 변환(es2022/esm) 통과, ESLint exit 0(무시 패턴 적용), 루트 tsconfig include 영향 없음.
+- `git check-ignore -v .opencode/logs/test.jsonl` → `logs/` 패턴 매칭 확인(원장은 gitignore 대상).
+
+### 보류 항목
+- OpenCode 재시작 후 세션 원장 파일 생성 실측.
+
+---
+
 ## 2026-08-11 | xvideos.com + xvideos.red 이중 도메인 지원 — "xvideos 페이징 액션" 화면 문구 + URL 분석 기반 경로 생성
 
 ### 요청

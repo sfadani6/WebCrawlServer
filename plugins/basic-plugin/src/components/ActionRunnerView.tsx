@@ -139,6 +139,15 @@ export function ActionRunnerView({
     setExpanded(new Set());
   };
 
+  /**
+   * 진행 바에 표시할 총 페이지 수.
+   * 실행 중에는 runner progress 기준, 대기 중에는 초기 감지 정보(initInfo) 기준을 사용해
+   * 실행 전에도 예상 순회 규모를 항상 확인할 수 있습니다.
+   */
+  const progressTotal = progress?.total ?? initInfo?.totalPages ?? null;
+  /** 진행 바 현재 처리 페이지 (실행 전에는 0으로 표시) */
+  const progressCurrent = progress?.current ?? 0;
+
   return (
     <div className="w-full min-h-screen bg-[#0d131f] text-slate-100 flex flex-col p-4 box-border select-text font-sans">
       {/* 실행기 헤더 */}
@@ -161,19 +170,28 @@ export function ActionRunnerView({
         </button>
       </div>
 
-      {/* 감지된 페이지 수 + 진행 바 */}
+      {/* 감지된 페이지 수 + 전체 진행률 바 (실행 전에도 총 페이지 기준 0%로 상시 노출) */}
       <div className="py-2 space-y-1.5">
         {initInfo && <InitInfoView initInfo={initInfo} />}
-        {progress && (
+        {progressTotal !== null && (
           <div className="flex items-center gap-2">
-            <div className="h-1.5 flex-1 rounded-full bg-slate-800 overflow-hidden">
+            <div
+              role="progressbar"
+              aria-label="전체 페이지 순회 진행률"
+              aria-valuemin={0}
+              aria-valuemax={progressTotal}
+              aria-valuenow={progressCurrent}
+              className="h-1.5 flex-1 rounded-full bg-slate-800 overflow-hidden"
+            >
               <div
                 className="h-full rounded-full bg-sky-500 transition-all duration-300"
-                style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                style={{ width: `${(progressCurrent / progressTotal) * 100}%` }}
               />
             </div>
             <span className="shrink-0 text-[10px] text-slate-400">
-              {progress.current}/{progress.total}
+              {progress
+                ? `${progressCurrent}/${progressTotal}`
+                : `0/${progressTotal} (대기)`}
             </span>
           </div>
         )}

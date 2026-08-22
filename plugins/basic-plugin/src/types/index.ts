@@ -415,3 +415,13 @@ export interface XvBestOfRedSavedFileInfo {
   /** 프리뷰 mp4 저장 파일 절대 경로 (미저장 시 빈 문자열) */
   preview?: string;
 }
+
+/**
+ * 노드 환경설정(별칭) 저장 진행 상태 구분자.
+ * 설정 탭 저장 결과 배지의 색상을 결정하는 데 사용됩니다.
+ * - pending : 서버 전송 대기 중
+ * - success : 저장 완료 (서버 ACK 수신)
+ * - error   : 저장 실패 (서버 오류·응답 실패)
+ * - warning : 입력 검증 경고 (예: 빈 별칭)
+ */
+export type ConfigSaveState = "idle" | "pending" | "success" | "error" | "warning";

@@ -31,6 +31,7 @@ export default function Popup() {
     alias,
     setAlias,
     configSaveStatus,
+    configSaveState,
     isElementPicking,
     isFrameCollecting,
     hasFrame,
@@ -71,7 +72,8 @@ export default function Popup() {
 
   return (
     <div className="popup-container" style={popupContainerStyle}>
-      <Header />
+      {/* 헤더 (서버 연결 상태 배지 포함) */}
+      <Header isServerOnline={isServerOnline} />
       <TabBar activeTab={activeTab} onSelectTab={handleTabChange} />
 
       {/* 탭 콘텐츠 영역 (터미널 콘솔 위 공간) */}
@@ -116,6 +118,7 @@ export default function Popup() {
             alias={alias}
             onAliasChange={setAlias}
             configSaveStatus={configSaveStatus}
+            configSaveState={configSaveState}
             onSave={() => handleSaveClientConfig(alias)}
           />
         )}

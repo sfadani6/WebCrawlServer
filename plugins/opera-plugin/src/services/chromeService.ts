@@ -1,4 +1,4 @@
-// plugins/basic-plugin/src/services/chromeService.ts
+// plugins/opera-plugin/src/services/chromeService.ts
 
 import {
   BrowserInfo,

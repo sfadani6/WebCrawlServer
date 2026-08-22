@@ -1,4 +1,4 @@
-// plugins/basic-plugin/src/content.ts
+// plugins/opera-plugin/src/content.ts
 
 import { XvideosMediaEntry } from "./types/index.js";
 

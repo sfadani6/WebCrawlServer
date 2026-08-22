@@ -1,4 +1,4 @@
-// plugins/basic-plugin/src/hooks/useBestOfRedRunner.ts
+// plugins/opera-plugin/src/hooks/useBestOfRedRunner.ts
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import {

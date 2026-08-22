@@ -36,6 +36,7 @@ export default function SidePanel() {
     alias,
     setAlias,
     configSaveStatus,
+    configSaveState,
     isElementPicking,
     isFrameCollecting,
     hasFrame,
@@ -78,8 +79,8 @@ export default function SidePanel() {
 
   return (
     <div className="w-full h-screen bg-[#0d131f] text-slate-100 flex flex-col p-4 box-border overflow-hidden select-text font-sans">
-      {/* 사이드바 상단 헤더 */}
-      <Header />
+      {/* 사이드바 상단 헤더 (서버 연결 상태 배지 포함) */}
+      <Header isServerOnline={isServerOnline} />
 
       {/* 탭 전환 바 */}
       <div className="my-2">
@@ -132,6 +133,7 @@ export default function SidePanel() {
             alias={alias}
             onAliasChange={setAlias}
             configSaveStatus={configSaveStatus}
+            configSaveState={configSaveState}
             onSave={() => handleSaveClientConfig(alias)}
           />
         )}

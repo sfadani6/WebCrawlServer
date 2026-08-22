@@ -33,6 +33,9 @@
 ---
 ## Unreleased
 
+- 2026-08-22: 오페라 플러그인 UI/UX 개선 9건(헤더 오기·서버 배지·URL 복사·저장 배지·JSON 검증·진행률 바·콘솔 필터·접근성)을 양쪽 플러그인에 동기화 적용했습니다. 상세 내용은 [docs/CHANGELOG/opera-plugin-uiux-improvements-a-to-i-20260822225823.md](docs/CHANGELOG/opera-plugin-uiux-improvements-a-to-i-20260822225823.md) 를 참고하세요.
+- 2026-08-22: 오페라 플러그인 UI/UX 감사로 개선안 9건을 도출해 todo 예정 작업으로 등록하고, 그룹 버튼 기완료 상태를 재확인했습니다. 상세 내용은 [docs/CHANGELOG/opera-plugin-uiux-audit-todo-registration-20260822222710.md](docs/CHANGELOG/opera-plugin-uiux-audit-todo-registration-20260822222710.md) 를 참고하세요.
+- 2026-08-22: xvideos 페이징 액션 + 도움말 버튼을 연결형 그룹 버튼으로 재디자인하고 OpenCode 원장 실측·도움말 팝업 정적 검증을 완료했습니다. 상세 내용은 [docs/CHANGELOG/action-group-button-design-20260822221257.md](docs/CHANGELOG/action-group-button-design-20260822221257.md) 를 참고하세요.
 - 2026-08-22: `docs/todo.md` 완료 항목의 CHANGELOG 항목별 이관 및 목록 정리를 수행했습니다. 상세 내용은 [docs/CHANGELOG/todo-changelog-migration-cleanup-20260822203606.md](docs/CHANGELOG/todo-changelog-migration-cleanup-20260822203606.md) 를 참고하세요.
 - 2026-08-22: 오페라 플러그인 액션 실행에 도움말 레이어 팝업을 분리하고 인라인 설명을 제거했습니다. 상세 내용은 [docs/CHANGELOG/action-help-layer-popup-20260822185248.md](docs/CHANGELOG/action-help-layer-popup-20260822185248.md) 를 참고하세요.
 - 2026-08-22: OpenCode 로컬 세션 원장 기록 체계를 구축했습니다. 상세 내용은 [docs/CHANGELOG/opencode-local-session-logging-setup-20260822170705.md](docs/CHANGELOG/opencode-local-session-logging-setup-20260822170705.md) 를 참고하세요.
@@ -54,13 +57,4 @@
 - 2026-08-09: 플러그인 기본 탭 개편과 터미널 공통화를 적용했습니다. 상세 내용은 [docs/CHANGELOG/basic-tab-restructure-terminal-console-20260809205823.md](docs/CHANGELOG/basic-tab-restructure-terminal-console-20260809205823.md) 를 참고하세요.
 - 2026-08-09: 오페라 브라우저 전용 플러그인을 신설했습니다. 상세 내용은 [docs/CHANGELOG/opera-plugin-bootstrap-20260809100542.md](docs/CHANGELOG/opera-plugin-bootstrap-20260809100542.md) 를 참고하세요.
 - 2026-08-09: 클라이언트 4컬럼 재구성과 노드/워커 저장소 연동을 적용했습니다. 상세 내용은 [docs/CHANGELOG/client-four-column-node-worker-storage-20260809000000.md](docs/CHANGELOG/client-four-column-node-worker-storage-20260809000000.md) 를 참고하세요.
-- 2026-08-08: 관리자 네트워크 페이지의 런타임 크래시 원인 분석 및 해결 보고서를 작성했습니다. 상세 내용은 [docs/CHANGELOG/2026-08-08-admin-network-runtime-crash-report.md](docs/CHANGELOG/2026-08-08-admin-network-runtime-crash-report.md) 를 참고하세요.
-- 2026-08-08: 관리자 SPA 프록시 및 라우팅 복구 과정을 정리한 보고서를 추가했습니다. 상세 내용은 [docs/CHANGELOG/2026-08-08-admin-spa-proxy-routing-report.md](docs/CHANGELOG/2026-08-08-admin-spa-proxy-routing-report.md) 를 참고하세요.
-- 2026-08-08: 관리자 WebSocket 연결 상태 문제 원인 분석 및 대응 방안을 정리한 보고서를 추가했습니다. 상세 내용은 [docs/CHANGELOG/2026-08-08-admin-websocket-connection-report.md](docs/CHANGELOG/2026-08-08-admin-websocket-connection-report.md) 를 참고하세요.
-- 2026-08-08: 관리자 대시보드 문제의 통합 요약 문서를 추가했습니다. 상세 내용은 [docs/CHANGELOG/2026-08-08-admin-incident-summary.md](docs/CHANGELOG/2026-08-08-admin-incident-summary.md) 를 참고하세요.
-- 2026-08-08: 관리자 대시보드 문제의 개발자용 RCA 리포트를 추가했습니다. 상세 내용은 [docs/CHANGELOG/2026-08-08-admin-rca-report.md](docs/CHANGELOG/2026-08-08-admin-rca-report.md) 를 참고하세요.
-- 2026-08-08: 관리자 대시보드 문제의 운영/배포 관점 보고서를 추가했습니다. 상세 내용은 [docs/CHANGELOG/2026-08-08-admin-ops-deployment-report.md](docs/CHANGELOG/2026-08-08-admin-ops-deployment-report.md) 를 참고하세요.
-- 2026-08-08: 관리자 대시보드 문제를 표 형식으로 요약한 문서를 추가했습니다. 상세 내용은 [docs/CHANGELOG/2026-08-08-admin-problem-solution-verification-summary.md](docs/CHANGELOG/2026-08-08-admin-problem-solution-verification-summary.md) 를 참고하세요.
-- 2026-08-08: 관리자 대시보드 실무 담당자용 체크리스트 문서를 추가했습니다. 상세 내용은 [docs/CHANGELOG/2026-08-08-admin-operational-checklist.md](docs/CHANGELOG/2026-08-08-admin-operational-checklist.md) 를 참고하세요.
-- 2026-08-08: 관리자 대시보드 배포 전 확인항목 문서를 추가했습니다. 상세 내용은 [docs/CHANGELOG/2026-08-08-admin-pre-deployment-checklist.md](docs/CHANGELOG/2026-08-08-admin-pre-deployment-checklist.md) 를 참고하세요.
 

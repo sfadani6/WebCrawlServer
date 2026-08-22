@@ -9,6 +9,7 @@ import {
   PluginLogEntry,
   PluginLogType,
   ClientConfigAckPayload,
+  ConfigSaveState,
 } from "../types";
 import {
   fetchSocketStatus,
@@ -114,6 +115,23 @@ export function usePopupState() {
   // 환경설정(별칭) 상태 — chrome.storage.local에 보관하여 재로드 시 유지
   const [alias, setAlias] = useState<string>("");
   const [configSaveStatus, setConfigSaveStatus] = useState<string>("");
+  /** 별칭 저장 진행 상태 구분자 — 설정 탭 저장 결과 배지 색상 결정용 */
+  const [configSaveState, setConfigSaveState] = useState<ConfigSaveState>("idle");
+
+  /**
+   * 별칭 저장 상태 메시지와 배지 상태를 한 번에 갱신하는 헬퍼.
+   * 메시지 문자열과 배지 종류가 어긋나는 것을 방지합니다.
+   *
+   * @param state - 저장 진행 상태 구분자 (배지 색상)
+   * @param text - 사용자에게 표시할 결과 메시지
+   */
+  const applyConfigSaveStatus = useCallback(
+    (state: ConfigSaveState, text: string) => {
+      setConfigSaveState(state);
+      setConfigSaveStatus(text);
+    },
+    [],
+  );
 
   /** 콘솔 높이 드래그 시작 시점 정보 (시작 Y 좌표와 시작 높이) */
   const consoleDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
@@ -454,10 +472,10 @@ export function usePopupState() {
       if (message.type === "CLIENT_CONFIG_ACK_RECEIVED" && message.packet) {
         const ack = message.packet.payload as ClientConfigAckPayload | undefined;
         if (ack && ack.success) {
-          setConfigSaveStatus(`별칭 저장 완료: ${ack.alias || ""}`);
+          applyConfigSaveStatus("success", `별칭 저장 완료: ${ack.alias || ""}`);
           addTerminalLog(`별칭 저장 완료 (서버 반영): ${ack.alias || ""}`, "success");
         } else {
-          setConfigSaveStatus("별칭 저장 실패 (서버 응답 오류)");
+          applyConfigSaveStatus("error", "별칭 저장 실패 (서버 응답 오류)");
           addTerminalLog("별칭 저장 실패: 서버가 ACK를 거부했습니다.", "error");
         }
       }
@@ -490,7 +508,7 @@ export function usePopupState() {
       chrome.tabs.onActivated.removeListener(onTabActivated);
       chrome.tabs.onUpdated.removeListener(onTabUpdated);
     };
-  }, [checkSocketStatus, addTerminalLog, refreshCurrentTabInfo]);
+  }, [checkSocketStatus, addTerminalLog, refreshCurrentTabInfo, applyConfigSaveStatus]);
 
   /**
    * 사용자가 입력한 디버그 메시지를 JSON으로 파싱해 서버에 전송합니다.
@@ -606,12 +624,12 @@ export function usePopupState() {
     async (newAlias: string) => {
       const trimmed = newAlias.trim();
       if (!trimmed) {
-        setConfigSaveStatus("별칭을 입력해 주세요.");
+        applyConfigSaveStatus("warning", "별칭을 입력해 주세요.");
         addTerminalLog("별칭 저장 실패: 빈 별칭은 허용되지 않습니다.", "warning");
         return;
       }
 
-      setConfigSaveStatus("서버에 별칭 저장 중...");
+      applyConfigSaveStatus("pending", "서버에 별칭 저장 중...");
       addTerminalLog(`별칭 저장 요청 전송: ${trimmed}`, "info");
 
       // 1. 로컬 스토리지 보관 (재로드 시 유지)
@@ -626,13 +644,13 @@ export function usePopupState() {
       if (res.success) {
         // 실제 DB 반영은 ACK 수신 리스너에서 처리하며, 여기서는 전송 성공만 안내
         setAlias(trimmed);
-        setConfigSaveStatus("전송 완료 (서버 반영 대기 중)");
+        applyConfigSaveStatus("success", "전송 완료 (서버 반영 대기 중)");
       } else {
-        setConfigSaveStatus(`별칭 저장 실패: ${res.message}`);
+        applyConfigSaveStatus("error", `별칭 저장 실패: ${res.message}`);
         addTerminalLog(`별칭 저장 실패: ${res.message}`, "error");
       }
     },
-    [addTerminalLog],
+    [addTerminalLog, applyConfigSaveStatus],
   );
 
   /** 탭 전환 핸들러 (전환 이력을 터미널 콘솔에 기록) */
@@ -698,6 +716,7 @@ export function usePopupState() {
     alias,
     setAlias,
     configSaveStatus,
+    configSaveState,
     isElementPicking,
     isFrameCollecting,
     hasFrame,

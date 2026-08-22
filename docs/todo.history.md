@@ -2,6 +2,89 @@
 
 ---
 
+## 2026-08-22 | 오페라 플러그인 UI/UX 개선 9건(A~I) 전체 실행 및 basic-plugin 동기화
+
+### 요청
+- docs/todo.md 예정 작업(오페라 플러그인 UI/UX 개선 9건)을 전부 처리할 것.
+
+### 처리 내용
+- [A] opera-plugin 헤더 경로 주석 6파일 수정(R-00106 위반 해소, 전수 재검사 0건).
+- [B] Header 타이틀 "WebCrawlServer basic" → "WebCrawlServer opera" 수정.
+- [C] Header에 서버 연결 상태 배지(.server-status-badge on/off) 추가 — sidepanel/popup 엔트리에서 isServerOnline 전달.
+- [D] URL 카드 클립보드 복사 버튼(복사 성공 2초 피드백) 추가.
+- [E] ConfigSaveState 타입(idle/pending/success/error/warning) 신설, usePopupState 헬퍼로 메시지·배지 동시 갱신, SettingsTab 칩+배지 렌더링.
+- [F] DebugTab 실시간 JSON 검증 — 오류 시 경고 박스 표시 + 전송 버튼 비활성화.
+- [G] 액션 실행기 진행률 바를 대기 상태에도 상시 노출(0/N 대기) + progressbar ARIA. (감찰 정정: 실행 중 바는 기존 존재)
+- [H] TerminalConsole 로그 레벨 필터 칩 5종·검색 인풋·.log 내보내기 버튼 추가.
+- [I] TabBar WAI-ARIA 탭 패턴, 전역 :focus-visible 포커스 링, 리사이즈 바 role="separator" 등 접근성 보강.
+- 변경 16종(TS 15 + popup.css)을 basic-plugin에 동기화 — 파일별 diff는 헤더 경로 주석 1줄만 상이.
+
+### 변경된 파일
+- `plugins/{opera,basic}-plugin/src/**` 32파일(양방향 동기화), `docs/CHANGELOG/opera-plugin-uiux-improvements-a-to-i-20260822225823.md`(신규), `docs/CHANGELOG.md`, `docs/todo.md`, `docs/askLogs/ask-20260822225823.md`(신규)
+
+### 검증 결과
+- basic/opera 각각 tsc --noEmit exit 0, vite build 성공, dist CSS 신규 클래스 출력 확인
+- eslint plugins 지적 0건(admin 기존 14건 변동 없음)
+- 이슈: Set-Content 단일 라인 덮어쓰기로 popup.css 일시 손상 → git checkout 복구 후 라인 배열 유지 방식으로 재동기화, 최종 무손실
+
+### 보류 항목
+- 브라우저 실측(사용자 수동): 신규 UI 요소(헤더 배지/복사/저장 배지/JSON 차단/대기 진행 바/콘솔 필터·검색·내보내기/포커스 링) 동작 확인
+
+---
+
+## 2026-08-22 | 오페라 플러그인 UI/UX 감사 — 개선안 9건 todo 등록 및 그룹 버튼 기완료 재확인
+
+### 요청
+- 액션실행의 xvideos 페이징 액션 버튼과 도움말(?) 버튼을 그룹 버튼으로 디자인할 것.
+- 현재 오페라 플러그인의 UI/UX 개선안을 todo 항목으로 만들 것.
+
+### 처리 내용
+- 1항은 직전 세션에서 이미 구현·검증 완료됨을 확인(BasicTab.tsx:440 `btn-group`, popup.css 토큰 3종)하고 재작업 없이 기록만 정리.
+- opera-plugin src 전수 실측으로 UI/UX 개선안 9건 도출: [A] 헤더 경로 주석 오기 6파일(R-00106 위반), [B] Header 타이틀 "basic" 오기, [C] 서버 상태 인디케이터 부재, [D] URL 복사 버튼 부재, [E] 설정 저장 배지 미통일, [F] 디버그 JSON 검증 부재, [G] 실행기 팝업 진행률 바 부재, [H] 콘솔 필터·검색·내보내기 부재, [I] 접근성 속성 미통일.
+- 사용자 승인(전체 등록) 후 `docs/todo.md` 예정 작업 섹션에 우선순위[높음|중간|낮음]+파일:라인 근거로 등록.
+- CHANGELOG.md 인덱스 정합성 검사 중 docs/ 하위에 실존하지 않는 2026-08-08 보고서 링크 9건(18링크) 발견 — 해당 행 삭제로 끊긴 링크 0건 정리.
+
+### 변경된 파일
+- `docs/todo.md`, `docs/CHANGELOG/opera-plugin-uiux-audit-todo-registration-20260822222710.md`(신규), `docs/CHANGELOG.md`, `docs/askLogs/ask-20260822222710.md`(신규)
+
+### 검증 결과
+- 그룹 버튼 기구현 코드 위치 재확인 완료(재작업 불필요 판정).
+- 헤더 오기 6건은 파일 1열 주석과 실제 상대경로 불일치 비교로 확정.
+- CHANGELOG 링크↔실제 파일명 일치 확인.
+
+### 보류 항목
+- 예정 작업 A~I 9건 실행 — 사용자가 개별 항목 승인 시 진행.
+
+---
+
+## 2026-08-22 | xvideos 페이징 액션 + 도움말 버튼 연결형 그룹 버튼 디자인 및 잔여 검증 처리
+
+### 요청
+- 액션 실행의 "xvideos 페이징 액션" 버튼과 도움말(?) 버튼 두 개를 그룹 버튼으로 디자인할 것 (버튼이 떨어져 있어 공간 활용이 나쁘다는 지적).
+- (세션 선행) 이전 요청의 잔여 검증: OpenCode 재시작 후 질문/응답/도구 이벤트 원장 기록 실측.
+
+### 처리 내용
+- `popup.css`(basic/opera)에 연결형 그룹 버튼 토큰 신설 — `.btn-group`(flex+stretch 컨테이너), `.btn-group-main`(flex:1, `border-radius: 8px 0 0 8px`), `.btn-group-help`(`border-radius: 0 8px 8px 0`, `border-left: none`로 중앙 1px 경계선 공유).
+- 양 플러그인 `BasicTab.tsx` 실행 버튼 행을 `flex items-stretch gap-2` → `btn-group mt-2`로 교체하고 버튼 클래스를 각각 `btn-secondary btn-group-main`, `btn-help-round btn-group-help`로 변경. 도움말 버튼은 액션 disabled와 무관하게 클릭 가능 유지.
+- OpenCode 원장 실측 완료 — `.opencode/logs/2026-08-22.jsonl`에서 `chat.text`(질문)/`message.updated`(응답)/`chat.tool`(도구 running·completed) 기록 확인, 세션 진행 중 158→314줄 실시간 증가 확인.
+- 도움말 팝업(`ActionHelpModal.tsx`) 코드 정적 검증 완료 — 배경 클릭/ESC/✕ 3종 닫기 경로, basic-opera diff 0 확인.
+- 세션 도중 사용자가 todo.md 예정 작업 블록(브라우저 실측 13건)을 직접 삭제 — 완료 검증 2건은 CHANGELOG 문서 1건으로 통합 기록.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/popup.css`, `plugins/opera-plugin/src/popup.css`
+- `plugins/basic-plugin/src/components/tabs/BasicTab.tsx`, `plugins/opera-plugin/src/components/tabs/BasicTab.tsx`
+- `docs/CHANGELOG/action-group-button-design-20260822221257.md`(신규), `docs/CHANGELOG.md`, `docs/todo.md`, `docs/askLogs/ask-20260822221257.md`(신규)
+
+### 검증 결과
+- basic-plugin vite build 성공(1.91s), opera-plugin vite build 성공(2.05s), tsc --noEmit exit 0
+- 양쪽 `dist/chromeService.css`에 신규 클래스 출력 확인
+- basic/opera 소스 diff = 헤더 경로 주석 1줄만 상이, 루트 eslint plugins 지적 0건
+
+### 보류 항목
+- 브라우저 실측(사용자 수동): 그룹 버튼 시각 결합·호버 경계선, 도움말 팝업 표시 및 ✕/배경 클릭/ESC 닫기 동작
+
+---
+
 ## 2026-08-22 | todo.md 완료 항목 CHANGELOG 이관 및 목록 정리
 
 ### 요청

@@ -148,8 +148,27 @@ export function BasicTab({
   const [sendMode, setSendMode] = useState<DomSendMode>("full");
   // xvideos 페이징 액션 도움말 레이어 팝업 표시 여부
   const [isActionHelpOpen, setIsActionHelpOpen] = useState<boolean>(false);
+  // URL 복사 완료 표시 여부 (복사 성공 후 2초간 true)
+  const [urlCopied, setUrlCopied] = useState<boolean>(false);
   // 현재 페이지와 매칭된 사이트 전용 도메인 (없으면 null)
   const matchedSite = matchSiteDomain(currentUrl);
+
+  /**
+   * 현재 페이지 URL을 클립보드로 복사합니다.
+   * 복사 성공 시 버튼 문구를 2초간 "복사됨"으로 전환해 피드백을 제공합니다.
+   *
+   * @returns Promise<void>
+   */
+  const handleCopyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(currentUrl);
+      setUrlCopied(true);
+      window.setTimeout(() => setUrlCopied(false), 2000);
+    } catch (error) {
+      // 클립보드 권한 거부 등 실패 시 콘솔에만 기록 (UI 상태 유지)
+      console.error("[BasicTab] URL 클립보드 복사 실패:", error);
+    }
+  };
 
   /** 섹션 아코디언 토글 핸들러 */
   const toggleSection = (section: string) => {
@@ -204,7 +223,19 @@ export function BasicTab({
         <span className="url-label">
           현재 페이지 URL <span className="text-sky-400/80">(자동 갱신)</span>
         </span>
-        <div className="url-value truncate">{currentUrl}</div>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="url-value truncate">{currentUrl}</div>
+          {/* URL 클립보드 복사 버튼 — 클릭 즉시 복사되며 2초간 완료 문구로 전환 */}
+          <button
+            type="button"
+            onClick={handleCopyUrl}
+            aria-label="현재 페이지 URL 클립보드 복사"
+            title={urlCopied ? "복사 완료" : "URL 복사"}
+            className={`btn-mini shrink-0 ${urlCopied ? "on" : ""}`}
+          >
+            {urlCopied ? "복사됨" : "복사"}
+          </button>
+        </div>
       </div>
 
       {/* 처리 상태 안내 메시지 */}
@@ -436,8 +467,8 @@ export function BasicTab({
                 </span>
               </div>
 
-              {/* 실행 버튼 + 도움말 아이콘 행 (상세 설명은 레이어 팝업으로 이관) */}
-              <div className="flex items-stretch gap-2 mt-2">
+              {/* 실행 버튼 + 도움말 아이콘 연결형 그룹 버튼 (상세 설명은 레이어 팝업으로 이관) */}
+              <div className="btn-group mt-2">
                 <button
                   onClick={onOpenXvBestOfRedAction}
                   disabled={
@@ -449,7 +480,7 @@ export function BasicTab({
                       ? "현재 페이지의 카테고리·월(예: /best/2026-03)부터 마지막 페이지까지 순차 이동하며 각 페이지 비디오 메타를 수집·저장 (전용 팝업 창)"
                       : "xvideos.com 또는 xvideos.red 페이징 페이지에서 사용할 수 있습니다"
                   }
-                  className="btn-secondary flex-1"
+                  className="btn-secondary btn-group-main"
                 >
                   xvideos 페이징 액션
                 </button>
@@ -458,7 +489,7 @@ export function BasicTab({
                   onClick={() => setIsActionHelpOpen(true)}
                   aria-label="xvideos 페이징 액션 도움말"
                   title="도움말"
-                  className="btn-help-round shrink-0"
+                  className="btn-help-round btn-group-help"
                 >
                   ?
                 </button>

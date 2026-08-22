@@ -70,6 +70,29 @@ html, body {
   letter-spacing: -0.02em;
 }
 
+/* 서버 연결 상태 배지 — 헤더 우측에서 WebSocket 온라인 여부를 색상으로 즉시 구별 */
+.server-status-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.4;
+  border: 1px solid transparent;
+}
+
+.server-status-badge.on {
+  color: #34d399;
+  background-color: rgba(16, 185, 129, 0.12);
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.server-status-badge.off {
+  color: #f87171;
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
 /* 2. 탭 스위칭 네비게이션 바 */
 .tab-bar {
   display: flex;
@@ -412,6 +435,98 @@ html, body {
   background-color: #334155;
   border-color: #38bdf8;
   color: #7dd3fc;
+}
+
+/* 연결형 그룹 버튼 컨테이너 — 주 액션 버튼(좌)과 도움말(?) 버튼(우)을 한 덩어리로 결합해 여백 낭비 제거 */
+.btn-group {
+  display: flex;
+  align-items: stretch;
+}
+
+/* 그룹 좌측 주 액션 버튼 — 남은 폭을 전부 차지하고 우측 모서리를 각지게 하여 도움말 버튼과 맞닿음 */
+.btn-group-main {
+  flex: 1;
+  border-radius: 8px 0 0 8px;
+}
+
+/* 그룹 우측 도움말 버튼 — 반원 형태로 우측을 마감하고 좌변을 제거해 중앙 경계선이 1px로 공유됨 */
+.btn-group-help {
+  min-width: 36px;
+  padding: 0 10px;
+  border-radius: 0 8px 8px 0;
+  border-left: none;
+}
+
+/* 설정 저장 결과 배지 — 저장 상태(configSaveState)별로 색상을 달리해 결과를 즉시 구별 */
+.save-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  border: 1px solid transparent;
+}
+
+/* 배지 좌측 상태 칩 (성공/실패/저장 중/경고 라벨) */
+.save-status-chip {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background-color: rgba(148, 163, 184, 0.15);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.save-status-success {
+  color: #34d399;
+  background-color: rgba(16, 185, 129, 0.12);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.save-status-error {
+  color: #f87171;
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.save-status-warning {
+  color: #fbbf24;
+  background-color: rgba(245, 158, 11, 0.1);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.save-status-pending {
+  color: #7dd3fc;
+  background-color: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+/* 터미널 콘솔 로그 검색 입력 — 필터 행 우측에 배치되는 소형 다크 인풋 */
+.console-search-input {
+  min-width: 90px;
+  padding: 3px 8px;
+  font-size: 10px;
+  color: #e2e8f0;
+  background-color: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.console-search-input:focus {
+  border-color: #38bdf8;
+}
+
+/* 키보드 포커스 링 통일 — 모든 대화형 요소가 동일한 하늘색 포커스 표시를 받도록 강제 */
+:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
 }
 
 /* 4. 푸터 하단 정보 */

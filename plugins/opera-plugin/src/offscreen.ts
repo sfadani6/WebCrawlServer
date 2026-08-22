@@ -1,4 +1,4 @@
-// plugins/basic-plugin/src/offscreen.ts
+// plugins/opera-plugin/src/offscreen.ts
 
 import { PLUGIN_CONFIG, getWebSocketUrl } from "./config/pluginConfig.js";
 import {

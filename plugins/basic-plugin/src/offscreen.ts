@@ -27,7 +27,7 @@ const mediaAckWaiters = new Map<
 
 /**
  * 서버 페이지 저장 완료 ACK(CRAWL_PARTIAL_SAVED) 대기자 맵 (requestId → 해소 함수).
- * best-of-red 액션 실행기가 "실제 파일 저장 확인 후 다음 페이지 이동"을 보장하기 위해
+ * xvideos 페이징 액션 실행기가 "실제 파일 저장 확인 후 다음 페이지 이동"을 보장하기 위해
  * SEND_SOCKET_PACKET(CRAWL_PARTIAL) 응답을 ACK 수신까지 보류합니다.
  */
 const partialSaveWaiters = new Map<
@@ -213,26 +213,34 @@ async function handleFetchMediaBundle(
 }
 
 /**
- * best-of-red 페이지의 모든 비디오 엔트리 자산(메인/보조 썸네일 + 프리뷰 mp4)을
+ * xvideos 페이징 페이지의 모든 비디오 엔트리 자산(메인/보조 썸네일 + 프리뷰 mp4)을
  * 동시성 제한(3)으로 fetch 인출해 엔트리별 CRAWL_IMAGE 번들로 서버에 저장하고
  * 각각의 CRAWL_MEDIA_SAVED ACK를 확인한 뒤 집계 결과를 반환합니다.
  * 안정 우선 정책에 따라 한 번에 3개까지만 병렬로 인출·전송합니다.
  *
  * @param page - 페이지 인덱스
  * @param entries - 페이지에서 수집된 비디오 엔트리 목록
- * @param pathSegments - 저장 계층 경로 (예: ["best-of-red","2026-06","16"])
+ * @param pathSegments - URL 기반 저장 계층 경로 (예: ["best","2026-03","1"])
+ * @param pageUrl - 실제 페이지 URL (서버 저장 도메인 산출 기준, images/<도메인>/... 생성)
  * @returns 페이지 미디어 저장 집계 결과
  */
 async function handleFetchPageMediaBundles(
   page: number,
   entries: XvideosMediaEntry[],
   pathSegments: string[],
+  pageUrl: string,
 ): Promise<XvBestOfRedMediaResult> {
   const savedFiles: string[] = [];
   const failedEntries: Array<{ eid: string; reason: string }> = [];
   const entryFiles: XvBestOfRedSavedFileInfo[] = [];
   let savedCount = 0;
   let failedCount = 0;
+
+  // pathSegments는 URL 기반 [세그먼트, YYYY-MM, 페이지] 구조입니다.
+  // 첫 세그먼트는 카테고리로 분리하고 나머지(YYYY-MM/페이지)만 저장 계층으로 전달합니다.
+  // (이전 버전은 images/common/best-of-red/best-of-red/... 이중 폴더를 생성했음)
+  const category = pathSegments.length > 0 ? pathSegments[0] : "normal";
+  const mediaSegments = pathSegments.slice(1);
 
   // 동시성 제한 (안정 우선: 최대 3개 동시 인출·전송)
   const CONCURRENCY = 3;
@@ -249,10 +257,12 @@ async function handleFetchPageMediaBundles(
         try {
           const result = await handleFetchMediaBundle(bundleId, entry, {
             baseName,
-            category: "best-of-red",
+            category,
             clickUrl: entry.clickUrl,
             title: entry.title,
-            pathSegments,
+            pathSegments: mediaSegments,
+            // 서버가 실제 도메인(xvideos.com/xvideos.red)으로 images/<도메인>/... 폴더를 생성하도록 전달
+            pageUrl,
             timestamp: Date.now(),
           });
           const ack = result.ack as Record<string, unknown> | undefined;
@@ -456,7 +466,7 @@ async function connectOffscreenSocket(): Promise<void> {
       }
 
       // 페이지 단위 JSON 저장 완료 ACK(CRAWL_PARTIAL_SAVED) 수신 시 대기 중인 promise 해소
-      // (best-of-red 액션 실행기의 실제 파일 저장 확인용)
+      // (xvideos 페이징 액션 실행기의 실제 파일 저장 확인용)
       if (
         packet.action === "CRAWL_PARTIAL_SAVED" &&
         packet.payload &&
@@ -569,7 +579,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
         // CRAWL_PARTIAL에 requestId가 있으면 서버의 CRAWL_PARTIAL_SAVED ACK까지
         // 응답을 보류해 실제 물리 파일 저장을 확인한 뒤 결과를 반환합니다.
-        // (best-of-red 액션 실행기: "서버 저장 완료 확인 후 다음 페이지 이동" 보장)
+        // (xvideos 페이징 액션 실행기: "서버 저장 완료 확인 후 다음 페이지 이동" 보장)
         const partialPayload =
           message.packet.payload && typeof message.packet.payload === "object"
             ? (message.packet.payload as Record<string, unknown>)
@@ -693,18 +703,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
-  // best-of-red 페이지 미디어 전체 인출·저장: 페이지의 모든 엔트리 자산을
+  // xvideos 페이징 페이지 미디어 전체 인출·저장: 페이지의 모든 엔트리 자산을
   // 동시성 제한으로 서버에 번들 저장하고 집계 결과를 반환합니다.
   if (message.type === "FETCH_PAGE_MEDIA_BUNDLES" && message.payload) {
     const payload = message.payload as {
       page: number;
       entries: XvideosMediaEntry[];
       pathSegments: string[];
+      pageUrl?: string;
     };
     handleFetchPageMediaBundles(
       typeof payload.page === "number" ? payload.page : 0,
       Array.isArray(payload.entries) ? payload.entries : [],
       Array.isArray(payload.pathSegments) ? payload.pathSegments : [],
+      typeof payload.pageUrl === "string" ? payload.pageUrl : "",
     )
       .then((result) => {
         try {

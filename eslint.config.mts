@@ -12,8 +12,9 @@ const projectRootDir = dirname(fileURLToPath(import.meta.url));
 // 모노레포 전체 워크스페이스에 통합 적용할 Flat Config 정의 선언
 const config: Linter.Config[] = [
   {
-    // 정적 스타일 규칙 검사 대상에서 제외할 빌드 부산물 디렉토리 목록 명시
-    ignores: ["**/dist/**", "**/node_modules/**", "**/public/**"],
+    // 정적 스타일 규칙 검사 대상에서 제외할 빌드 부산물 및 도구 전용 디렉토리 목록 명시
+    // (.opencode는 OpenCode 로컬 설정/플러그인/로그 영역으로 tsconfig 프로젝트 범위 밖이므로 제외)
+    ignores: ["**/dist/**", "**/node_modules/**", "**/public/**", ".opencode/**"],
   },
   {
     // 분석 대상 소스코드 포맷 범위 지정 (TypeScript 전체 범위 적용)

@@ -227,6 +227,12 @@
 - `src/background.ts`의 `chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })` 호출은 오페라에서 `chrome.sidePanel`이 `undefined`이므로 **옵셔널 체이닝(`chrome.sidePanel?.setPanelBehavior(...)`)으로 가드**하여 예외를 방지합니다.
 - 오페라에서 `chrome.offscreen` 및 `chrome.runtime.getContexts` 지원 여부는 오페라 버전에 따라 상이할 수 있으며, 오프스크린 미지원 시 무중단 웹소켓 폴백 대응은 로드 테스트 결과에 따라 별도 ADR로 규정합니다.
 
+### 6.4 동기화 시 재발 방지 주의 (필수)
+
+- basic-plugin에서 변경 사항을 동기화할 때 `public/manifest.json`을 **통째로 복사하면 `sidePanel` 퍼미션과 `side_panel` 키가 오페라 manifest에 회귀**하여 `Permission 'sidePanel' is unknown` 오류가 재발합니다(ask-20260809100542 적용 후 ask-20260811011205에서 실제 재발 확인).
+- manifest 동기화는 **§6.2 오페라 전문 기준으로 diff를 반영**해야 하며, 다음 3가지는 반드시 유지합니다: ① `permissions`에 `sidePanel` 미포함 ② `sidebar_action` 키(`default_panel` 필수) 사용, `side_panel` 키 미사용 ③ name/description 오페라 명시 문구.
+- 빌드 후 `dist/manifest.json`으로 §7 검증 절차를 실행해 회귀 여부를 확인합니다.
+
 ---
 
 ## 7. 오페라 플러그인 검증 절차

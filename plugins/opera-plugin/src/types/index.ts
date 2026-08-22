@@ -181,7 +181,7 @@ export interface CrawlMediaBundlePayload {
   title?: string;
   /** 플러그인이 생성한 txt 메타 원문 (서버가 그대로 저장) */
   txtContent?: string;
-  /** 계층 저장 경로 세그먼트 (예: best-of-red 액션: ["best-of-red","2026-06","16"]) — 지정 시 해당 폴더에 저장 */
+  /** 계층 저장 경로 세그먼트 (예: xvideos 페이징 액션: ["best","2026-03","1"]) — 지정 시 해당 폴더에 저장 */
   pathSegments?: string[];
   /** 자산 목록 (최대 3종: thumb/sfw/preview) */
   assets?: MediaAssetPayload[];
@@ -345,9 +345,9 @@ export interface ProcessorInfo {
   maxTouchPoints: number;
 }
 
-/** xvideos best-of-red 초기 정보 응답 구조체 (COLLECT_BEST_OF_RED_INIT) */
+/** xvideos 페이징 초기 정보 응답 구조체 (COLLECT_BEST_OF_RED_INIT) */
 export interface XvBestOfRedInitData {
-  /** best-of-red 베이스 경로 (예: "/best-of-red/2026-06", 후행 슬래시 없음) */
+  /** 페이징 베이스 경로 (예: "/best/2026-03", 후행 슬래시 없음 — 현재 URL 분석 결과) */
   basePath: string;
   /** 현재 페이지 인덱스 (0 = 베이스 URL) */
   currentPage: number;
@@ -359,9 +359,9 @@ export interface XvBestOfRedInitData {
   url: string;
 }
 
-/** xvideos best-of-red 페이지 수집 응답 구조체 (COLLECT_BEST_OF_RED_PAGE) */
+/** xvideos 페이징 페이지 수집 응답 구조체 (COLLECT_BEST_OF_RED_PAGE) */
 export interface XvBestOfRedPageData {
-  /** 로드 완료 검증 여부 (네트워크 안정 + DOM 안정 + 썸네일 이미지 로드) */
+  /** 로드 완료 검증 여부 (네트워크 안정 + DOM 안정 + 기대 URL 일치) */
   ready: boolean;
   /** 수집 시점 페이지 인덱스 */
   page: number;
@@ -373,9 +373,22 @@ export interface XvBestOfRedPageData {
   data: XvideosMediaEntry[];
   /** 결과 메시지 */
   message: string;
+  /** 브라우저 네트워크 상태 모니터링 결과 (로드 검증 시점) */
+  network?: {
+    /** 페이지 내 인-플라이트 네트워크 요청 수 */
+    inflight: number;
+    /** 성능 리소스 엔트리 수 */
+    resources: number;
+    /** 네트워크 안정 판정 여부 */
+    stable: boolean;
+  };
+  /** 로드 검증에 소요된 대기 시간 (ms) */
+  waitedMs?: number;
+  /** 로드 검증 시점 탭 가시성 (visible/hidden — 백그라운드 판정용) */
+  visibilityState?: string;
 }
 
-/** xvideos best-of-red 페이지 미디어 번들 저장 결과 구조체 (FETCH_PAGE_MEDIA_BUNDLES 응답) */
+/** xvideos 페이징 페이지 미디어 번들 저장 결과 구조체 (FETCH_PAGE_MEDIA_BUNDLES 응답) */
 export interface XvBestOfRedMediaResult {
   /** 전체 성공 여부 (실패 엔트리가 0개일 때만 true) */
   success: boolean;
@@ -391,7 +404,7 @@ export interface XvBestOfRedMediaResult {
   failedEntries: Array<{ eid: string; reason: string }>;
 }
 
-/** xvideos best-of-red 페이지 저장 결과 구조체 (엔트리별 로컬 저장 파일 경로) */
+/** xvideos 페이징 페이지 저장 결과 구조체 (엔트리별 로컬 저장 파일 경로) */
 export interface XvBestOfRedSavedFileInfo {
   /** 엔트리 EID */
   eid: string;

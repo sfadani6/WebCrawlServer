@@ -22,25 +22,43 @@ export interface PaginationCrawlPayload {
 }
 
 /**
- * best-of-red URL 인식 정규식입니다.
- * 베이스 경로(/best-of-red/<월>, 후행 슬래시 유무 무관)와 선택 페이지 인덱스(/best-of-red/<월>/N)를 캡처합니다.
+ * xvideos 페이징 URL 인식 정규식입니다.
+ * 베이스 경로(/<세그먼트>/<YYYY-MM>, 후행 슬래시 유무 무관)와 선택 페이지 인덱스(/<세그먼트>/<YYYY-MM>/N)를 캡처합니다.
+ * URL 기반 파싱이므로 카테고리 세그먼트가 best-of-red, best, porn 등 무엇이든 동일하게 동작합니다.
+ * 예: /best/2026-03, /best-of-red/2026-06/16
  */
-const XV_BEST_OF_RED_BASE_RE = /^(\/best-of-red\/[^/]+)(?:\/(\d+))?\/?$/;
+const XV_BEST_OF_RED_BASE_RE = /^(\/[^/]+\/\d{4}-\d{2})(?:\/(\d+))?\/?$/;
 
-/** best-of-red 페이지 완전 로드 대기 상한 시간 (ms, 네트워크 안정 + DOM 안정 + 이미지 완료) */
+/**
+ * xvideos 페이징 액션 지원 호스트 판정 함수입니다.
+ * xvideos.com과 xvideos.red 및 그 서브도메인(www. 등)만 허용합니다.
+ *
+ * @param hostname 대상 호스트명 (예: "www.xvideos.red")
+ * @returns 지원 도메인이면 true
+ */
+function isXvideosHost(hostname: string): boolean {
+  const host = hostname.replace(/^www\./, "").toLowerCase();
+  return host === "xvideos.com" || host === "xvideos.red";
+}
+
+/** xvideos 페이징 페이지 완전 로드 대기 상한 시간 (ms, 네트워크 안정 + DOM 안정) */
 const XV_BEST_OF_RED_IMAGE_WAIT_MS = 20000;
-/** best-of-red 로드 검증 폴링 간격 (ms) */
+/** xvideos 페이징 로드 검증 폴링 간격 (ms) */
 const XV_BEST_OF_RED_READY_POLL_MS = 400;
-/** best-of-red 로드 안정 판정을 위한 연속 동일 관측 횟수 (폴링 간격 × 횟수 = 안정 윈도우) */
+/** xvideos 페이징 로드 안정 판정을 위한 연속 동일 관측 횟수 (폴링 간격 × 횟수 = 안정 윈도우) */
 const XV_BEST_OF_RED_STABLE_POLLS = 3;
+/** 기대 페이지 URL과 현재 페이지 경로가 다를 때 대기하는 최대 시간 (ms, 이전/새 페이지 구분 방어) */
+const XV_BEST_OF_RED_URL_WAIT_MS = 8000;
+/** 화면 밖 lazy 블록 렌더링 유도를 위한 재스크롤 간격 (ms) */
+const XV_BEST_OF_RED_RESCROLL_MS = 2000;
 
 /**
  * 페이지 AJAX/네트워크 인-플라이트 요청 카운터입니다.
- * best-of-red 페이지의 비디오 블록은 lazy 로드(XHR/스크립트)로 지연 렌더링되므로,
+ * xvideos 페이징 페이지의 비디오 블록은 lazy 로드(XHR/스크립트)로 지연 렌더링되므로,
  * 로드 완료 판정 시점에 실제로 진행 중인 요청이 남아있는지 감시하는 데 사용합니다.
- * XHR.open/fetch를 패치해 전송(시작)과 종료(완료)를 카운팅합니다.
- * (콘텐츠 스크립트 주입 이전의 초기 요청은 카운트에 잡히지 않지만,
- *  리소스 타이밍 증가 안정 판정과 함께 사용해 누락을 보완합니다.)
+ * XHR.send/fetch 시작 시점에 카운트하고, 완료(loadend) 시점에 차감합니다.
+ * (open이 아니라 send 시점에 카운트해, open만 되고 전송되지 않은 재사용/폐기 XHR
+ *  객체가 카운터를 누수시키는 문제를 차단합니다.)
  */
 let pageInflightCount = 0;
 
@@ -48,34 +66,29 @@ let pageInflightCount = 0;
  * 페이지의 XHR/fetch 인-플라이트 요청을 감시하도록 전역 네트워크 API를 패치합니다.
  * 모듈 로드 시 1회 실행되며, 감시 자체가 페이지 로딩을 방해하지 않도록
  * 원본 구현을 호출한 뒤 카운터만 증감합니다. (예외 발생 시 원본 동작에 영향 없음)
+ * 콘텐츠 스크립트가 document_start에 주입되므로 페이지 초기 XHR/fetch도 감시됩니다.
  */
 function installNetworkActivityWatch(): void {
   try {
-    const originalXhrOpen = window.XMLHttpRequest.prototype.open;
     const originalXhrSend = window.XMLHttpRequest.prototype.send;
-    window.XMLHttpRequest.prototype.open = function (
-      this: XMLHttpRequest,
-      method: string,
-      url: string | URL,
-      ...rest: unknown[]
-    ) {
-      // 전송 시점에 요청 시작으로 카운트 (보안 경고용 세 번째 인자 등은 그대로 전달)
-      pageInflightCount += 1;
-      return originalXhrOpen.apply(this, [method, url, ...rest] as [
-        string,
-        string | URL,
-      ]);
-    };
     window.XMLHttpRequest.prototype.send = function (
       this: XMLHttpRequest,
       body?: Document | XMLHttpRequestBodyInit | null,
     ) {
+      // 전송 시작 시점에 인-플라이트로 카운트 (open이 아닌 send 기준)
+      pageInflightCount += 1;
       try {
-        this.addEventListener("loadend", () => {
-          if (pageInflightCount > 0) pageInflightCount -= 1;
-        });
+        // loadend는 성공/실패/중단 모든 종료를 보장하는 종착 이벤트이며,
+        // once 옵션으로 XHR 재사용 시 중복 차감을 방지합니다.
+        this.addEventListener(
+          "loadend",
+          () => {
+            if (pageInflightCount > 0) pageInflightCount -= 1;
+          },
+          { once: true },
+        );
       } catch {
-        // loadend 리스너 등록 실패 시 카운트는 open 시점만 유지 (큰 영향 없음)
+        // loadend 리스너 등록 실패 시 카운트는 send 시점만 유지 (큰 영향 없음)
       }
       return originalXhrSend.call(this, body);
     };
@@ -374,15 +387,53 @@ function extractImageFileName(src: string, fallbackName: string): string {
  * @param img - 대상 img 요소
  * @returns 최종 이미지 URL (없으면 빈 문자열)
  */
+/**
+ * 이미지 요소에서 실제 표시할 소스 URL을 해석합니다.
+ * lazy 로드 이미지는 src 속성이 플레이스홀더(no-img 등)를 가리키고 실 URL을
+ * data-src 계열 속성에 보관하므로, 플레이스홀더 src는 무시하고 속성을 우선합니다.
+ * 이미지가 아직 로드되지 않은 상태에서도 HTML 속성만으로 실 URL을 확보할 수 있습니다.
+ *
+ * @param img 대상 이미지 요소
+ * @returns 해석된 소스 URL (없으면 빈 문자열)
+ */
 function resolveImageSource(img: HTMLImageElement): string {
-  const src = img.currentSrc || img.src || "";
-  if (src) return src;
-  const lazyAttrs = ["data-src", "data-original", "data-lazy-src", "data-url", "data-lazy"];
+  // 실제 로드된 currentSrc를 최우선으로 사용합니다.
+  const currentSrc = img.currentSrc || "";
+  if (currentSrc && !isPlaceholderUrl(currentSrc)) return currentSrc;
+
+  // lazy 로드 속성(실 URL)을 플레이스홀더 src보다 우선합니다.
+  const lazyAttrs = [
+    "data-src",
+    "data-original",
+    "data-lazy-src",
+    "data-url",
+    "data-lazy",
+    "data-poster",
+  ];
   for (const attr of lazyAttrs) {
     const value = img.getAttribute(attr);
-    if (value) return value;
+    if (value && !isPlaceholderUrl(value)) return value;
   }
+
+  // 최후 폴백: src 속성 (플레이스홀더 제외)
+  const src = img.getAttribute("src") || "";
+  if (src && !isPlaceholderUrl(src)) return src;
   return "";
+}
+
+/**
+ * 플레이스홀더/더미 이미지 URL 여부를 판정합니다.
+ * lazy 로드 대기 상태를 나타내는 no-img 계열, 1x1 투명 gif, about:blank를 걸러냅니다.
+ *
+ * @param url 판정 대상 URL
+ * @returns 플레이스홀더 여부
+ */
+function isPlaceholderUrl(url: string): boolean {
+  return (
+    /no-img(\.|$)/.test(url) ||
+    url === "about:blank" ||
+    (/^data:image\/(gif|png);base64,/i.test(url) && url.length < 200)
+  );
 }
 
 /**
@@ -724,7 +775,7 @@ function collectXvideosMediaEntries(): XvideosMediaEntry[] {
 }
 
 /**
- * best-of-red 비디오 블록(.thumb-block[data-video])의 data-video JSON 속성을 파싱합니다.
+ * xvideos 페이징 비디오 블록(.thumb-block[data-video])의 data-video JSON 속성을 파싱합니다.
  * xvideos는 썸네일/보조썸네일/프리뷰 mp4 등의 정확한 자산 URL을 JSON으로 내장합니다.
  *
  * @param block - 비디오 블록 DOM 요소
@@ -820,10 +871,10 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * best-of-red 페이지 인덱스에 대응하는 이동 URL을 생성합니다.
- * 0은 베이스 URL(예: /best-of-red/2026-06), N은 베이스/N(예: /best-of-red/2026-06/16)입니다.
+ * xvideos 페이징 페이지 인덱스에 대응하는 이동 URL을 생성합니다.
+ * 0은 베이스 URL(예: /best/2026-03), N은 베이스/N(예: /best/2026-03/16)입니다.
  *
- * @param basePath 베이스 경로 (예: "/best-of-red/2026-06", 후행 슬래시 없음)
+ * @param basePath 베이스 경로 (예: "/best/2026-03", 후행 슬래시 없음)
  * @param pageIndex 이동할 페이지 인덱스
  * @returns 이동할 페이지 URL
  */
@@ -832,16 +883,19 @@ function buildXvBestOfRedPageUrl(basePath: string, pageIndex: number): string {
 }
 
 /**
- * 현재 URL에서 best-of-red 베이스 경로와 페이지 인덱스를 파싱합니다.
- * best-of-red 페이지가 아니면 null을 반환합니다.
+ * 현재 URL에서 xvideos 페이징 베이스 경로와 페이지 인덱스를 파싱합니다.
+ * xvideos.com/xvideos.red 페이징 페이지가 아니면 null을 반환합니다.
  *
  * 파싱 규칙:
- * - 베이스 경로: /best-of-red/<한 세그먼트> 형태 (후행 슬래시 유무 무관, 예: /best-of-red/2026-06)
+ * - 도메인 가드: 호스트가 xvideos.com 또는 xvideos.red여야 합니다.
+ * - 베이스 경로: /<세그먼트>/<YYYY-MM> 형태 (후행 슬래시 유무 무관, 예: /best/2026-03)
  * - 페이지 인덱스: 베이스 경로 뒤 /N (없으면 0)
  *
  * @returns 베이스 경로·현재 페이지 인덱스 또는 null
  */
 function parseXvBestOfRedUrl(): { basePath: string; currentPage: number } | null {
+  // xvideos.com/xvideos.red 외 호스트는 페이징 액션 대상이 아닙니다.
+  if (!isXvideosHost(window.location.hostname)) return null;
   const match = window.location.pathname.match(XV_BEST_OF_RED_BASE_RE);
   if (!match) return null;
   return {
@@ -880,21 +934,80 @@ function detectXvBestOfRedMaxPage(currentPage: number): number {
 }
 
 /**
- * best-of-red 페이지 완전 로드 여부를 검증합니다.
- * "브라우저가 실제 모든 요소를 로드한 상태"를 보장하기 위해 아래 조건을 모두 충족할 때
- * 로드 완료로 판정하며, 데드라인(XV_BEST_OF_RED_IMAGE_WAIT_MS) 내에 끝나지 않으면 false를 반환합니다.
+ * xvideos 페이징 페이지 로드 검증 결과 보고 구조체입니다.
+ * 검증 상세(네트워크 인-플라이트/리소스 수/안정 여부/대기 시간)를
+ * 수집 응답과 함께 반환해 팝업 실행기 로그에 노출합니다.
+ */
+export interface XvBestOfRedReadyReport {
+  /** 최종 완전 로드 여부 */
+  ready: boolean;
+  /** 최종 DOM 비디오 블록(.thumb-block:not(.thumb-ad)) 개수 */
+  blockCount: number;
+  /** 검증 시점 페이지 내 인-플라이트 네트워크 요청 수 */
+  inflight: number;
+  /** 검증 시점 성능 리소스 엔트리 수 */
+  resources: number;
+  /** 네트워크 안정 판정 여부 (인-플라이트 0 + 리소스 수 연속 동일) */
+  networkStable: boolean;
+  /** 로드 검증에 소요된 대기 시간 (ms) */
+  waitedMs: number;
+  /** 실패 사유 (ready=false 시 원인 메시지) */
+  reason: string;
+}
+
+/**
+ * xvideos 페이징 페이지 완전 로드 여부를 검증합니다.
+ * "브라우저가 실제 모든 요소를 로드한 상태"를 보장하기 위해 아래 조건을 충족할 때
+ * 로드 완료로 판정하며, 데드라인(XV_BEST_OF_RED_IMAGE_WAIT_MS) 내에 끝나지 않으면
+ * 실패 사유가 담긴 보고 객체를 반환합니다. (백그라운드 탭은 폴링 간격·데드라인 확장)
  *
  * 검증 조건:
- * 1. document.readyState === "complete" (load 이벤트 대기, 누락 시 3초 폴백)
- * 2. 네트워크 안정: 페이지 내 XHR/fetch 인-플라이트 카운터가 0이고,
- *    performance 리소스 엔트리 수가 연속 XV_BEST_OF_RED_STABLE_POLLS회 증가하지 않음 (lazy 로드 종료 신호)
- * 3. DOM 안정: .thumb-block(광고 제외) 개수가 연속 XV_BEST_OF_RED_STABLE_POLLS회 동일 (지연 렌더 완료 신호)
- * 4. 이미지 완료: 대상 블록 내 img가 전부 complete && naturalWidth > 0
+ * 1. 기대 URL 검증: 현재 pathname이 기대 경로(예: /best/2026-03/1)와 일치해야 합니다.
+ *    탭 이동 직후 이전 페이지 DOM이 남아 응답하는 혼동을 차단하기 위한 첫 관문입니다.
+ * 2. document.readyState === "complete" (load 이벤트 대기, 누락 시 3초 폴백)
+ * 3. 강제 렌더링: 화면 밖 lazy 블록/이미지가 렌더링되도록 반복 스크롤과
+ *    lazy→eager 전환을 수행합니다. (백그라운드 탭에서도 전체 블록 DOM 확보)
+ * 4. DOM 안정: .thumb-block(광고 제외) 개수가 재스크롤 후 연속 XV_BEST_OF_RED_STABLE_POLLS회
+ *    동일 (지연 렌더 완료 신호)
+ * 5. 네트워크 안정: XHR/fetch 인-플라이트가 0이고, performance 리소스 엔트리 수가
+ *    연속 XV_BEST_OF_RED_STABLE_POLLS회 증가하지 않음 (lazy 로드 종료 신호)
  *
- * @returns 완전 로드 여부 (데드라인 초과 시 false)
+ * 이미지 자체의 로드(complete/naturalWidth)는 완료 판정에 요구하지 않습니다.
+ * 수집은 HTML 속성(src/data-src/data-video JSON)에서 URL을 추출하고, 실제 미디어
+ * 다운로드는 오프스크린 fetch로 수행되므로 페이지의 이미지 네트워크 로드를 기다릴
+ * 필요가 없습니다. (백그라운드 탭 이미지 지연과 무관하게 전체 항목 수집 가능)
+ *
+ * @param expectedPath 기대 페이지 경로 (예: "/best/2026-03/1")
+ * @returns 로드 검증 결과 보고 객체
  */
-async function waitForXvBestOfRedPageReady(): Promise<boolean> {
-  // 1) readyState complete 대기 (탭 이동 직후 프레임 진입 방어)
+async function waitForXvBestOfRedPageReady(
+  expectedPath: string,
+): Promise<XvBestOfRedReadyReport> {
+  const startedAt = Date.now();
+  // 백그라운드 탭은 타이머가 ~1초로 스로틀링되어 폴링 간격·데드라인을 확장합니다.
+  const hidden = document.visibilityState === "hidden";
+  const pollMs = hidden ? 800 : XV_BEST_OF_RED_READY_POLL_MS;
+  const deadlineMs = hidden ? 35000 : XV_BEST_OF_RED_IMAGE_WAIT_MS;
+  const expected = normalizePathname(expectedPath);
+
+  // 1) 기대 URL 검증 (이전/새 페이지 구분 — 불일치 시 최대 대기 후 즉시 실패)
+  const urlDeadline = Date.now() + XV_BEST_OF_RED_URL_WAIT_MS;
+  while (normalizePathname(window.location.pathname) !== expected) {
+    if (Date.now() > urlDeadline) {
+      return {
+        ready: false,
+        blockCount: 0,
+        inflight: pageInflightCount,
+        resources: performance.getEntriesByType("resource").length,
+        networkStable: false,
+        waitedMs: Date.now() - startedAt,
+        reason: `기대 페이지(${expectedPath})와 현재 페이지(${window.location.pathname})가 다릅니다.`,
+      };
+    }
+    await sleep(300);
+  }
+
+  // 2) readyState complete 대기 (탭 이동 직후 프레임 진입 방어)
   if (document.readyState !== "complete") {
     await new Promise<void>((resolve) => {
       window.addEventListener("load", () => resolve(), { once: true });
@@ -903,30 +1016,32 @@ async function waitForXvBestOfRedPageReady(): Promise<boolean> {
     });
   }
 
-  // 2) 네트워크·DOM·이미지 완료 통합 폴링
-  const deadline = Date.now() + XV_BEST_OF_RED_IMAGE_WAIT_MS;
+  // 3) 최초 강제 렌더링 (lazy 블록·이미지 eager 전환 + 스크롤)
+  forceRenderBestOfRedContent();
+  forceScrollThroughPage();
+
+  // 4) 네트워크·DOM 안정 통합 폴링
+  const deadline = Date.now() + deadlineMs;
   let prevBlockCount = -1;
   let stableBlockCount = 0;
+  let lastScrollAt = 0;
 
   while (Date.now() < deadline) {
-    const blocks = Array.from(
-      document.querySelectorAll<HTMLElement>(".thumb-block:not(.thumb-ad)"),
-    );
-    const images = blocks
-      .map((block) => block.querySelector<HTMLImageElement>("img"))
-      .filter((img): img is HTMLImageElement => Boolean(img));
+    const blocks = queryXvBestOfRedBlocks();
 
-    // 이미지가 아직 DOM에 없는 경우에도 로드 대기 (동적 렌더 전)
-    if (images.length === 0) {
-      await sleep(XV_BEST_OF_RED_READY_POLL_MS);
-      continue;
+    // 화면 밖 lazy 렌더링 유도 (재스크롤 + eager 전환 반복)
+    if (Date.now() - lastScrollAt > XV_BEST_OF_RED_RESCROLL_MS) {
+      forceScrollThroughPage();
+      forceRenderBestOfRedContent();
+      lastScrollAt = Date.now();
     }
 
-    // 2-1) 네트워크 안정 판정 (인-플라이트 0 + 리소스 타이밍 증가 없음)
-    const netIdle =
-      pageInflightCount === 0 && networkResourcesStable();
+    // 4-1) 네트워크 안정 판정 (인-플라이트 0 + 리소스 타이밍 증가 없음)
+    const inflight = pageInflightCount;
+    const resources = performance.getEntriesByType("resource").length;
+    const netIdle = inflight === 0 && networkResourcesStable(resources);
 
-    // 2-2) DOM 안정 판정 (블록 개수 연속 동일)
+    // 4-2) DOM 안정 판정 (블록 개수 연속 동일)
     if (blocks.length === prevBlockCount) {
       stableBlockCount += 1;
     } else {
@@ -935,37 +1050,126 @@ async function waitForXvBestOfRedPageReady(): Promise<boolean> {
     }
     const domStable = stableBlockCount >= XV_BEST_OF_RED_STABLE_POLLS;
 
-    // 2-3) 이미지 완료 판정 (플레이스홀더 no-img는 완료 대상에서 제외)
-    const realImages = images.filter(
-      (img) => !/no-img(\.|$)/.test(img.getAttribute("src") || ""),
-    );
-    const imagesReady =
-      realImages.length > 0 &&
-      realImages.every((img) => img.complete && img.naturalWidth > 0);
+    // 아직 블록이 전혀 렌더되지 않았으면 계속 대기 (동적 렌더 전 단계)
+    if (blocks.length === 0) {
+      await sleep(pollMs);
+      continue;
+    }
 
     // 모든 조건 충족 시 완전 로드 판정
-    if (netIdle && domStable && imagesReady) {
-      return true;
+    if (netIdle && domStable) {
+      return {
+        ready: true,
+        blockCount: blocks.length,
+        inflight,
+        resources,
+        networkStable: true,
+        waitedMs: Date.now() - startedAt,
+        reason: "",
+      };
     }
-    await sleep(XV_BEST_OF_RED_READY_POLL_MS);
+    await sleep(pollMs);
   }
-  return false;
+
+  // 데드라인 초과 — 마지막 관측 값을 담아 실패 보고
+  return {
+    ready: false,
+    blockCount: prevBlockCount < 0 ? 0 : prevBlockCount,
+    inflight: pageInflightCount,
+    resources: performance.getEntriesByType("resource").length,
+    networkStable: pageInflightCount === 0,
+    waitedMs: Date.now() - startedAt,
+    reason: "로드 검증 데드라인 초과 (DOM/네트워크 안정 미달)",
+  };
+}
+
+/**
+ * xvideos 페이징 비디오 블록 목록(.thumb-block)을 광고(thumb-ad)를 제외해 반환합니다.
+ *
+ * @returns 비디오 블록 DOM 요소 배열
+ */
+function queryXvBestOfRedBlocks(): HTMLElement[] {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(".thumb-block:not(.thumb-ad)"),
+  );
+}
+
+/**
+ * xvideos 페이징 lazy 렌더링을 강제로 진행하도록 이미지를 eager로 전환합니다.
+ * 화면 밖 블록이 지연 렌더되는 구조에서 백그라운드 탭이어도 전체 블록이
+ * DOM에 들어오도록 lazy 속성의 실 URL을 src로 복사하고 loading을 eager로 바꿉니다.
+ */
+function forceRenderBestOfRedContent(): void {
+  try {
+    document
+      .querySelectorAll<HTMLImageElement>(
+        ".thumb-block:not(.thumb-ad) img[loading='lazy'], .thumb-block:not(.thumb-ad) img[data-src]",
+      )
+      .forEach((img) => {
+        const lazy =
+          img.getAttribute("data-src") ||
+          img.getAttribute("data-original") ||
+          "";
+        if (lazy && !isPlaceholderUrl(lazy)) {
+          img.setAttribute("src", lazy);
+        }
+        img.setAttribute("loading", "eager");
+      });
+  } catch {
+    // 강제 렌더링 실패 시 자연 렌더링에 의존합니다.
+  }
+}
+
+/**
+ * 페이지 전체를 강제 스크롤해 화면 밖 lazy 블록 렌더링을 유도합니다.
+ * 백그라운드 탭에서도 scrollTo는 동작하므로 IntersectionObserver 기반 지연
+ * 렌더가 전체 콘텐츠를 DOM에 배치하게 합니다. 끝까지 내려간 뒤 다시 맨 위로
+ * 올려 재렌더링을 유도합니다.
+ */
+function forceScrollThroughPage(): void {
+  try {
+    const maxScroll = Math.max(
+      document.body?.scrollHeight || 0,
+      document.documentElement?.scrollHeight || 0,
+    );
+    const y = window.scrollY || document.documentElement?.scrollTop || 0;
+    if (y < maxScroll - window.innerHeight) {
+      // 아래로 일정 폭 이동 (한 화면 분량)
+      window.scrollTo(0, y + Math.max(300, Math.floor(window.innerHeight * 0.8)));
+    } else {
+      // 끝 도달 시 맨 위로 복귀 (렌더 트리거 재연)
+      window.scrollTo(0, 0);
+    }
+  } catch {
+    // 스크롤 실패는 무시 (렌더에 영향 없음)
+  }
+}
+
+/**
+ * 경로 문자열의 후행 슬래시를 제거해 비교용으로 정규화합니다.
+ * xvideos 페이징 베이스 경로는 후행 슬래시 유무가 무관하므로 동일하게 취급합니다.
+ *
+ * @param path 대상 경로 문자열
+ * @returns 정규화된 경로
+ */
+function normalizePathname(path: string): string {
+  return path.replace(/\/$/, "");
 }
 
 /**
  * 페이지의 리소스 타이밍 엔트리가 최근 안정적으로 증가하지 않는지 판정합니다.
  * lazy 로드가 모두 끝나면 새 리소스가 발생하지 않으므로 엔트리 수가 멈춥니다.
  *
+ * @param resourceCount 현재 성능 리소스 엔트리 수
  * @returns 리소스 수 안정 여부 (연속 XV_BEST_OF_RED_STABLE_POLLS회 동일 시 true)
  */
 let lastResourceStableCount = 0;
 let lastResourceCountValue = -1;
-function networkResourcesStable(): boolean {
-  const count = performance.getEntriesByType("resource").length;
-  if (count === lastResourceCountValue) {
+function networkResourcesStable(resourceCount: number): boolean {
+  if (resourceCount === lastResourceCountValue) {
     lastResourceStableCount += 1;
   } else {
-    lastResourceCountValue = count;
+    lastResourceCountValue = resourceCount;
     lastResourceStableCount = 0;
   }
   return lastResourceStableCount >= XV_BEST_OF_RED_STABLE_POLLS;
@@ -1092,14 +1296,14 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return false;
   }
 
-  // [7-2] xvideos best-of-red 초기 정보 조회 지시 (액션 실행기 팝업용)
+  // [7-2] xvideos 페이징 초기 정보 조회 지시 (액션 실행기 팝업용)
   // 페이지네이션 연속 블록에서 총 페이지 수를 감지해 베이스 경로·현재 페이지 인덱스와 함께 반환합니다.
   if (request.command === "COLLECT_BEST_OF_RED_INIT") {
     const parsed = parseXvBestOfRedUrl();
     if (!parsed) {
       sendResponse({
         success: false,
-        message: "best-of-red 페이지에서만 실행할 수 있습니다.",
+        message: "xvideos 페이징 페이지에서만 실행할 수 있습니다.",
       });
       return false;
     }
@@ -1118,33 +1322,51 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return false;
   }
 
-  // [7-3] xvideos best-of-red 페이지 수집 지시 (액션 실행기 팝업용)
-  // 페이지 로드 완료(readyState complete + 썸네일 이미지 로드)를 검증한 뒤
-  // 비디오 블록 메타를 수집해 data 하위에 중첩해 반환합니다. 서버 전송은 팝업(오프스크린 경유)이 담당합니다.
+  // [7-3] xvideos 페이징 페이지 수집 지시 (액션 실행기 팝업용)
+  // 실행기가 전달한 기대 경로(expectedPath)로 이전/새 페이지를 구분한 뒤,
+  // 브라우저 상태 검증(네트워크 안정 + DOM 안정 + 강제 렌더링)을 거쳐
+  // 비디오 블록 메타를 수집해 data 하위에 중첩해 반환합니다.
+  // 검증 상세(네트워크 인-플라이트/리소스 수/대기 시간)도 함께 반환해 로그에 노출합니다.
+  // 서버 전송은 팝업(오프스크린 경유)이 담당합니다.
   if (request.command === "COLLECT_BEST_OF_RED_PAGE") {
-    waitForXvBestOfRedPageReady().then((ready) => {
+    const payload = request.payload as
+      | { expectedPath?: string }
+      | undefined;
+    const expectedPath =
+      payload && typeof payload.expectedPath === "string"
+        ? payload.expectedPath
+        : "";
+    waitForXvBestOfRedPageReady(expectedPath).then((report) => {
       const parsed = parseXvBestOfRedUrl();
       if (!parsed) {
         sendResponse({
           success: false,
-          message: "best-of-red 페이지가 아닙니다.",
+          message: "xvideos 페이징 페이지가 아닙니다.",
         });
         return;
       }
-      const entries = ready ? collectXvideosMediaEntries() : [];
-      const message = ready
+      const entries = report.ready ? collectXvideosMediaEntries() : [];
+      const message = report.ready
         ? `페이지 로드 완료 · 비디오 블록 ${entries.length}건 수집`
-        : "로드 완료 검증 시간 초과 (수집 결과 미포함)";
+        : `로드 완료 검증 실패: ${report.reason} (수집 결과 미포함)`;
       sendResponse({
         success: true,
         message,
         data: {
-          ready,
+          ready: report.ready,
           page: parsed.currentPage,
           url: window.location.href,
           title: document.title,
           data: entries,
           message,
+          // 브라우저 네트워크 상태 모니터링 결과 (팝업 로그 가시화용)
+          network: {
+            inflight: report.inflight,
+            resources: report.resources,
+            stable: report.networkStable,
+          },
+          waitedMs: report.waitedMs,
+          visibilityState: document.visibilityState,
         },
       });
     });

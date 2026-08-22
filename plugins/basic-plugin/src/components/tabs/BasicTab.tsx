@@ -39,7 +39,7 @@ interface BasicTabProps {
   onCollectSiteInfo: () => void;
   /** xvideos 다운로드 매니저 팝업 창 열기 콜백 */
   onOpenXvideosManager: () => void;
-  /** xvideos best-of-red 액션 실행기 팝업 창 열기 콜백 */
+  /** xvideos 페이징 액션 실행기 팝업 창 열기 콜백 */
   onOpenXvBestOfRedAction: () => void;
 }
 
@@ -55,6 +55,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 const SITE_IMAGE_BUTTONS: Record<string, string[]> = {
   "xchina.co": ["normal", "album", "cover", "info"],
   "xvideos.com": ["normal", "info"],
+  "xvideos.red": ["normal", "info"],
 };
 
 /**
@@ -350,8 +351,9 @@ export function BasicTab({
                   {site === "xvideos.com" && isMatched && (
                     <p className="mt-3 border-t border-slate-700/60 pt-3 text-[10px] text-slate-500 leading-relaxed">
                       "다운로드 매니저 열기" 버튼으로 새 팝업 창을 열어 넓은
-                      목록에서 순차 다운로드를 진행합니다. best-of-red 자동 이동은
-                      아래 "액션 실행" 섹션의 xvideos.com 액션 모듈에서 실행합니다.
+                      목록에서 순차 다운로드를 진행합니다. xvideos 페이징 액션은
+                      아래 "액션 실행" 섹션의 xvideos.com · xvideos.red 액션
+                      모듈에서 실행합니다.
                     </p>
                   )}
                 </div>
@@ -381,38 +383,40 @@ export function BasicTab({
               출력하며 실행됩니다.
             </p>
 
-            {/* xvideos.com 액션 모듈 */}
+            {/* xvideos.com · xvideos.red 페이징 액션 모듈 */}
             <div className="mt-3 rounded-lg border border-slate-700/60 bg-[#121a26] p-3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
                 <h3 className="text-[11px] font-bold text-slate-200 shrink-0">
-                  xvideos.com
+                  xvideos.com · xvideos.red
                 </h3>
                 <span className="text-[10px] text-slate-500 truncate min-w-0">
-                  {matchedSite === "xvideos.com"
+                  {matchedSite === "xvideos.com" || matchedSite === "xvideos.red"
                     ? "현재 페이지와 일치"
-                    : "xvideos.com 페이지에서 활성화"}
+                    : "xvideos 페이징 페이지에서 활성화"}
                 </span>
               </div>
 
               <button
                 onClick={onOpenXvBestOfRedAction}
                 disabled={
-                  matchedSite !== "xvideos.com" || !isServerOnline
+                  (matchedSite !== "xvideos.com" && matchedSite !== "xvideos.red") ||
+                  !isServerOnline
                 }
                 title={
-                  matchedSite === "xvideos.com"
-                    ? "best-of-red 월간 페이지부터 마지막 페이지까지 순차 이동하며 각 페이지 비디오 메타를 수집·저장 (전용 팝업 창)"
-                    : "xvideos.com 페이지에서 사용할 수 있습니다"
+                  matchedSite === "xvideos.com" || matchedSite === "xvideos.red"
+                    ? "현재 페이지의 카테고리·월(예: /best/2026-03)부터 마지막 페이지까지 순차 이동하며 각 페이지 비디오 메타를 수집·저장 (전용 팝업 창)"
+                    : "xvideos.com 또는 xvideos.red 페이징 페이지에서 사용할 수 있습니다"
                 }
                 className="btn-secondary w-full mt-2"
               >
-                best-of-red 자동 이동
+                xvideos 페이징 액션
               </button>
               <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-                best-of-red 페이지 수를 감지해 1페이지씩 순차 이동합니다. 각
-                페이지는 이미지 로딩이 완전히 끝난 뒤 수집하고 저장 경로는
-                best-of-red/월/페이지 규칙으로 분리됩니다.
+                페이지 수를 감지해 1페이지씩 순차 이동합니다. 각 페이지는 이미지
+                로딩이 완전히 끝난 뒤 수집하며, 저장 경로는 현재 URL을 분석해
+                도메인/카테고리/월/페이지 규칙(예: images/xvideos.red/best/2026-03/1/)
+                으로 자동 분리됩니다.
               </p>
             </div>
           </div>

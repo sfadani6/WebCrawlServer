@@ -475,7 +475,7 @@ export function requestCollectXvideosMediaFromTab(tabId: number): Promise<{
 }
 
 /**
- * 대상 xvideos best-of-red 탭의 초기 정보(베이스 경로·현재/마지막 페이지·총 페이지 수)를 조회합니다.
+ * 대상 xvideos 페이징 탭의 초기 정보(베이스 경로·현재/마지막 페이지·총 페이지 수)를 조회합니다.
  * 페이지네이션(data-page) 연속 블록에서 마지막 페이지를 콘텐츠 스크립트가 감지합니다.
  *
  * @param tabId - 대상 xvideos 탭 ID
@@ -500,19 +500,27 @@ export function requestXvBestOfRedInit(tabId: number): Promise<{
 }
 
 /**
- * 대상 xvideos best-of-red 탭의 현재 페이지 비디오 블록 메타를 수집합니다.
- * 콘텐츠 스크립트가 로드 완료(readyState complete + 썸네일 이미지 로드)를 검증한 뒤 수집하며,
- * 검증이 끝나기 전에는 수집을 미루므로 페이지의 로딩이 완전히 끝난 상태를 보장합니다.
+ * 대상 xvideos 페이징 탭의 현재 페이지 비디오 블록 메타를 수집합니다.
+ * 기대 페이지 경로(expectedPath)를 함께 전달해 콘텐츠 스크립트가 이전/새 페이지를
+ * 구분하고, 브라우저 상태 검증(네트워크 안정 + DOM 안정 + 강제 렌더링)을 거친 뒤
+ * 수집합니다. 검증이 끝나기 전에는 수집을 미루므로 페이지의 로딩이 완전히 끝난
+ * 상태를 보장합니다.
  *
  * @param tabId - 대상 xvideos 탭 ID
+ * @param expectedPath - 수집 대상 페이지 경로 (예: "/best/2026-03/1")
  * @returns 페이지 수집 응답 객체 (success/message/data)
  */
-export function requestXvBestOfRedPage(tabId: number): Promise<{
+export function requestXvBestOfRedPage(
+  tabId: number,
+  expectedPath: string,
+): Promise<{
   success: boolean;
   message: string;
   data: XvBestOfRedPageData | null;
 }> {
-  return sendCommandToTab(tabId, "COLLECT_BEST_OF_RED_PAGE").then((res) => {
+  return sendCommandToTab(tabId, "COLLECT_BEST_OF_RED_PAGE", {
+    expectedPath,
+  }).then((res) => {
     const data =
       typeof res.data === "object" && res.data !== null
         ? (res.data as XvBestOfRedPageData)
@@ -526,17 +534,19 @@ export function requestXvBestOfRedPage(tabId: number): Promise<{
 }
 
 /**
- * best-of-red 페이지의 비디오 엔트리 전체(메인/보조 썸네일 + 프리뷰 mp4)를
+ * xvideos 페이징 페이지의 비디오 엔트리 전체(메인/보조 썸네일 + 프리뷰 mp4)를
  * 오프스크린이 fetch로 인출해 서버에 번들 저장하고 완료 여부를 반환합니다.
  * (FETCH_PAGE_MEDIA_BUNDLES 메시지 → 오프스크린이 엔트리별 CRAWL_IMAGE 번들 전송)
+ * 실제 페이지 URL(pageUrl)을 함께 전달해 서버가 도메인별 저장 폴더를 생성하게 합니다.
  *
- * @param payload - 페이지 미디어 인출 요청 페이로드 (page/entries/pathSegments)
+ * @param payload - 페이지 미디어 인출 요청 페이로드 (page/entries/pathSegments/pageUrl)
  * @returns 페이지 미디어 저장 결과 (성공/실패 엔트리 수, 저장 파일 목록)
  */
 export function requestFetchPageMediaBundles(payload: {
   page: number;
   entries: XvideosMediaEntry[];
   pathSegments: string[];
+  pageUrl: string;
 }): Promise<XvBestOfRedMediaResult> {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(
@@ -551,6 +561,7 @@ export function requestFetchPageMediaBundles(payload: {
             savedCount: 0,
             failedCount: payload.entries.length,
             savedFiles: [],
+            entryFiles: [],
             failedEntries: [
               { eid: "", reason: "백그라운드 엔진 오프라인" },
             ],
@@ -563,6 +574,7 @@ export function requestFetchPageMediaBundles(payload: {
             savedCount: 0,
             failedCount: payload.entries.length,
             savedFiles: [],
+            entryFiles: [],
             failedEntries: [{ eid: "", reason: "응답 없음" }],
           });
           return;

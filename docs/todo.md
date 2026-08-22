@@ -1,7 +1,46 @@
 # 실행 계획 체크리스트 (docs/todo.md)
 
 ## 현재 작업
-- ask-20260810225335: best-of-red 안정 우선 재설계 — 0페이지부터 전체 순회 + 실제 미디어 다운로드 + 저장 ACK 확인 후 이동
+- ask-20260811030252: xvideos.com + xvideos.red 이중 도메인 지원 — "xvideos 페이징 액션" 화면 문구 + 하드코딩 `/best-of-red/` 제거 및 URL 분석 기반 저장 경로 생성
+
+## 완료된 작업 (ask-20260811030252)
+- [x] content.ts(basic/opera): `XV_BEST_OF_RED_BASE_RE = /^(\/[^/]+\/\d{4}-\d{2})(?:\/(\d+))?\/?$/` + `isXvideosHost()` 도메인 가드(xvideos.com/xvideos.red, `www.` 허용) — 하드코딩 `best-of-red` 기본값 제거, 현재 URL 분석으로 basePath 생성. 오류 메시지 → "xvideos 페이징 페이지에서만 실행할 수 있습니다." / "xvideos 페이징 페이지가 아닙니다."
+- [x] offscreen.ts(basic/opera): `handleFetchPageMediaBundles()` `pathSegments` → `[세그먼트, YYYY-MM, 페이지]` 해석, `pathSegments[0]` → category 분리 + `slice(1)` → 저장 계층, 번들에 `pageUrl` 포함(하드코딩 best-of-red 중복 제거 로직 제거). `FETCH_PAGE_MEDIA_BUNDLES` 수신부에 `pageUrl?` 필드 추가.
+- [x] chromeService.ts/useBestOfRedRunner.ts(basic/opera): `requestFetchPageMediaBundles()` payload에 `pageUrl: string` 전달.
+- [x] usePopupState.ts(basic/opera): 탭 탐색 `["*://*.xvideos.com/*", "*://*.xvideos.red/*"]` + 페이징 경로 `/\/(?:[^/]+)\/\d{4}-\d{2}/` 우선 매칭 + 상태 메시지 "xvideos 페이징 ..." 변경.
+- [x] actionRunner.tsx(basic/opera): 이중 도메인 폴백 탭 탐색 + initError 문구 갱신.
+- [x] BasicTab.tsx(basic/opera): `SITE_IMAGE_BUTTONS`에 `"xvideos.red": ["normal", "info"]` 추가, 액션 카드 `xvideos.com · xvideos.red` 헤더 + 버튼 라벨 `xvideos 페이징 액션` + 저장 경로 설명.
+- [x] ActionRunnerView.tsx(basic/opera): 헤더 `액션 실행기 · xvideos 페이징 액션` + 저장 루트 표기 `images/<도메인>/<세그먼트>/<월>/<N>/`(`initInfo.basePath.replace(/^\//, "")`).
+- [x] types/index.ts(basic/opera): 주석만 갱신.
+- [x] offscreen.ts(basic/opera): 잔여 "best-of-red" 주석 3건 → "xvideos 페이징"으로 변경.
+- [x] 검증: `node node_modules/typescript/bin/tsc --noEmit -p ...` basic/opera 통과(출력 없음), `npm run build --workspace=basic-plugin`/`--workspace=opera-plugin` 모두 56 모듈 성공, ESLint 신규 오류 0건(기존 `xvideosManager.tsx` react-hooks 2건·미사용 4건은 기존 이슈와 무관).
+- [x] 문서: R-00430 §5.5/§6, R-00420 §4.5, R-00440 §2.4+체크리스트, R-00480 §3.1, R-00208(계층 경로·분리 저장 예시) 갱신 + askLog 신규(ask-20260811030252) + ask.md 초기화.
+
+## 예정 작업 (ask-20260811030252)
+- [ ] 브라우저 실측: `https://www.xvideos.com/best/2026-03`에서 액션 실행 → 베이스 경로 `/best/2026-03`(기본값 없음) 표시, `images/<도메인>/<세그먼트>/<월>/<N>/`(예: `images/xvideos.red/best/2026-03/1/`)로 이중 폴더 없이 저장, xvideos.red 탭에서도 버튼 활성화·탭 탐색 동작 확인.
+
+## 완료된 작업 (ask-20260811011205)
+- [x] opera-plugin manifest.json: `permissions`에서 `"sidePanel"` 제거 + `"side_panel"` 키 → `"sidebar_action"`(`default_title`/`default_panel`/`default_icon`) 교체 + name/description 오페라 문구 복구 + `run_at: document_start` 유지
+- [x] background.ts: 변경 없음(`chrome.sidePanel?.setPanelBehavior` 옵셔널 가드 유지 — 오페라 undefined no-op)
+- [x] 검증: `npm run build`(opera-plugin, 56 모듈) → `dist/manifest.json`에서 `sidebar_action` 존재·`sidePanel`/`side_panel` 부재·name 오페라 문구·run_at document_start 확인
+- [x] 문서: R-00460 §6.4 "동기화 시 재발 방지 주의" 신설(manifest 통째 복사 금지 + 3대 유지 항목 + dist 검증), askLog 신규(ask-20260811011205), ask.md 초기화
+
+## 예정 작업 (ask-20260811011205)
+- [ ] 오페라 `opera://extensions`에서 `plugins/opera-plugin/dist` 로드 → `Permission 'sidePanel' is unknown` 미발생·정상 로드, 툴바/사이드바 아이콘 클릭 시 `sidepanel.html` 사이드바 표시 확인
+
+## 완료된 작업 (ask-20260811001627)
+- [x] content.ts: `installNetworkActivityWatch()` 재작성 — XHR `send()`+1 / `loadend`(once)-1(open 누수 제거) + manifest `run_at: "document_start"`(초기 요청 감시)
+- [x] content.ts: `waitForXvBestOfRedPageReady(expectedPath)` 재작성 — 기대 URL 검증(8초, 불일치 시 ready:false+사유) + readyState complete + **강제 렌더링**(lazy→eager·data-src→src + 2초 간격 재스크롤, 끝 도달 시 맨 위 복귀) + DOM 안정(블록 3연속 동일) + 네트워크 안정(인플라이트 0 + 리소스 3연속 동일), **이미지 로드 조건 제거**, 백그라운드 탭 800ms·35초 보정, 응답에 `network{inflight,resources,stable}`·`waitedMs`·`visibilityState`
+- [x] content.ts: `resolveImageSource()` 재작성 + `isPlaceholderUrl()` 신규(no-img/about:blank/1×1 gif 무시, data-src 계열 우선) + COLLECT_BEST_OF_RED_PAGE `expectedPath` 수신
+- [x] types/index.ts: `XvBestOfRedPageData.network/waitedMs/visibilityState` + chromeService.ts `requestXvBestOfRedPage(tabId, expectedPath)` + 실패 분기 `entryFiles: []`
+- [x] useBestOfRedRunner.ts: `ActionRunnerLog.page` 그룹 키·페이지 귀속 로그 + "브라우저 로드 검증 대기 중...(네트워크 모니터링)" 로그 + 검증 완료 로그(네트워크 안정·인플라이트·리소스·대기 시간·블록 수) + `ready=false` 2회 연속 시 `chrome.tabs.reload()` 후 재대기
+- [x] ActionRunnerView.tsx 전면 재작성: 페이지 등장순 그룹 + 전역 `__global__` 트리, ▾/▸ 토글 + 배지(오류>경고>완료) + 로그 수, 현재 페이지 자동 펼침·자동 스크롤, "전체 펼치기/접기" 버튼
+- [x] offscreen.ts: best-of-red `pathSegments[0]`일 때 `slice(1)`로 중복 세그먼트 제거 — `best-of-red/best-of-red/` 이중 폴더 버그 수정
+- [x] opera-plugin 7종 동기화(content/offscreen/types/chromeService/useBestOfRedRunner/ActionRunnerView/manifest, diff 0) + 양 플러그인 빌드 성공(각 56 모듈) + server `npx tsc --noEmit` 통과 + `npx eslint .` 플러그인 이슈 0건 + pm2 재시작(포트 9600 HTTP 200)
+- [x] 문서: R-00430 §5.5+§6, R-00420 §4.5, R-00440 §2.4+체크리스트, askLog 신규(ask-20260811001627), ask.md 초기화
+
+## 예정 작업 (ask-20260811001627)
+- [ ] 브라우저 실측: 확장 프로그램 리로드 후 0페이지부터 액션 실행 → 페이지 1+의 수집 건수가 **전체(≈27건)**로 나오는지, "브라우저 로드 검증 대기 중" 로그(네트워크 안정·인플라이트·리소스·대기 시간)와 **페이지별 트리 로그 UI**(현재 페이지 자동 펼침·자동 스크롤·배지)가 정상 동작하는지, 미디어 저장 경로에 이중 폴더가 없는지 확인
 
 ## 완료된 작업 (ask-20260810225335)
 - [x] content.ts: `installNetworkActivityWatch()` 신규(XHR/fetch 패치로 인플라이트 추적) + `waitForXvBestOfRedPageReady()` 재작성(네트워크 안정+DOM 안정+이미지 완료 통합 폴링, 400ms, 20초 데드라인) + `collectXvideosMediaEntries()` 보강(title 폴백·data-video 파싱·sfw/preview 우선순위) + INIT `totalPages = maxPage + 1`

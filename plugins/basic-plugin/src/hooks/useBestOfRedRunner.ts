@@ -24,6 +24,8 @@ export interface ActionRunnerLog {
   text: string;
   /** 로그 레벨 */
   level: ActionRunnerLogLevel;
+  /** 로그가 속한 페이지 인덱스 (전역 로그는 null, 트리 그룹 키로 사용) */
+  page: number | null;
 }
 
 /** 액션 실행기 상태 구분자 */
@@ -35,7 +37,7 @@ export type ActionRunnerStatus =
   | "stopped"
   | "error";
 
-/** best-of-red 실행 완료 요약 구조체 (완료 배너 표시용) */
+/** xvideos 페이징 액션 실행 완료 요약 구조체 (완료 배너 표시용) */
 export interface XvBestOfRedRunSummary {
   /** 성공 처리 페이지 수 */
   okPages: number;
@@ -63,20 +65,23 @@ const COLLECT_RETRY_DELAY_MS = 1000;
 const PAGE_BREATH_DELAY_MS = 600;
 
 /**
- * best-of-red 액션 실행기 상태 훅입니다.
+ * xvideos 페이징 액션 실행기 상태 훅입니다.
  * 대상 탭을 0페이지(베이스)부터 maxPage까지 전체 순회하며 페이지별로
- * 브라우저 로딩 완료 검증 → 비디오 블록 수집(재시도 포함) → 미디어 실제
- * 다운로드(썸네일+프리뷰 mp4 저장 ACK 확인) → JSON 저장(서버 ACK 확인)을
- * 순차 수행하고 진행 로그를 콘솔 형태로 기록합니다. (무작위 이동 없음, 순차 +1씩)
+ * 브라우저 로딩 완료 검증(기대 URL 일치 + 네트워크 안정 + DOM 안정 + 강제
+ * 렌더링) → 비디오 블록 수집(재시도/연속 실패 시 탭 새로고침 포함) → 미디어
+ * 실제 다운로드(썸네일+프리뷰 mp4 저장 ACK 확인) → JSON 저장(서버 ACK 확인)을
+ * 순차 수행하고 진행 로그를 페이지별로 기록합니다. (무작위 이동 없음, 순차 +1씩)
  *
  * 안정 우선 정책: 페이지당 실제 물리 파일 저장(미디어/JSON)이 확인된 뒤에만
  * 다음 페이지로 이동하며, 각 단계 실패는 개별 페이지 실패로 집계되어
- * 완료 배너에 보고됩니다.
+ * 완료 배너에 보고됩니다. 수집 시 콘텐츠 스크립트가 브라우저의 네트워크
+ * 상태(인-플라이트 요청/리소스 수)를 모니터링한 결과를 로그로 노출합니다.
  *
  * 동작 흐름:
  *   1. INIT: 페이지네이션에서 총 페이지 수 감지 (totalPages = maxPage + 1)
  *   2. 페이지 이동: chrome.tabs.update + onUpdated(complete) 대기
- *   3. 수집: 콘텐츠 스크립트가 이미지 로드 완료까지 검증한 뒤 메타 수집 (재시도)
+ *   3. 수집: 콘텐츠 스크립트가 기대 URL/네트워크/DOM 안정을 검증한 뒤 메타 수집
+ *      (재시도, 로드 검증 2회 연속 실패 시 탭 새로고침)
  *   4. 미디어 다운로드: FETCH_PAGE_MEDIA_BUNDLES → 엔트리별 3자산 실제 저장 ACK 확인
  *   5. JSON 저장: CRAWL_PARTIAL(requestId) 패킷 → CRAWL_PARTIAL_SAVED ACK(실제 파일 경로) 확인
  */
@@ -103,14 +108,21 @@ export function useBestOfRedRunner() {
    *
    * @param text - 로그 메시지 본문
    * @param level - 로그 레벨
+   * @param page - 로그가 속한 페이지 인덱스 (전역 로그는 생략)
    */
-  const addLog = useCallback((text: string, level: ActionRunnerLogLevel = "info") => {
-    logSeq.current += 1;
-    setLogs((prev) => {
-      const next = [...prev, { id: `action_log_${logSeq.current}`, text, level }];
-      return next.length > 300 ? next.slice(next.length - 300) : next;
-    });
-  }, []);
+  const addLog = useCallback(
+    (text: string, level: ActionRunnerLogLevel = "info", page: number | null = null) => {
+      logSeq.current += 1;
+      setLogs((prev) => {
+        const next = [
+          ...prev,
+          { id: `action_log_${logSeq.current}`, text, level, page },
+        ];
+        return next.length > 300 ? next.slice(next.length - 300) : next;
+      });
+    },
+    [],
+  );
 
   /** 실행기 열릴 때 로그/상태 초기화 */
   useEffect(() => {
@@ -127,10 +139,10 @@ export function useBestOfRedRunner() {
   }, []);
 
   /**
-   * best-of-red 액션 실행을 시작합니다.
+   * xvideos 페이징 액션 실행을 시작합니다.
    * 초기 정보 조회 → 0..maxPage 전체 순회(이동→수집→미디어 다운로드→JSON 저장) 루프를 수행합니다.
    *
-   * @param tabId - 대상 xvideos best-of-red 탭 ID
+   * @param tabId - 대상 xvideos 페이징 탭 ID
    * @returns Promise<void>
    */
   const start = useCallback(
@@ -146,11 +158,11 @@ export function useBestOfRedRunner() {
       try {
         // 1) 초기 정보 조회 (총 페이지 수 감지)
         setStatus("init");
-        addLog("best-of-red 초기 정보를 조회합니다... (페이지네이션 감지)", "info");
+        addLog("xvideos 페이징 초기 정보를 조회합니다... (페이지네이션 감지)", "info");
         const init = await requestXvBestOfRedInit(tabId);
         if (!init.success || !init.data) {
           setStatus("error");
-          addLog(init.message || "best-of-red 초기 정보 조회에 실패했습니다.", "error");
+          addLog(init.message || "xvideos 페이징 초기 정보 조회에 실패했습니다.", "error");
           return;
         }
         setInitInfo(init.data);
@@ -195,6 +207,7 @@ export function useBestOfRedRunner() {
             addLog(
               `[${step + 1}/${totalPages}] ${page}페이지 이동 중... ${targetPath}`,
               "info",
+              page,
             );
             await chrome.tabs
               .update(tabId, { url: origin + targetPath })
@@ -205,9 +218,14 @@ export function useBestOfRedRunner() {
                 ? `[${step + 1}/${totalPages}] 브라우저 로딩 완료: ${targetPath}`
                 : `[${step + 1}/${totalPages}] 로딩 완료 대기 시간 초과: ${targetPath}`,
               loaded ? "success" : "warning",
+              page,
             );
           } else {
-            addLog(`[${step + 1}/${totalPages}] 이미 ${targetPath} 페이지에 있습니다.`, "info");
+            addLog(
+              `[${step + 1}/${totalPages}] 이미 ${targetPath} 페이지에 있습니다.`,
+              "info",
+              page,
+            );
           }
           if (stopRequested.current) {
             setStatus("stopped");
@@ -215,44 +233,74 @@ export function useBestOfRedRunner() {
             return;
           }
 
-          // 3-2) 페이지 수집 (로드 검증 실패/0건 시 최대 재시도, 안정 우선)
+          // 3-2) 페이지 수집 (브라우저 로드 검증 + 재시도, 안정 우선)
+          // 기대 경로를 전달해 이전/새 페이지를 구분하고, 콘텐츠 스크립트의
+          // 네트워크·DOM 안정 검증(강제 렌더링 포함) 결과를 로그로 노출합니다.
           let pageData: XvBestOfRedPageData | null = null;
           let collectMessage = "";
+          let notReadyStreak = 0;
           for (let attempt = 1; attempt <= MAX_COLLECT_ATTEMPTS; attempt += 1) {
             addLog(
-              `[${step + 1}/${totalPages}] 데이터 수집 중... (시도 ${attempt}/${MAX_COLLECT_ATTEMPTS})`,
+              `[${step + 1}/${totalPages}] 브라우저 로드 검증 대기 중... (시도 ${attempt}/${MAX_COLLECT_ATTEMPTS}, 네트워크 모니터링)`,
               "info",
+              page,
             );
-            const collect = await requestXvBestOfRedPage(tabId);
+            const collect = await requestXvBestOfRedPage(tabId, targetPath);
             if (!collect.success || !collect.data) {
               collectMessage = collect.message || "수집 실패";
               addLog(
                 `[${step + 1}/${totalPages}] 수집 실패: ${collectMessage}`,
                 "warning",
+                page,
               );
             } else {
               pageData = collect.data;
               collectMessage = pageData.message;
               const entries = pageData.data || [];
+              // 브라우저 네트워크 상태 모니터링 결과 (인플라이트/리소스/안정 여부)
+              const net = pageData.network;
+              const netDesc = net
+                ? `네트워크 ${net.stable ? "안정" : "불안정"} (인플라이트 ${net.inflight} · 리소스 ${net.resources})`
+                : "네트워크 정보 없음";
+              const waitDesc =
+                pageData.waitedMs != null
+                  ? `대기 ${(pageData.waitedMs / 1000).toFixed(1)}s`
+                  : "";
               if (pageData.ready && entries.length > 0) {
                 addLog(
-                  `[${step + 1}/${totalPages}] 데이터 수집 완료: ${collectMessage} (${entries.length}건)`,
+                  `[${step + 1}/${totalPages}] 로드 검증 완료 · ${netDesc} · ${waitDesc} · 비디오 블록 ${entries.length}건 수집`,
                   "success",
+                  page,
                 );
                 break;
               }
               // 로드 검증은 끝났지만 항목이 0건일 수 있음 → 재시도로 안정 확인
-              if (entries.length === 0) {
+              if (pageData.ready && entries.length === 0) {
                 addLog(
-                  `[${step + 1}/${totalPages}] 수집 항목이 0건입니다. 재시도합니다. (${collectMessage})`,
+                  `[${step + 1}/${totalPages}] 로드 검증 완료지만 수집 항목 0건 · ${netDesc} · ${waitDesc} (재시도)`,
                   "warning",
+                  page,
                 );
               } else if (!pageData.ready) {
                 addLog(
-                  `[${step + 1}/${totalPages}] 로드 검증이 완료되지 않았습니다. 재시도합니다.`,
+                  `[${step + 1}/${totalPages}] 로드 검증 실패: ${pageData.message} · ${netDesc} · ${waitDesc}`,
                   "warning",
+                  page,
                 );
+                notReadyStreak += 1;
               }
+            }
+
+            // 로드 검증이 2회 연속 실패하면 탭을 새로고침해 렌더 상태를 재시작합니다.
+            if (notReadyStreak >= 2 && attempt < MAX_COLLECT_ATTEMPTS) {
+              addLog(
+                `[${step + 1}/${totalPages}] 로드 검증 연속 실패로 탭 새로고침 후 재대기합니다.`,
+                "warning",
+                page,
+              );
+              await chrome.tabs.reload(tabId).catch(() => null);
+              await waitForTabComplete(tabId, targetPath, () => stopRequested.current);
+              notReadyStreak = 0;
             }
             if (attempt < MAX_COLLECT_ATTEMPTS) {
               await sleep(COLLECT_RETRY_DELAY_MS);
@@ -271,6 +319,7 @@ export function useBestOfRedRunner() {
             addLog(
               `[${step + 1}/${totalPages}] ${page}페이지 수집 최종 실패: ${collectMessage}`,
               "error",
+              page,
             );
             continue;
           }
@@ -282,11 +331,14 @@ export function useBestOfRedRunner() {
             addLog(
               `[${step + 1}/${totalPages}] 미디어 ${entries.length}건 다운로드·저장 중... (동시성 3 제한)`,
               "info",
+              page,
             );
             const media = await requestFetchPageMediaBundles({
               page,
               entries,
               pathSegments: segments,
+              // 실제 도메인(xvideos.com/xvideos.red) 기준 저장 폴더 산출용
+              pageUrl: pageData.url,
             });
             mediaEntryFiles = media.entryFiles || [];
             savedMediaCount += media.savedCount;
@@ -294,6 +346,7 @@ export function useBestOfRedRunner() {
             addLog(
               `[${step + 1}/${totalPages}] 미디어 저장 완료: ${media.savedCount}건 성공 / ${media.failedCount}건 실패`,
               media.failedCount === 0 ? "success" : "warning",
+              page,
             );
             if (media.failedCount > 0) pageFailed = true;
             if (stopRequested.current) {
@@ -305,6 +358,7 @@ export function useBestOfRedRunner() {
             addLog(
               `[${step + 1}/${totalPages}] 수집 항목이 0건이라 미디어 저장을 건너뜁니다.`,
               "warning",
+              page,
             );
           }
 
@@ -330,11 +384,13 @@ export function useBestOfRedRunner() {
             addLog(
               `[${step + 1}/${totalPages}] JSON 서버 저장 완료: ${segments.join("/")}/${fileName} (${entries.length}건)`,
               "success",
+              page,
             );
             if (sendRes.savedFilePath) {
               addLog(
                 `[${step + 1}/${totalPages}] 실제 저장 파일: ${sendRes.savedFilePath} (${sendRes.fileSize ?? 0} bytes)`,
                 "info",
+                page,
               );
             }
           } else {
@@ -342,6 +398,7 @@ export function useBestOfRedRunner() {
             addLog(
               `[${step + 1}/${totalPages}] JSON 서버 저장 실패: ${sendRes.message}`,
               "error",
+              page,
             );
           }
 
@@ -394,8 +451,8 @@ export function useBestOfRedRunner() {
 }
 
 /**
- * best-of-red 페이지 인덱스에 대응하는 이동 경로를 생성합니다.
- * 0은 베이스 경로(예: /best-of-red/2026-06), N은 베이스/N(예: /best-of-red/2026-06/16)입니다.
+ * xvideos 페이징 페이지 인덱스에 대응하는 이동 경로를 생성합니다.
+ * 0은 베이스 경로(예: /best/2026-03), N은 베이스/N(예: /best/2026-03/16)입니다.
  *
  * @param basePath 베이스 경로 (후행 슬래시 없음)
  * @param pageIndex 이동할 페이지 인덱스
@@ -455,7 +512,7 @@ function waitForTabComplete(
 
     const listener = (
       id: number,
-      changeInfo: chrome.tabs.TabChangeInfo,
+      changeInfo: { status?: string },
       tab: chrome.tabs.Tab,
     ) => {
       if (id !== tabId || changeInfo.status !== "complete") return;

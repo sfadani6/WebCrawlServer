@@ -2,6 +2,106 @@
 
 ---
 
+## 2026-08-11 | xvideos.com + xvideos.red 이중 도메인 지원 — "xvideos 페이징 액션" 화면 문구 + URL 분석 기반 경로 생성
+
+### 요청
+- 액션 실행 문구가 `xvideos.com`만 표시되는데 **`xvideos.red`도 함께 지원**할 것.
+- 실행 버튼 문구를 `best-of-red 자동 이동` → **`[xvideos 페이징 액션]`**로 변경.
+- `https://www.xvideos.com/best/2026-03`에서 베이스 경로가 `/best-of-red/2026-07`로 잡히는 문제 → **하드코딩 기본값이 아닌 URL 분석**으로 `best/2026-03` 저장 디렉토리 생성.
+- `https://www.xvideos.red/` 도메인도 지원.
+
+### 처리 내용
+- content.ts: 범용 정규식(`^/([^/]+)/(\d{4}-\d{2})(?:/(\d+))?/?$`) + `isXvideosHost()` 도메인 가드, 하드코딩 `best-of-red` 제거.
+- offscreen.ts: `pathSegments`를 `[세그먼트, 월, 페이지]`로 해석·첫 세그먼트를 category로 분리, 번들에 `pageUrl` 포함 → `images/<도메인>/<세그먼트>/<월>/<N>/` 저장(이중 폴더 없음).
+- chromeService/useBestOfRedRunner/usePopupState/actionRunner: `pageUrl` 전달 + `xvideos.com`/`xvideos.red` 이중 도메인 탭 탐색.
+- BasicTab/ActionRunnerView: 액션 카드 `xvideos.com · xvideos.red` + 버튼 `xvideos 페이징 액션` + 저장 루트 표기 갱신. 내부 식별자는 개명하지 않음(확정).
+- 검증: tsc basic/opera 통과, 빌드 56 모듈×2 성공, ESLint 신규 오류 0건.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/{content.ts,offscreen.ts,actionRunner.tsx}` 및 `components/ActionRunnerView.tsx`·`components/tabs/BasicTab.tsx`·`hooks/useBestOfRedRunner.ts`·`hooks/usePopupState.ts`·`services/chromeService.ts`·`types/index.ts`
+- `plugins/opera-plugin/src/` 동일 8종(동기화)
+- `docs/rule/R-00430` §5.5/§6, `R-00420` §4.5, `R-00440` §2.4/§5, `R-00480` §3.1, `R-00208` §2.2/§2.3/§3.1/§5
+- `docs/askLogs/ask-20260811030252.md`(신규), `docs/todo.md`, `docs/ask.md`
+
+### 검증 결과
+- `node node_modules/typescript/bin/tsc --noEmit -p ...`(basic/opera) 통과, `npm run build` 56 모듈×2 성공, ESLint 신규 문제 0건.
+- (보류) 브라우저 실측 — URL 분석 경로 표시·이중 폴더 미발생·xvideos.red 탭 탐색은 사용자 브라우저에서 수행.
+
+### 보류 항목
+- 브라우저 실측: `best/2026-03` 베이스 경로 표시, `images/<도메인>/<세그먼트>/<월>/<N>/` 저장, xvideos.red 활성화·탭 탐색.
+
+---
+
+## 2026-08-11 | 오페라 플러그인 `sidePanel` 퍼미션 오류 재발 수정 — `sidebar_action` manifest 회귀 복구 + 재발 방지 규정
+
+### 요청
+- 오페라 브라우저에서 `Permission 'sidePanel' is unknown` 퍼미션 오류 발생.
+- (사용자가 받은 AI 제안) `sidePanel` 대신 `sidebar` 퍼미션을 쓰라는 문구였으나 **부정확** — Opera 공식 권한 목록에 `sidebar` 퍼미션은 존재하지 않으며, 사이드바는 별도 권한 없이 `sidebar_action` 키(`default_panel` 필수)로 동작.
+
+### 원인
+- ask-20260809100542에서 오페라 전용 manifest로 정상화했으나, 이후 동기화에서 `basic-plugin` manifest를 **통째로 복사**하며 `sidePanel` 퍼미션·`side_panel` 키가 회귀.
+
+### 완료된 작업 목록
+- `plugins/opera-plugin/public/manifest.json`: `sidePanel` permission 제거, `side_panel` → `sidebar_action`(default_title/default_panel/default_icon), name/description 오페라 문구 복구, `run_at: document_start` 유지.
+- `background.ts`: 변경 없음(옵셔널 가드 유지).
+- 검증: opera-plugin 빌드 성공(56 모듈) + `dist/manifest.json` 회귀 확인(`sidebar_action` 존재, `sidePanel`/`side_panel` 부재).
+- 문서: R-00460 §6.4 재발 방지 규정 신설, askLog 신규(ask-20260811011205), ask.md 초기화.
+
+### 변경된 파일
+- `plugins/opera-plugin/public/manifest.json`
+- `docs/rule/R-00460 plugin-manifest-permissions.md`
+- `docs/askLogs/ask-20260811011205.md`(신규), `docs/todo.md`, `docs/ask.md`
+
+### 검증 결과
+- `npm run build`(opera-plugin, 56 모듈) 성공, `dist/manifest.json`에서 회귀 필드 부재 확인.
+- (보류) 오페라 `opera://extensions` 실측 — dist 로드 오류 미발생·사이드바 표시 확인은 사용자 브라우저에서 수행.
+
+### 보류 항목
+- 오페라 실측: `dist` 로드 시 퍼미션 오류 미발생, 툴바/사이드바 아이콘 클릭 시 `sidepanel.html` 표시.
+
+---
+
+## 2026-08-11 | best-of-red 수집 정확도 재설계 — 기대 URL 검증 + 강제 렌더링(스크롤) + 네트워크 상태 모니터링 + 페이지별 트리 로그 UI
+
+### 요청
+- 페이지당 기본 28건 수집이어야 하는데 **12건만 수집**되는 문제 → 이전/새 페이지 구분 실패 + **브라우저 로드 완료 미검증**으로 진단.
+- HTML만 분석해도 27~8건은 나오며, `데이터 수집 중... (시도 2/3)`은 **로드 완료 대기 로직 부재**가 원인.
+- 브라우저 해당 탭의 **브라우저 상태 검증**과 **네트워크 상태 모니터링**으로 페이지 분석·수집을 수행할 것.
+- 팝업 진행 표시를 **페이지별 트리 구조**(1페이지/2페이지... ul 그룹)로 **펼치고 접을 수 있게** 변경할 것.
+
+### 확정된 상세 규격
+- **기대 URL 검증**: `waitForXvBestOfRedPageReady(expectedPath)`가 이동 후 경로 일치를 8초 폴링, 불일치 시 `ready:false`+사유.
+- **강제 렌더링(비침입적 강제 스크롤)**: lazy→eager·data-src→src 복사 + 2초 간격 재스크롤(끝 도달 시 맨 위 복귀)로 백그라운드 탭에서도 화면 밖 블록 렌더 유도.
+- **네트워크 상태 모니터링**: XHR `send()`+1/`loadend`-1(open 누수 제거) + `run_at: document_start`, 인플라이트 0 + 리소스 3연속 동일.
+- **이미지 로드 불요**: 완료 판정에서 썸네일 로딩 제거(URL은 HTML 속성 추출, 다운로드는 오프스크린 fetch).
+- **트리 로그 UI**: 페이지 번호 그룹 + 전역 그룹, 현재 페이지 자동 펼침·자동 스크롤, 배지(오류>경고>완료) + 로그 수, 전체 펼치기/접기.
+- **이중 폴더 제거**: best-of-red `pathSegments[0]` 시 `slice(1)` → `images/common/best-of-red/<월>/<N>/`.
+
+### 완료된 작업 목록
+- `plugins/basic-plugin/src/content.ts`: 네트워크 감시 send 기반 재작성, `waitForXvBestOfRedPageReady(expectedPath)`(기대 URL+강제 렌더링+DOM/네트워크 안정, 이미지 조건 제거, 백그라운드 보정), `resolveImageSource()`+`isPlaceholderUrl()` 재작성.
+- `plugins/basic-plugin/src/types/index.ts`: `network`/`waitedMs`/`visibilityState` 추가. `chromeService.ts`: `requestXvBestOfRedPage(tabId, expectedPath)`.
+- `plugins/basic-plugin/src/hooks/useBestOfRedRunner.ts`: `ActionRunnerLog.page` 그룹 키 + 로드 검증 대기/완료(네트워크 상태) 로그 + `ready=false` 2회 연속 시 탭 reload.
+- `plugins/basic-plugin/src/components/ActionRunnerView.tsx`: 페이지별 트리 로그 UI 전면 재작성(자동 펼침·자동 스크롤·배지·전체 토글).
+- `plugins/basic-plugin/src/offscreen.ts`: best-of-red 이중 폴더(`best-of-red/best-of-red/`) 중복 세그먼트 `slice(1)` 제거.
+- `plugins/basic-plugin/public/manifest.json` + opera: content_scripts `run_at: "document_start"`.
+- opera-plugin 7종 동기화 + 양 플러그인 빌드 성공(각 56 모듈) + server tsc 통과 + eslint 신규 문제 0건 + pm2 재시작(포트 9600 HTTP 200).
+- 문서: R-00430 §5.5+§6, R-00420 §4.5, R-00440 §2.4+체크리스트, askLog 신규(ask-20260811001627), ask.md 초기화.
+
+### 변경된 파일
+- `plugins/basic-plugin/src/content.ts`, `plugins/basic-plugin/src/types/index.ts`, `plugins/basic-plugin/src/services/chromeService.ts`, `plugins/basic-plugin/src/hooks/useBestOfRedRunner.ts`, `plugins/basic-plugin/src/components/ActionRunnerView.tsx`, `plugins/basic-plugin/src/offscreen.ts`, `plugins/basic-plugin/public/manifest.json`
+- `plugins/opera-plugin/` 동일 7종
+- `docs/rule/R-00430 plugin-crawling.md`, `docs/rule/R-00420 plugin-communication.md`, `docs/rule/R-00440 plugin-ui-ux.md`
+- `docs/askLogs/ask-20260811001627.md`(신규), `docs/todo.md`, `docs/ask.md`
+
+### 검증 결과
+- 양 플러그인 `npm run build` 성공(각 56 모듈), server `npx tsc --noEmit` 통과 → pm2 재시작(포트 9600 HTTP 200).
+- `npx eslint .` 플러그인 변경 파일 신규 이슈 0건, opera-plugin 동기화 diff 0 확인.
+
+### 보류 항목
+- 브라우저 실측: 페이지 1+ 전체(≈27건) 수집, 로드 검증 대기 로그, 페이지별 트리 UI 동작, 이중 폴더 미발생.
+
+---
+
 ## 2026-08-10 | best-of-red 안정 우선 재설계 — 0페이지부터 전체 순회 + 실제 미디어 다운로드 + 저장 ACK 확인 후 이동
 
 ### 요청

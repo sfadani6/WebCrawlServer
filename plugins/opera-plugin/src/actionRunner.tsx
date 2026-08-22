@@ -10,7 +10,7 @@ import { ActionRunnerView } from "./components/ActionRunnerView";
 /**
  * 액션 실행기 전용 팝업 창 엔트리 컴포넌트입니다.
  * 베이스 탭 "액션 실행" 섹션의 액션 모듈이 전달한 ?module=&tabId= 쿼리로
- * 대상 탭을 식별하고, 해당 액션(현재 best-of-red 자동 이동)을 전용 창에서 독립 수행합니다.
+ * 대상 탭을 식별하고, 해당 액션(현재 xvideos 페이징 액션)을 전용 창에서 독립 수행합니다.
  * 진행 로그(이동 중/브라우저 로딩 완료/데이터 수집/서버 저장)를 콘솔 형태로 출력합니다.
  *
  * 지원 모듈: module=best-of-red
@@ -42,12 +42,15 @@ export default function ActionRunner() {
         // 탭이 닫혔거나 접근 불가 — URL 기반 폴백 진행
       }
 
-      // 2) 폴백: 열려 있는 best-of-red 탭 검색
+      // 2) 폴백: 열려 있는 xvideos.com/xvideos.red 페이징 탭 검색
       try {
-        const tabs = await chrome.tabs.query({ url: "*://*.xvideos.com/*" });
+        const tabs = await chrome.tabs.query({
+          url: ["*://*.xvideos.com/*", "*://*.xvideos.red/*"],
+        });
         const found =
-          tabs.find((t) => t.url && t.url.includes("/best-of-red/")) ||
-          tabs.find((t) => typeof t.id === "number");
+          tabs.find((t) =>
+            t.url ? /\/(?:[^/]+)\/\d{4}-\d{2}/.test(t.url) : false,
+          ) || tabs.find((t) => typeof t.id === "number");
         if (found && typeof found.id === "number") {
           setTabId(found.id);
           return;
@@ -58,7 +61,7 @@ export default function ActionRunner() {
 
       if (!cancelled) {
         setInitError(
-          "xvideos.com best-of-red 페이지 탭을 찾을 수 없습니다. best-of-red 페이지를 연 상태에서 액션을 다시 실행해 주세요.",
+          "xvideos 페이징 페이지 탭을 찾을 수 없습니다. xvideos.com 또는 xvideos.red 페이징 페이지(예: /best/2026-03)를 연 상태에서 액션을 다시 실행해 주세요.",
         );
       }
     };

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md"
+  ],
+  "logLevel": "INFO",
+  "share": "disabled",
+  "permission": {
+    "edit": "allow",
+    "bash": {
+      "*": "ask",
+
+      "git *": "allow",
+      "node *": "allow",
+      "npm *": "allow",
+      "npx *": "allow",
+      "tsc *": "allow",
+      "pnpm *": "allow",
+      "powershell *": "allow",
+      "pwsh *": "allow",
+
+      "cd *": "allow",
+      "dir *": "allow",
+      "ls *": "allow",
+
+      "Get-*": "allow",
+      "Get-* *": "allow",
+      "Select-*": "allow",
+      "Select-* *": "allow",
+      "Where-*": "allow",
+      "Where-* *": "allow",
+      "Sort-*": "allow",
+      "Sort-* *": "allow",
+      "Group-*": "allow",
+      "Group-* *": "allow",
+      "Measure-*": "allow",
+      "Measure-* *": "allow",
+      "Out-*": "allow",
+      "Out-* *": "allow",
+      "Format-*": "allow",
+      "Format-* *": "allow",
+
+      "*; *": "allow",
+
+      "Set-*": "ask",
+      "New-*": "ask",
+      "Start-*": "ask",
+      "Stop-*": "ask",
+
+      "rm *": "deny",
+      "rmdir *": "deny",
+      "del *": "deny",
+      "erase *": "deny",
+      "Remove-*": "deny",
+      "ri *": "deny",
+      "rd *": "deny",
+
+      "format *": "deny",
+      "diskpart *": "deny",
+      "Clear-*": "deny",
+      "git push * --force*": "deny"
+    },
+    "webfetch": "allow",
+    "external_directory": {
+      "*": "ask",
+      "*/AppData/Local/Temp/opencode/*": "allow",
+      "./.opencode/data/opencode/tool-output/*": "allow",
+      "*/.claude/skills/*": "allow"
+    }
+  },
+  "autoupdate": false
+}

@@ -32,6 +32,15 @@ server/storage/
 # Environment files
 .env
 .env.*
+!.env.example
+
+# OpenCode 프로젝트 실행 로그
+.opencode/logs/
+.opencode/data/
+.opencode/cache/
+.opencode/state/
+# 런처 자동 업데이트 확인 캐시(런타임 상태)
+.opencode/update-check.json
 
 # Editor / IDE
 .vscode/

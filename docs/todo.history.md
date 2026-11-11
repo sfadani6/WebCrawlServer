@@ -2,6 +2,24 @@
 
 ---
 
+## 2026-11-05 | opencode 문서·플러그인 정합
+
+### 완료 작업
+- `docs/todo.md`에 후속 작업(로그 로테이션·과거 로그 보관 기준·tips 인덱스·GitHub 보류)과 참고 링크를 명시해 문서 공백을 해소했다.
+- `docs/tips/2026-11-05-opencode-run-and-port.md`를 신규 작성해 포트 39739·런처·상주 서버 인증·로그 규격을 기록했다.
+- 로그 플러그인을 `worklog.ts`로 통일하고 구 `session-logger.ts`를 `session-logger.ts.bak`으로 비활성화했다(과거 날짜별 로그는 유지).
+- `.opencode/agent/lm-dev.md`의 `bash: ask`를 제거해 상위 `opencode.json` 허용 목록을 상속하도록 수정했다.
+
+### 변경 파일
+- `docs/todo.md`, `docs/tips/2026-11-05-opencode-run-and-port.md`(신규), `docs/askLogs/ask-20261105141214.md`(신규), `docs/CHANGELOG/opencode-docs-plugin-alignment-20261105141214.md`(신규)
+- `.opencode/plugin/worklog.ts`(신규), `.opencode/plugin/session-logger.ts.bak`(이동), `.opencode/agent/lm-dev.md`
+
+### 검증
+- `opencode.json` 파싱 OK, `debug agent lm-dev`에서 `*: ask` 1건(전역)만 존재.
+- `worklog.ts` `tsc --noEmit` 통과.
+
+---
+
 ## 2026-08-22 | 오페라 플러그인 UI/UX 개선 9건(A~I) 전체 실행 및 basic-plugin 동기화
 
 ### 요청

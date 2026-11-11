@@ -3,7 +3,6 @@ description: WebCrawlServer 프로젝트 전담 개발 에이전트
 mode: primary
 permission:
   edit: allow
-  bash: ask
   webfetch: deny
 ---
 
